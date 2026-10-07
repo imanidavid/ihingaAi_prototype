@@ -7,6 +7,9 @@ import {
   PlanAheadItem,
   RiskLevel,
   UserProfileSettings,
+  UserAccount,
+  CoopData,
+  CoopGroup,
   OfficerData,
   SectorOverviewItem,
   OfficerWarningDelivery,
@@ -21,6 +24,7 @@ import {
   SectorAcknowledgedItem,
   SectorWarningItem,
 } from '../types';
+import { INITIAL_USER_ACCOUNTS } from './rwandaAdminData';
 import heroImg from '../assets/images/musanze_terraced_hero_1790594273190.jpg';
 import officerHeroImg from '../assets/images/musanze_aerial_hero_1790767815128.jpg';
 import potatoImg from '../assets/images/irish_potato_crop_1790594286456.jpg';
@@ -139,9 +143,14 @@ export interface HorizonPackage {
 /**
  * RAINFALL FORECAST DATASETS CONSISTENT ACROSS HORIZONS:
  * - 10 Days: Daily 10 points (Sep 28 – Oct 07), Tue Sep 29 is peak 48 mm.
- * - This Month: 30 daily points summing up to exactly 210 mm ("210 mm total, above normal").
- * - Season: 6 monthly totals Sep–Feb: Sep 140 mm, Oct 210 mm, Nov 185 mm (Oct-Nov wettest), Dec 110 mm, Jan 65 mm, Feb 75 mm.
+ * - This Month: 30 daily points summing up to exactly 300 mm ("300 mm total").
+ * - Season: 6 monthly totals Sep–Feb: Sep 130 mm, Oct 240 mm, Nov 220 mm (Oct–Nov wettest), Dec 110 mm, Jan 45 mm, Feb 70 mm.
  */
+
+// District rainfall normal (flat seasonal average). Every "Normal" line and "vs normal" chip reads these.
+export const RAINFALL_NORMAL_MM_PER_DAY = 13;
+// Normal used on the season (monthly totals) chart.
+export const RAINFALL_NORMAL_MM_PER_MONTH_SEASON_CHART = 65;
 
 export const RAINFALL_10D: WeatherForecastDay[] = [
   { day: 'Mon', fullDate: 'Sep 28', rainfallMm: 12, temp: 22, humidity: 78 },
@@ -637,17 +646,41 @@ export const MUSANZE_SEASON_CALENDAR = {
 };
 
 // Initial user profile settings state
-export const INITIAL_USER_SETTINGS: UserProfileSettings = {
-  fullName: NOW.farmerFullName,
-  phone: '+250 788 123 412',
-  email: 'j.ndayisaba@musanzecoop.rw',
+/**
+ * Jean-Baptiste's sign-in account (`acc-farmer-jb` in rwandaAdminData.ts) is the ONE record
+ * of who he is. Profile settings are derived from an account, never seeded separately.
+ */
+export function userSettingsFromAccount(
+  account: UserAccount,
+  base: UserProfileSettings = DEFAULT_FARMER_SETTINGS
+): UserProfileSettings {
+  return {
+    ...base,
+    fullName: account.fullName,
+    phone: account.phone,
+    email: account.email || '',
+    preferredLanguage: account.preferredLanguage === 'en' ? 'English' : 'Kinyarwanda',
+    district: account.district || 'Musanze',
+    sector: account.farmerDetails?.sector || '',
+    cell: account.farmerDetails?.cell || '',
+    farmSizeHa: account.farmerDetails?.farmSizeHa ?? 0,
+    cropsGrown: account.farmerDetails?.cropsGrown || [],
+    cooperative: account.farmerDetails?.cooperative || 'None / Individual',
+  };
+}
+
+// Defaults for every farmer; the account fields are overwritten by userSettingsFromAccount.
+const DEFAULT_FARMER_SETTINGS: UserProfileSettings = {
+  fullName: '',
+  phone: '',
+  email: '',
   preferredLanguage: 'Kinyarwanda',
   district: 'Musanze',
-  sector: 'Kinigi',
-  cell: 'Bisoke',
-  farmSizeHa: 1.8,
-  cropsGrown: ['Irish Potato', 'Climbing Beans', 'Maize'],
-  cooperative: 'Musanze Potato Growers Cooperative',
+  sector: '',
+  cell: '',
+  farmSizeHa: 0,
+  cropsGrown: [],
+  cooperative: 'None / Individual',
   alertChannel: 'SMS',
   isSmsStopped: false,
   notifyEarlyWarnings: true,
@@ -656,6 +689,12 @@ export const INITIAL_USER_SETTINGS: UserProfileSettings = {
   notifyCoopMessages: true,
   messageLanguage: 'Kinyarwanda',
 };
+
+export const FARMER_DEMO_ACCOUNT_ID = 'acc-farmer-jb';
+
+export const INITIAL_USER_SETTINGS: UserProfileSettings = userSettingsFromAccount(
+  INITIAL_USER_ACCOUNTS.find((a) => a.id === FARMER_DEMO_ACCOUNT_ID)!
+);
 
 // All 30 Districts of Rwanda
 export const ALL_30_RWANDA_DISTRICTS = [
@@ -2143,93 +2182,126 @@ export function computeChannelSplit(total: number): { sms: number; voice: number
   return { sms, voice, inApp };
 }
 
-export const COOPERATIVE_DATA: {
-  cooperativeName: string;
-  totalMembers: number;
-  leader: {
-    name: string;
-    roleTitle: string;
-    phone: string;
-    initials: string;
+export const RISK_LEVEL_COLORS: Record<RiskLevel, string> = {
+  Low: '#3E8E55',
+  Watch: '#D9A032',
+  High: '#D9772F',
+  Critical: '#C93B3B',
+};
+
+const RISK_LEVEL_ORDER: RiskLevel[] = ['Low', 'Watch', 'High', 'Critical'];
+
+// 'DD/MM HH:MM' -> sortable number (all demo dates are in 2026)
+function issuedAtSortKey(issuedAt?: string): number {
+  const m = issuedAt?.match(/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
+  if (!m) return 0;
+  return Number(`${m[2]}${m[1]}${m[3]}${m[4]}`);
+}
+
+/**
+ * Cooperative groups with their active warnings computed from the CURRENT warnings state.
+ * Warning levels are never copied into cooperative data: a group shows every active warning
+ * that covers its sector, at the level the warning has in the store.
+ * Acknowledgement counts per warning are the only seeded part (members who replied);
+ * a warning issued during the demo starts at 0 acknowledged.
+ * "Not acknowledged" = members who have not acknowledged the group's latest active warning.
+ */
+export function computeCoopGroups(warnings: WarningItem[]): CoopGroup[] {
+  return COOPERATIVE_DATA.groups.map((g) => {
+    const active = warnings
+      .filter((w) => w.status === 'Active' && isWarningRelevantToFarmer(w, g.sector))
+      .sort((x, y) => issuedAtSortKey(y.issuedAt) - issuedAtSortKey(x.issuedAt));
+
+    const acknowledgement = active.map((w) => {
+      const level = w.level ?? w.severity;
+      const acknowledgedCount = g.acknowledgedByWarning[w.id] ?? 0;
+      return {
+        warningId: w.id,
+        warningTitle: w.title,
+        level,
+        dotColor: RISK_LEVEL_COLORS[level],
+        acknowledgedCount,
+        totalCount: g.membersCount,
+        pct: Math.round((acknowledgedCount / g.membersCount) * 100),
+      };
+    });
+
+    const latest = acknowledgement[0];
+    const unacknowledgedCount = latest ? latest.totalCount - latest.acknowledgedCount : 0;
+
+    return {
+      id: g.id,
+      name: g.name,
+      sector: g.sector,
+      membersCount: g.membersCount,
+      warnings: active.map((w) => ({ id: w.id, title: w.title, level: w.level ?? w.severity })),
+      acknowledgement,
+      reports7Days: g.reports7Days,
+      unacknowledgedWarningTitle: latest ? latest.warningTitle : null,
+      unacknowledgedCount,
+      unacknowledgedMembers: latest ? g.pendingMemberNames.slice(0, unacknowledgedCount) : [],
+    };
+  });
+}
+
+/** Cooperative-wide summary, computed from the groups (dashboard hero + KPIs). */
+export function computeCoopSummary(groups: CoopGroup[]) {
+  const totalMembers = groups.reduce((sum, g) => sum + g.membersCount, 0);
+  const groupsUnderWarning = groups.filter((g) => g.warnings.length > 0);
+  const membersUnderWarning = groupsUnderWarning.reduce((sum, g) => sum + g.membersCount, 0);
+  const activeWarningTitles = Array.from(
+    new Set(groups.flatMap((g) => g.warnings.map((w) => w.title)))
+  );
+  const highestLevel = groups
+    .flatMap((g) => g.warnings.map((w) => w.level))
+    .reduce<RiskLevel>(
+      (max, l) => (RISK_LEVEL_ORDER.indexOf(l) > RISK_LEVEL_ORDER.indexOf(max) ? l : max),
+      'Low'
+    );
+
+  // Acknowledgement of the rain warning across the groups it covers
+  const rainRows = groups.flatMap((g) =>
+    g.acknowledgement
+      .filter((a) => a.warningId === 'alert-rain')
+      .map((a) => ({ group: g, ack: a }))
+  );
+  const rainAcknowledged = rainRows.reduce((sum, r) => sum + r.ack.acknowledgedCount, 0);
+  const rainTotal = rainRows.reduce((sum, r) => sum + r.ack.totalCount, 0);
+
+  return {
+    totalMembers,
+    groupCount: groups.length,
+    groupSectors: groups.map((g) => g.sector),
+    membersUnderWarning,
+    groupsUnderWarning: groupsUnderWarning.map((g) => g.sector),
+    activeWarningTitles,
+    highestLevel,
+    rainAcknowledged,
+    rainTotal,
+    rainPct: rainTotal > 0 ? Math.round((rainAcknowledged / rainTotal) * 100) : null,
+    rainSectors: rainRows.map((r) => r.group.sector),
+    memberReports7d: groups.reduce((sum, g) => sum + g.reports7Days, 0),
   };
-  groups: {
-    id: string;
-    name: string;
-    sector: string;
-    membersCount: number;
-    warnings: { id: string; title: string; level: RiskLevel }[];
-    acknowledgement: {
-      warningTitle: string;
-      level: RiskLevel;
-      dotColor: string;
-      acknowledgedCount: number;
-      totalCount: number;
-      pct: number;
-    }[];
-    reports7Days: number;
-    unacknowledgedCount: number;
-    unacknowledgedMembers: string[];
-  }[];
-  kpis: {
-    members: number;
-    underActiveWarnings: number;
-    acknowledgedRainWarningPct: number;
-    memberReports7d: number;
-  };
-  actions: {
-    id: string;
-    description: string;
-    buttonLabel: string;
-    targetGroup: string;
-    prefillMessageEn: string;
-    prefillMessageRw: string;
-  }[];
-} = {
+}
+
+export const COOPERATIVE_DATA: CoopData = {
   cooperativeName: 'Musanze Potato Growers Cooperative',
-  totalMembers: 186,
   leader: {
     name: 'Aline Uwimana',
     roleTitle: 'Cooperative leader · Musanze Potato Growers',
     phone: '+250 788 000 034',
     initials: 'AU',
   },
-  kpis: {
-    members: 186,
-    underActiveWarnings: 186,
-    acknowledgedRainWarningPct: 63,
-    memberReports7d: 11,
-  },
+  // Member counts: Kinigi 82 + Busogo 54 + Muhoza 50 = 186. Jean-Baptiste is in Kinigi growers.
   groups: [
     {
       id: 'grp-kinigi',
       name: 'Kinigi growers',
       sector: 'Kinigi',
       membersCount: 82,
-      warnings: [
-        { id: 'alert-rain', title: 'Heavy Rain Influx', level: 'Watch' },
-        { id: 'alert-blight', title: 'Late Blight Threat', level: 'Watch' },
-      ],
-      acknowledgement: [
-        {
-          warningTitle: 'Heavy Rain Influx',
-          level: 'Watch',
-          dotColor: '#D9A032',
-          acknowledgedCount: 64,
-          totalCount: 82,
-          pct: 78,
-        },
-        {
-          warningTitle: 'Late Blight Threat',
-          level: 'Watch',
-          dotColor: '#D9A032',
-          acknowledgedCount: 50,
-          totalCount: 82,
-          pct: 61,
-        },
-      ],
+      acknowledgedByWarning: { 'alert-rain': 64, 'alert-blight': 50 },
       reports7Days: 6,
-      unacknowledgedCount: 18,
-      unacknowledgedMembers: [
+      pendingMemberNames: [
         'Emmanuel Habimana (Kaguhu)',
         'Faustin Nzeyimana (Bisoke)',
         'Daphrose Mukamana (Kaguhu)',
@@ -2238,7 +2310,6 @@ export const COOPERATIVE_DATA: {
         'Venuste Bizimana (Kaguhu)',
         'Speciose Nyiraharerimana (Nyonirima)',
         'Donat Hakizimana (Kaguhu)',
-        '+10 other members',
       ],
     },
     {
@@ -2246,28 +2317,14 @@ export const COOPERATIVE_DATA: {
       name: 'Busogo growers',
       sector: 'Busogo',
       membersCount: 54,
-      warnings: [
-        { id: 'alert-rain', title: 'Heavy Rain Influx', level: 'Watch' },
-      ],
-      acknowledgement: [
-        {
-          warningTitle: 'Heavy Rain Influx',
-          level: 'Watch',
-          dotColor: '#D9A032',
-          acknowledgedCount: 22,
-          totalCount: 54,
-          pct: 41,
-        },
-      ],
+      acknowledgedByWarning: { 'alert-rain': 22 },
       reports7Days: 3,
-      unacknowledgedCount: 32,
-      unacknowledgedMembers: [
+      pendingMemberNames: [
         'Innocent Nshimiyimana (Gisesero)',
         'Valens Munyaneza (Sahara)',
         'Esperance Nyirahabineza (Gisesero)',
         'Jean Damascene Manirakiza (Sahara)',
         'Beatrice Mukakarangwa (Gisesero)',
-        '+27 other members',
       ],
     },
     {
@@ -2275,27 +2332,13 @@ export const COOPERATIVE_DATA: {
       name: 'Muhoza growers',
       sector: 'Muhoza',
       membersCount: 50,
-      warnings: [
-        { id: 'alert-blight', title: 'Late Blight Threat', level: 'Watch' },
-      ],
-      acknowledgement: [
-        {
-          warningTitle: 'Late Blight Threat',
-          level: 'Watch',
-          dotColor: '#D9A032',
-          acknowledgedCount: 28,
-          totalCount: 50,
-          pct: 56,
-        },
-      ],
+      acknowledgedByWarning: { 'alert-blight': 28 },
       reports7Days: 2,
-      unacknowledgedCount: 22,
-      unacknowledgedMembers: [
+      pendingMemberNames: [
         'Therese Mukamugema (Kigombe)',
         'Theogene Bagirishya (Cyivugiza)',
         'Claudine Uwamahoro (Mpenge)',
         'Aloys Nkurunziza (Kigombe)',
-        '+18 other members',
       ],
     },
   ],

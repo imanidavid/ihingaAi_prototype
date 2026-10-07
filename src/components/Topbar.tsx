@@ -72,14 +72,14 @@ const FARMER_APP_VIEWS: {
   },
   {
     id: 'forecast',
-    title: 'Risk Forecast & Rainfall',
+    title: 'Risk forecast & rainfall',
     subtitle: '30-day rain series (300 mm total) and sector risk rankings',
     keywords: ['forecast', 'rainfall', 'precipitation', 'rain', '30d', '10d', 'season', 'sectors', 'weather'],
     icon: <CloudRain className="w-3.5 h-3.5 text-[#1F4A34]" />,
   },
   {
     id: 'warnings',
-    title: 'Early Warnings',
+    title: 'Early warnings',
     subtitle: 'Hazard alerts, downpour timing and required field precautions',
     keywords: ['warnings', 'alerts', 'hazards', 'severe', 'blight', 'downpour', 'threat', 'storm'],
     icon: <AlertTriangle className="w-3.5 h-3.5 text-[#D9772F]" />,
@@ -93,7 +93,7 @@ const FARMER_APP_VIEWS: {
   },
   {
     id: 'calendar',
-    title: 'Crop Calendar',
+    title: 'Crop calendar',
     subtitle: 'Planting and harvest windows, monthly soil moisture breakdown',
     keywords: ['calendar', 'planting', 'harvest', 'soil', 'moisture', 'season', 'months', 'september', 'october'],
     icon: <Calendar className="w-3.5 h-3.5 text-[#1F4A34]" />,
@@ -130,7 +130,7 @@ const OFFICER_APP_VIEWS: {
   },
   {
     id: 'forecast',
-    title: 'Risk Forecast',
+    title: 'Risk forecast',
     subtitle: 'Rainfall series and sector vulnerability rankings for Musanze',
     keywords: ['forecast', 'risk', 'rainfall', 'precipitation', 'rain', 'sectors', 'weather'],
     icon: <CloudRain className="w-3.5 h-3.5 text-[#1F4A34]" />,
@@ -209,14 +209,14 @@ const COOP_APP_VIEWS: {
   },
   {
     id: 'forecast',
-    title: 'Risk Forecast',
+    title: 'Risk forecast',
     subtitle: 'Rainfall series and sector vulnerability rankings for Musanze',
     keywords: ['forecast', 'risk', 'rainfall', 'precipitation', 'rain'],
     icon: <CloudRain className="w-3.5 h-3.5 text-[#1F4A34]" />,
   },
   {
     id: 'warnings',
-    title: 'Early Warnings',
+    title: 'Early warnings',
     subtitle: 'Active hazard warnings and member acknowledgement',
     keywords: ['warnings', 'alerts', 'delivery', 'hazards', 'blight', 'rain'],
     icon: <AlertTriangle className="w-3.5 h-3.5 text-[#D9772F]" />,
@@ -482,7 +482,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         { label: 'Busogo', query: 'busogo' },
         { label: 'Late Blight', query: 'late blight' },
         { label: 'Heavy Rain', query: 'heavy rain' },
-        { label: 'Risk Forecast', query: 'forecast' },
+        { label: 'Risk forecast', query: 'forecast' },
         { label: 'Observations', query: 'observations' },
       ]
     : [
@@ -490,8 +490,8 @@ export const Topbar: React.FC<TopbarProps> = ({
         { label: 'Heavy Rain', query: 'heavy rain' },
         { label: 'Irish Potato', query: 'potato' },
         { label: 'Kinigi Sector', query: 'kinigi' },
-        { label: 'Risk Forecast', query: 'forecast' },
-        { label: 'Crop Calendar', query: 'calendar' },
+        { label: 'Risk forecast', query: 'forecast' },
+        { label: 'Crop calendar', query: 'calendar' },
       ];
 
   const getSeverityChip = (severity?: string) => {

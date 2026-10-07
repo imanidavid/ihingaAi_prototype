@@ -7,6 +7,8 @@ Review target date: ~28/10/2026. Each task: follow the `ihinga-new-page` skill, 
 - [x] Officer role (dashboard, warnings, observations review, reports)
 - [x] Sign-in, two-step verification, session timeout, sign-up, verification, forgot password
 - [x] Cooperative leader — part 1 (dashboard, message composer, cross-role messages)
+- [x] Task A — Data integrity fixes (Jean-Baptiste single record, cooperative warning levels computed, rainfall normal in data, composer groups from data, sentence-case sidebar, staff id MUS-AO-4401, media manifest) — 07/10/2026
+- [ ] Task B — PillSelect + DatePicker, replace 17 native selects (folded into Task 9)
 - [ ] Task 1 — Cooperative leader part 2 (Module 11 + Module 8 sharing)
 - [ ] Task 2 — Admin: shell, dashboard, Users & access (Module 13, Module 2)
 - [ ] Task 3 — Admin: Security & audit (Module 14)
@@ -23,7 +25,8 @@ Review target date: ~28/10/2026. Each task: follow the `ihinga-new-page` skill, 
 Fixes on the cooperative dashboard:
 - Remove the invented "reduces fungicide cost by 32%" claim. Use: "A shared spraying schedule
   means members don't spray before rain and the cooperative's sprayers are used in turn."
-- "Under active warnings" KPI value in text primary colour, not amber.
+- ~~"Under active warnings" KPI value in text primary colour, not amber.~~ Done in Task A
+  (the KPI and the hero are now computed from the warnings state).
 
 Members & groups page — tabs Members · Groups · Performance · Directory
 - Members: table of all 186 members (10/page): name, group, masked phone, role, crops,

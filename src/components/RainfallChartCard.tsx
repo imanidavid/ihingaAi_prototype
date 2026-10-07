@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { RAINFALL_10D, RAINFALL_MONTH_30D, MUSANZE_RECORD } from '../data/musanzeData';
+import {
+  RAINFALL_10D,
+  RAINFALL_MONTH_30D,
+  MUSANZE_RECORD,
+  RAINFALL_NORMAL_MM_PER_DAY,
+} from '../data/musanzeData';
 
 type TimeRange = '7D' | '10D' | '30D';
 
@@ -43,8 +48,8 @@ export const RainfallChartCard: React.FC = () => {
 
   const peakPoint = points.find((p) => p.data.isPeak) || points[1];
 
-  // Normal line: flat seasonal average of 13 mm per day (never follows forecast shape per FIX 6)
-  const normalMm = 13;
+  // Normal line: flat seasonal average per day from musanzeData (never follows forecast shape per FIX 6)
+  const normalMm = RAINFALL_NORMAL_MM_PER_DAY;
   const normalY = paddingTop + chartHeight - (normalMm / maxRain) * chartHeight;
 
   // Comparison chip computed from data shown: (forecast total ÷ normal total for selected range − 1)
@@ -69,7 +74,7 @@ export const RainfallChartCard: React.FC = () => {
             </span>
             <span className="flex items-center gap-1">
               <span className="w-3 border-b border-dashed border-[#5B665E] inline-block" />
-              <span>Normal (13 mm)</span>
+              <span>Normal ({normalMm} mm)</span>
             </span>
           </div>
         </div>
@@ -134,7 +139,7 @@ export const RainfallChartCard: React.FC = () => {
           {/* Soft gradient area fill */}
           <path d={areaPath} fill="url(#rainGradient)" />
 
-          {/* Dashed muted line = Normal seasonal average (13 mm flat per FIX 6) */}
+          {/* Dashed muted line = Normal seasonal average (flat per FIX 6) */}
           <line
             x1={paddingX}
             y1={normalY}
@@ -270,7 +275,7 @@ export const RainfallChartCard: React.FC = () => {
             <div className="text-[#E4ECDB] flex items-center gap-2">
               <span>Rainfall: {points[hoveredIndex].data.rainfallMm} mm</span>
               <span>·</span>
-              <span>Normal: 13 mm</span>
+              <span>Normal: {normalMm} mm</span>
               <span>·</span>
               <span>{points[hoveredIndex].data.temp}°C</span>
             </div>

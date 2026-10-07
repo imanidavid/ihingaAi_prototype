@@ -675,7 +675,7 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
               {activeTab === 'forecast' && (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-[17px] font-semibold text-[#17271D]">Risk Forecast</h3>
+                    <h3 className="text-[17px] font-semibold text-[#17271D]">Risk forecast</h3>
                     <p className="text-[11px] text-[#5B665E]">{MUSANZE_RECORD.districtName} · {MUSANZE_RECORD.season}</p>
                   </div>
 
@@ -1038,7 +1038,7 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
               {activeTab === 'warnings' && (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-[17px] font-semibold text-[#17271D]">Early Warnings</h3>
+                    <h3 className="text-[17px] font-semibold text-[#17271D]">Early warnings</h3>
                     <p className="text-[11px] text-[#5B665E]">
                       {MUSANZE_RECORD.activeWarningsCount} active alerts require field precautions
                     </p>

@@ -17,6 +17,7 @@ import {
   MUSANZE_RECORD,
   MUSANZE_SECTORS_CELLS,
 } from '../data/musanzeData';
+import { COOPERATIVE_OPTIONS } from '../data/rwandaAdminData';
 
 interface SettingsViewProps {
   settings: UserProfileSettings;
@@ -411,16 +412,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   onChange={(e) => markChanged({ ...formData, cooperative: e.target.value })}
                   className="w-full h-11 px-4 pr-10 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34] appearance-none"
                 >
-                  <option value="Musanze Potato Growers Cooperative">
-                    Musanze Potato Growers Cooperative
-                  </option>
-                  <option value="Kinigi Bean Farmers Union">
-                    Kinigi Bean Farmers Union
-                  </option>
-                  <option value="Virunga Hillside Terrace Cooperative">
-                    Virunga Hillside Terrace Cooperative
-                  </option>
-                  <option value="None">None (Independent Farmer)</option>
+                  {COOPERATIVE_OPTIONS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown className="w-4 h-4 text-[#5B665E] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>

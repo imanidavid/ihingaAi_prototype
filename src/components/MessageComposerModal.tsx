@@ -22,12 +22,13 @@ interface MessageComposerModalProps {
   prefillRw?: string;
 }
 
-const GROUPS_LIST = [
-  { id: 'all', name: 'All groups', count: 186 },
-  { id: 'grp-kinigi', name: 'Kinigi growers', count: 82 },
-  { id: 'grp-busogo', name: 'Busogo growers', count: 54 },
-  { id: 'grp-muhoza', name: 'Muhoza growers', count: 50 },
-];
+const COOP_GROUPS = COOPERATIVE_DATA.groups.map((g) => ({
+  id: g.id,
+  name: g.name,
+  count: g.membersCount,
+}));
+const TOTAL_MEMBERS = COOP_GROUPS.reduce((sum, g) => sum + g.count, 0);
+const GROUPS_LIST = [{ id: 'all', name: 'All groups', count: TOTAL_MEMBERS }, ...COOP_GROUPS];
 
 export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
   isOpen,
@@ -68,14 +69,15 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
   // Compute total reached members
   const reachedCount = useMemo(() => {
     if (selectedGroups.includes('All groups')) {
-      return 186;
+      return TOTAL_MEMBERS;
     }
-    let sum = 0;
-    if (selectedGroups.includes('Kinigi growers')) sum += 82;
-    if (selectedGroups.includes('Busogo growers')) sum += 54;
-    if (selectedGroups.includes('Muhoza growers')) sum += 50;
-    return sum || 82;
+    return COOP_GROUPS.filter((g) => selectedGroups.includes(g.name)).reduce(
+      (sum, g) => sum + g.count,
+      0
+    );
   }, [selectedGroups]);
+
+  const sharePct = (n: number) => (reachedCount > 0 ? Math.round((n / reachedCount) * 100) : 0);
 
   // Compute live channel delivery split
   const channelSplit = useMemo(() => {
@@ -98,8 +100,8 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
       }
     } else {
       next.push(groupName);
-      // If all 3 individual groups are selected, collapse into All groups
-      if (next.length >= 3) {
+      // If every individual group is selected, collapse into All groups
+      if (next.length >= COOP_GROUPS.length) {
         next = ['All groups'];
       }
     }
@@ -280,7 +282,7 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
                   )}
                 </div>
                 <div className="text-[11px] font-medium mt-1 tabular-nums">
-                  {channelSplit.sms} members (82%)
+                  {channelSplit.sms} members ({sharePct(channelSplit.sms)}%)
                 </div>
               </button>
 
@@ -304,7 +306,7 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
                   )}
                 </div>
                 <div className="text-[11px] font-medium mt-1 tabular-nums">
-                  {channelSplit.voice} members (7%)
+                  {channelSplit.voice} members ({sharePct(channelSplit.voice)}%)
                 </div>
               </button>
 
@@ -328,7 +330,7 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
                   )}
                 </div>
                 <div className="text-[11px] font-medium mt-1 tabular-nums">
-                  {channelSplit.inApp} members (11%)
+                  {channelSplit.inApp} members ({sharePct(channelSplit.inApp)}%)
                 </div>
               </button>
             </div>

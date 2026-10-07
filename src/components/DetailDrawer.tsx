@@ -28,6 +28,7 @@ import {
   CoopGroup,
   CoopMessage,
 } from '../types';
+import { RISK_LEVEL_COLORS } from '../data/musanzeData';
 
 export type DrawerContent =
   | { type: 'alert'; data: AlertItem }
@@ -574,23 +575,35 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                     Active warnings covering this group
                   </h3>
                   <div className="space-y-2">
+                    {groupData.warnings.length === 0 && (
+                      <p className="text-[12px] text-[#5B665E]">No active warnings cover this group.</p>
+                    )}
                     {groupData.warnings.map((w) => (
                       <div
                         key={w.id}
-                        className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-2.5"
+                        className="p-3.5 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.08)] flex items-start gap-2.5"
                       >
-                        <AlertTriangle className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+                        <AlertTriangle
+                          className="w-4 h-4 flex-shrink-0 mt-0.5"
+                          style={{ color: RISK_LEVEL_COLORS[w.level] }}
+                        />
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-[13px] text-[#17271D]">
                               {w.title}
                             </span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-200 text-amber-900">
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-[#17271D] border"
+                              style={{
+                                backgroundColor: `${RISK_LEVEL_COLORS[w.level]}1F`,
+                                borderColor: `${RISK_LEVEL_COLORS[w.level]}4D`,
+                              }}
+                            >
                               {w.level}
                             </span>
                           </div>
                           <p className="text-[11.5px] text-[#5B665E] mt-0.5">
-                            High-risk hazard threshold triggered across {groupData.sector} plots.
+                            Covers {groupData.sector} sector, where this group farms.
                           </p>
                         </div>
                       </div>
@@ -635,20 +648,30 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                     <h3 className="text-[13.5px] font-semibold text-[#17271D]">
                       Members pending acknowledgement
                     </h3>
-                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-semibold text-[11px]">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#E4ECDB] text-[#1F4A34] font-semibold text-[11px]">
                       {groupData.unacknowledgedCount} members
                     </span>
                   </div>
+                  {groupData.unacknowledgedWarningTitle && (
+                    <p className="text-[11.5px] text-[#5B665E]">
+                      Latest warning: {groupData.unacknowledgedWarningTitle}
+                    </p>
+                  )}
 
                   <div className="p-3.5 rounded-xl bg-white border border-[rgba(31,74,52,0.10)] divide-y divide-[rgba(31,74,52,0.06)] max-h-48 overflow-y-auto">
                     {groupData.unacknowledgedMembers.map((m, idx) => (
                       <div key={idx} className="py-2 first:pt-0 last:pb-0 flex items-center justify-between text-[12px]">
                         <span className="font-medium text-[#17271D]">{m}</span>
-                        <span className="text-[10.5px] text-[#9E6905] bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
+                        <span className="text-[10.5px] text-[#5B665E] bg-white px-2 py-0.5 rounded-full border border-[rgba(31,74,52,0.16)]">
                           Not acknowledged
                         </span>
                       </div>
                     ))}
+                    {groupData.unacknowledgedCount > groupData.unacknowledgedMembers.length && (
+                      <div className="py-2 last:pb-0 text-[12px] text-[#5B665E]">
+                        +{groupData.unacknowledgedCount - groupData.unacknowledgedMembers.length} other members
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

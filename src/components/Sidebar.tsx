@@ -37,17 +37,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const farmerNavItems: { id: NavView; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'forecast', label: 'Risk Forecast', icon: CloudRain },
-    { id: 'warnings', label: 'Early Warnings', icon: AlertTriangle },
+    { id: 'forecast', label: 'Risk forecast', icon: CloudRain },
+    { id: 'warnings', label: 'Early warnings', icon: AlertTriangle },
     { id: 'recommendations', label: 'Recommendations', icon: Sprout },
-    { id: 'calendar', label: 'Crop Calendar', icon: CalendarDays },
+    { id: 'calendar', label: 'Crop calendar', icon: CalendarDays },
     { id: 'observations', label: 'Observations', icon: Eye },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   const officerNavItems: { id: NavView; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'forecast', label: 'Risk Forecast', icon: CloudRain },
+    { id: 'forecast', label: 'Risk forecast', icon: CloudRain },
     { id: 'warnings', label: 'Warnings', icon: AlertTriangle },
     { id: 'observations', label: 'Observations', icon: Eye },
     { id: 'reports', label: 'Reports', icon: FileText },
@@ -60,8 +60,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'meetings', label: 'Meetings', icon: CalendarDays },
     { id: 'training', label: 'Training', icon: GraduationCap },
-    { id: 'forecast', label: 'Risk Forecast', icon: CloudRain },
-    { id: 'warnings', label: 'Early Warnings', icon: AlertTriangle },
+    { id: 'forecast', label: 'Risk forecast', icon: CloudRain },
+    { id: 'warnings', label: 'Early warnings', icon: AlertTriangle },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -148,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="mt-2 flex justify-end">
               <button
                 onClick={() => onSelectView('warnings')}
-                title="View Early Warnings"
+                title="View early warnings"
                 className="w-8 h-8 rounded-full bg-[#1F4A34] text-white flex items-center justify-center hover:bg-[#2C6343] transition-colors shadow-xs group cursor-pointer"
               >
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" strokeWidth={1.5} />

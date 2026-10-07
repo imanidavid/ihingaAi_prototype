@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Users,
   AlertTriangle,
@@ -18,8 +18,13 @@ import {
   Bell,
 } from 'lucide-react';
 import potatoImg from '../assets/images/irish_potato_crop_1790594286456.jpg';
-import { CoopData, CoopGroup, CoopMessage } from '../types';
-import { COOPERATIVE_DATA } from '../data/musanzeData';
+import { CoopGroup, CoopMessage, WarningItem } from '../types';
+import {
+  COOPERATIVE_DATA,
+  RISK_LEVEL_COLORS,
+  computeCoopGroups,
+  computeCoopSummary,
+} from '../data/musanzeData';
 
 interface CooperativeDashboardViewProps {
   onOpenMessageComposer: (
@@ -31,6 +36,7 @@ interface CooperativeDashboardViewProps {
   onSelectMessage: (message: CoopMessage) => void;
   onShowToast: (msg: string) => void;
   messages: CoopMessage[];
+  warnings: WarningItem[];
 }
 
 export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> = ({
@@ -39,8 +45,25 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
   onSelectMessage,
   onShowToast,
   messages,
+  warnings,
 }) => {
   const coop = COOPERATIVE_DATA;
+  const groups = useMemo(() => computeCoopGroups(warnings), [warnings]);
+  const summary = useMemo(() => computeCoopSummary(groups), [groups]);
+  const joinNames = (names: string[]) =>
+    names.length <= 1
+      ? names.join('')
+      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  const underWarningPct =
+    summary.totalMembers > 0
+      ? Math.round((summary.membersUnderWarning / summary.totalMembers) * 100)
+      : 0;
+  const heroHeadline =
+    summary.membersUnderWarning === 0
+      ? 'No active warnings cover your members.'
+      : summary.membersUnderWarning === summary.totalMembers
+      ? `All ${summary.totalMembers} members are under an active warning.`
+      : `${summary.membersUnderWarning} of ${summary.totalMembers} members are under an active warning.`;
 
   const scrollToGroupRisk = () => {
     const el = document.getElementById('risk-by-group-section');
@@ -78,14 +101,19 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
 
             {/* Heading */}
             <h1 className="text-[24px] md:text-[27px] font-normal text-white leading-tight tracking-tight max-w-xl">
-              Good afternoon, Aline. All 186 members are under an active warning.
+              Good afternoon, Aline. {heroHeadline}
             </h1>
 
             {/* Status caption */}
-            <div className="flex items-center gap-2 mt-2 text-[12.5px] text-[#E4ECDB]/90">
-              <span className="w-2 h-2 rounded-full bg-[#D9A032]" />
-              <span>Active hazard coverage across Kinigi, Busogo and Muhoza groups</span>
-            </div>
+            {summary.groupsUnderWarning.length > 0 && (
+              <div className="flex items-center gap-2 mt-2 text-[12.5px] text-[#E4ECDB]/90">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: RISK_LEVEL_COLORS[summary.highestLevel] }}
+                />
+                <span>Active warnings for {joinNames(summary.groupsUnderWarning)} groups</span>
+              </div>
+            )}
           </div>
 
           {/* 3 Action Pills */}
@@ -129,9 +157,11 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
             </div>
           </div>
           <div className="mt-2.5">
-            <span className="text-[26px] font-bold text-[#17271D] tracking-tight">186</span>
+            <span className="text-[26px] font-bold text-[#17271D] tracking-tight">
+              {summary.totalMembers}
+            </span>
             <p className="text-[11px] text-[#5B665E] mt-0.5">
-              3 grower groups · Kinigi, Busogo, Muhoza
+              {summary.groupCount} grower groups · {summary.groupSectors.join(', ')}
             </p>
           </div>
         </div>
@@ -140,16 +170,20 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
         <div className="bg-[#FBFCF8] rounded-[16px] p-5 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[12px] font-medium text-[#5B665E]">Under active warnings</span>
-            <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center text-amber-800">
+            <div className="w-7 h-7 rounded-full bg-[#E4ECDB] flex items-center justify-center text-[#1F4A34]">
               <AlertTriangle className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="mt-2.5">
-            <span className="text-[26px] font-bold text-[#9E6905] tracking-tight">
-              186 <span className="text-[15px] font-normal text-[#5B665E]">of 186</span>
+            <span className="text-[26px] font-bold text-[#17271D] tracking-tight">
+              {summary.membersUnderWarning}{' '}
+              <span className="text-[15px] font-normal text-[#5B665E]">of {summary.totalMembers}</span>
             </span>
             <p className="text-[11px] text-[#5B665E] mt-0.5">
-              100% · Heavy Rain & Late Blight
+              {underWarningPct}%
+              {summary.activeWarningTitles.length > 0
+                ? ` · ${summary.activeWarningTitles.join(' & ')}`
+                : ' · No active warnings'}
             </p>
           </div>
         </div>
@@ -163,9 +197,13 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
             </div>
           </div>
           <div className="mt-2.5">
-            <span className="text-[26px] font-bold text-[#1F4A34] tracking-tight">63%</span>
+            <span className="text-[26px] font-bold text-[#1F4A34] tracking-tight">
+              {summary.rainPct === null ? '—' : `${summary.rainPct}%`}
+            </span>
             <p className="text-[11px] text-[#5B665E] mt-0.5">
-              86 of 136 target growers (Kinigi & Busogo)
+              {summary.rainPct === null
+                ? 'No active rain warning'
+                : `${summary.rainAcknowledged} of ${summary.rainTotal} target growers (${summary.rainSectors.join(' & ')})`}
             </p>
           </div>
         </div>
@@ -179,7 +217,9 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
             </div>
           </div>
           <div className="mt-2.5">
-            <span className="text-[26px] font-bold text-[#17271D] tracking-tight">11</span>
+            <span className="text-[26px] font-bold text-[#17271D] tracking-tight">
+              {summary.memberReports7d}
+            </span>
             <p className="text-[11px] text-[#5B665E] mt-0.5">
               Field observations submitted by members
             </p>
@@ -221,10 +261,10 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[rgba(31,74,52,0.06)]">
-                  {coop.groups.map((group) => (
+                  {groups.map((group) => (
                     <tr
                       key={group.id}
-                      onClick={() => onSelectGroup(group as any)}
+                      onClick={() => onSelectGroup(group)}
                       className="hover:bg-[#E4ECDB]/40 cursor-pointer transition-colors group"
                     >
                       {/* Group Name & Sector */}
@@ -248,13 +288,24 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
                       {/* Active Warnings (Level chips) */}
                       <td className="py-3.5 px-3">
                         <div className="flex flex-wrap gap-1.5">
+                          {group.warnings.length === 0 && (
+                            <span className="text-[11px] text-[#5B665E]">None</span>
+                          )}
                           {group.warnings.map((w) => (
                             <span
                               key={w.id}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-100 text-amber-900 border border-amber-200"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold text-[#17271D] border"
+                              style={{
+                                backgroundColor: `${RISK_LEVEL_COLORS[w.level]}1F`,
+                                borderColor: `${RISK_LEVEL_COLORS[w.level]}4D`,
+                              }}
                             >
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#D9A032]" />
+                              <span
+                                className="w-1.5 h-1.5 rounded-full"
+                                style={{ backgroundColor: RISK_LEVEL_COLORS[w.level] }}
+                              />
                               <span>{w.title}</span>
+                              <span className="font-normal text-[#5B665E]">· {w.level}</span>
                             </span>
                           ))}
                         </div>
@@ -299,7 +350,9 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
 
           <div className="pt-2 border-t border-[rgba(31,74,52,0.06)] flex items-center justify-between text-[11px] text-[#5B665E]">
             <span>Click any row to open group actions and unacknowledged list</span>
-            <span>Total 186 members in 3 sectors</span>
+            <span>
+              Total {summary.totalMembers} members in {summary.groupCount} sectors
+            </span>
           </div>
         </div>
 
@@ -421,17 +474,17 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
                     <Smartphone className="w-3 h-3 text-[#1F4A34]" />
-                    <span>SMS {msg.channelSplit?.sms ?? Math.round((msg.recipientCount || 82) * 0.82)}</span>
+                    <span>SMS {msg.channelSplit.sms}</span>
                   </span>
                   <span>·</span>
                   <span className="flex items-center gap-1">
                     <PhoneCall className="w-3 h-3 text-[#1F4A34]" />
-                    <span>Voice {msg.channelSplit?.voice ?? Math.round((msg.recipientCount || 82) * 0.07)}</span>
+                    <span>Voice {msg.channelSplit.voice}</span>
                   </span>
                   <span>·</span>
                   <span className="flex items-center gap-1">
                     <Bell className="w-3 h-3 text-[#1F4A34]" />
-                    <span>In-app {msg.channelSplit?.inApp ?? Math.round((msg.recipientCount || 82) * 0.11)}</span>
+                    <span>In-app {msg.channelSplit.inApp}</span>
                   </span>
                 </div>
 

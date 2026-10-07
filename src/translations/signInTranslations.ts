@@ -235,7 +235,7 @@ export const SIGN_IN_TRANSLATIONS: Record<SignInLanguage, SignInTranslationStrin
     membersCountPlaceholder: 'e.g. 140',
     districtOfAssignmentLabel: 'District of assignment',
     staffIdLabel: 'Staff ID',
-    staffIdPlaceholder: 'e.g. RAB-EXT-8821',
+    staffIdPlaceholder: 'e.g. MUS-AO-8821',
     officePhoneLabel: 'Office phone',
     institutionLabel: 'Institution / Organization',
     institutionPlaceholder: 'e.g. University of Rwanda',
@@ -450,7 +450,7 @@ export const SIGN_IN_TRANSLATIONS: Record<SignInLanguage, SignInTranslationStrin
     // to be reviewed by a native speaker
     staffIdLabel: 'Nimero y’akazi (Staff ID)',
     // to be reviewed by a native speaker
-    staffIdPlaceholder: 'urugero: RAB-EXT-8821',
+    staffIdPlaceholder: 'urugero: MUS-AO-8821',
     // to be reviewed by a native speaker
     officePhoneLabel: 'Telefone y’ibiro',
     // to be reviewed by a native speaker

@@ -324,6 +324,7 @@ export interface NotificationItem {
   targetData?: any;
 }
 
+/** A cooperative group as shown in the UI — computed by computeCoopGroups() from the warnings state. */
 export interface CoopGroup {
   id: string;
   name: string;
@@ -335,6 +336,7 @@ export interface CoopGroup {
     level: RiskLevel;
   }[];
   acknowledgement: {
+    warningId: string;
     warningTitle: string;
     level: RiskLevel;
     dotColor: string;
@@ -343,8 +345,23 @@ export interface CoopGroup {
     pct: number;
   }[];
   reports7Days: number;
+  /** Latest active warning covering the group; "not acknowledged" counts refer to it. */
+  unacknowledgedWarningTitle: string | null;
   unacknowledgedCount: number;
+  /** Named members who have not acknowledged (the rest are shown as "+N other members"). */
   unacknowledgedMembers: string[];
+}
+
+/** Seeded group record. Warnings and levels are NOT stored here (they come from the warnings state). */
+export interface CoopGroupSeed {
+  id: string;
+  name: string;
+  sector: string;
+  membersCount: number;
+  /** Members who acknowledged each warning, by warning id. Missing id = 0. */
+  acknowledgedByWarning: Record<string, number>;
+  reports7Days: number;
+  pendingMemberNames: string[];
 }
 
 export interface CoopMessage {
@@ -368,20 +385,13 @@ export interface CoopMessage {
 
 export interface CoopData {
   cooperativeName: string;
-  totalMembers: number;
   leader: {
     name: string;
     roleTitle: string;
     phone: string;
     initials: string;
   };
-  groups: CoopGroup[];
-  kpis: {
-    members: number;
-    underActiveWarnings: number;
-    acknowledgedRainWarningPct: number;
-    memberReports7d: number;
-  };
+  groups: CoopGroupSeed[];
   actions: {
     id: string;
     description: string;
