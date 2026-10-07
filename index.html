@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IHINGA AI — Rwanda Farmer Dashboard</title>
+    <meta name="description" content="Editorial climate-smart farmer dashboard for Musanze District, Rwanda, featuring hyperlocal risk forecasting, crop advisories, and interactive district map." />
+    <meta property="og:title" content="IHINGA AI — Rwanda Farmer Dashboard" />
+    <meta property="og:description" content="Editorial climate-smart farmer dashboard for Musanze District, Rwanda, featuring hyperlocal risk forecasting, crop advisories, and interactive district map." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      @media print {
+        @page {
+          size: A4;
+          margin: 1.5cm;
+        }
+        body {
+          background-color: #ffffff !important;
+          color: #17271d !important;
+        }
+        header,
+        aside,
+        nav,
+        .no-print,
+        #floating-device-switcher {
+          display: none !important;
+        }
+        #printable-report-backdrop {
+          position: static !important;
+          background: transparent !important;
+          padding: 0 !important;
+          inset: auto !important;
+          display: block !important;
+          overflow: visible !important;
+        }
+        #printable-report {
+          width: 100% !important;
+          max-width: 100% !important;
+          box-shadow: none !important;
+          border: none !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-[#F4F6EF] text-[#17271D] antialiased selection:bg-[#E4ECDB] selection:text-[#1F4A34]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

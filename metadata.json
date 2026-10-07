@@ -1,0 +1,6 @@
+{
+  "name": "IHINGA AI — Rwanda Farmer Dashboard",
+  "description": "Editorial climate-smart farmer dashboard for Musanze District, Rwanda, featuring hyperlocal risk forecasting, crop advisories, and interactive district map.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
