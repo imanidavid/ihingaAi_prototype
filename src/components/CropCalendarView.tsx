@@ -8,7 +8,7 @@ export const CropCalendarView: React.FC = () => {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2">
-          <h1 className="text-[24px] font-semibold text-[#17271D]">Crop Calendar</h1>
+          <h1 className="text-[24px] font-semibold text-[#17271D]">Crop calendar</h1>
           <span className="px-2.5 py-0.5 rounded-full bg-[#E4ECDB] text-[#1F4A34] text-[11px] font-medium border border-[rgba(31,74,52,0.10)]">
             Musanze District · Season 2026/27 A
           </span>

@@ -1,7 +1,23 @@
 # Media manifest
 
 Generate each file in Gemini, save it in `public/media/` with the exact filename, then set status to `done`.
+Files in `public/media/` are served at `/media/<filename>`.
 Rules and prompt templates: `.claude/skills/ihinga-media-prompts/SKILL.md`.
+
+## Existing images (already in the app)
+
+These five came from the AI Studio build. They live in `src/assets/images/` and are imported
+directly (Vite bundles them). Leave them there; only **new** media goes in `public/media/`.
+
+| file | where used | size | alt text | status |
+|---|---|---|---|---|
+| `src/assets/images/musanze_terraced_hero_1790594273190.jpg` | Farmer dashboard hero (`HeroBanner.tsx`), sign-in panel (`SignInView.tsx`) | 1376×768 | Terraced fields in Musanze | done |
+| `src/assets/images/musanze_aerial_hero_1790767815128.jpg` | Officer dashboard hero (`OFFICER_DATA.heroPhoto` in `musanzeData.ts`) | 1376×768 | Aerial view of Musanze farmland | done |
+| `src/assets/images/irish_potato_crop_1790594286456.jpg` | Potato advisory photo card (`musanzeData.ts`), cooperative dashboard hero (`CooperativeDashboardView.tsx`) | 1200×896 | Irish potato plants | done |
+| `src/assets/images/climbing_beans_crop_1790594298767.jpg` | Climbing beans advisory photo card (`musanzeData.ts`) | 1200×896 | Climbing beans on stakes | done |
+| `src/assets/images/highland_maize_crop_1790594310562.jpg` | Maize advisory photo card (`musanzeData.ts`) | 1200×896 | Young highland maize | done |
+
+## New media (to generate)
 
 | filename | type | where used | size / aspect | alt text | Gemini prompt | status |
 |---|---|---|---|---|---|---|

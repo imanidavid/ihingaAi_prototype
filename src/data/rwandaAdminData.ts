@@ -113,10 +113,12 @@ export const CROP_OPTIONS = [
 
 export const COOPERATIVE_OPTIONS = [
   'None / Individual',
-  'COOPAMA (Kinigi Irish Potato)',
-  'KOPABU (Busogo Maize & Beans)',
-  'COAMV (Musanze Horti & Vegetables)',
-  'COPROMA (Muhoza Seed Multiplication)',
+  'Musanze Potato Growers Cooperative',
+  'Kinigi Bean Farmers Union',
+  'Busogo Maize Cooperative',
+  'Muhoza Vegetable Growers',
+  'Remera Wheat & Potato Cooperative',
+  'Nyange Pyrethrum Growers',
   'Other cooperative',
 ];
 
@@ -177,7 +179,7 @@ export const INITIAL_USER_ACCOUNTS: UserAccount[] = [
     role: 'farmer',
     fullName: 'Jean-Baptiste Ndayisaba',
     phone: '+250 788 000 012',
-    email: '',
+    email: 'j.ndayisaba@musanzecoop.rw',
     password: 'demo1234',
     district: 'Musanze',
     preferredLanguage: 'rw',
@@ -185,10 +187,10 @@ export const INITIAL_USER_ACCOUNTS: UserAccount[] = [
     createdAt: '01/09/2026',
     farmerDetails: {
       sector: 'Kinigi',
-      cell: 'Kaguhu',
-      farmSizeHa: 0.8,
+      cell: 'Bisoke',
+      farmSizeHa: 1.8,
       cropsGrown: ['Irish Potato', 'Climbing Beans', 'Maize'],
-      cooperative: 'COOPAMA (Kinigi Irish Potato)',
+      cooperative: 'Musanze Potato Growers Cooperative',
     },
   },
   {
@@ -204,7 +206,7 @@ export const INITIAL_USER_ACCOUNTS: UserAccount[] = [
     createdAt: '01/09/2026',
     officerDetails: {
       districtOfAssignment: 'Musanze',
-      staffId: 'RAB-EXT-4401',
+      staffId: 'MUS-AO-4401',
       officePhone: '+250 252 510 120',
     },
   },

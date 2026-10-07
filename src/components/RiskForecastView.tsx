@@ -23,6 +23,8 @@ import {
   MUSANZE_RECORD,
   OFFICER_CROP_RISK_MAP,
   computeSectorClimateRisk,
+  RAINFALL_NORMAL_MM_PER_DAY,
+  RAINFALL_NORMAL_MM_PER_MONTH_SEASON_CHART,
 } from '../data/musanzeData';
 
 type HorizonType = '10d' | 'month' | 'season';
@@ -66,7 +68,8 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
       forecast: d.rainfallMm,
       rangeMin: Math.max(0, Math.round(d.rainfallMm * 0.7)),
       rangeMax: Math.round(d.rainfallMm * 1.25),
-      normal: horizon === 'season' ? 65 : 13, // Flat seasonal average of 12–14 mm/day (never follows forecast shape)
+      // Flat seasonal average from musanzeData (never follows forecast shape)
+      normal: horizon === 'season' ? RAINFALL_NORMAL_MM_PER_MONTH_SEASON_CHART : RAINFALL_NORMAL_MM_PER_DAY,
       isPeak: d.isPeak,
     };
   });
@@ -198,7 +201,7 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-semibold text-[#17271D]">Risk Forecast</h1>
+          <h1 className="text-[24px] font-semibold text-[#17271D]">Risk forecast</h1>
           <p className="text-[13px] text-[#5B665E] mt-0.5">
             Musanze · Season 2026/27 A
           </p>

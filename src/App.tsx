@@ -52,6 +52,7 @@ import { INITIAL_GENERATED_REPORTS } from './data/reportsModuleData';
 import { INITIAL_USER_ACCOUNTS } from './data/rwandaAdminData';
 import {
   INITIAL_USER_SETTINGS,
+  userSettingsFromAccount,
   INITIAL_WARNINGS,
   INITIAL_THRESHOLD_RULES,
   INITIAL_52_REPORTS,
@@ -122,18 +123,7 @@ export default function App() {
     }
     // If a farmer signed in:
     if (signedInRole === 'farmer' && userAccount) {
-      setUserSettings((prev) => ({
-        ...prev,
-        fullName: userAccount.fullName,
-        phone: userAccount.phone,
-        email: userAccount.email || '',
-        district: userAccount.district || 'Musanze',
-        sector: userAccount.farmerDetails?.sector || 'Kinigi',
-        cell: userAccount.farmerDetails?.cell || 'Kaguhu',
-        farmSizeHa: userAccount.farmerDetails?.farmSizeHa || 0.8,
-        cropsGrown: userAccount.farmerDetails?.cropsGrown || ['Irish Potato', 'Climbing Beans', 'Maize'],
-        cooperative: userAccount.farmerDetails?.cooperative || 'None / Individual',
-      }));
+      setUserSettings((prev) => userSettingsFromAccount(userAccount, prev));
       // If a newly created farmer, start personal lists empty:
       if (userAccount.id !== 'acc-farmer-jb') {
         setSavedItemIds([]);
@@ -912,6 +902,7 @@ export default function App() {
                     setTimeout(() => setToastMessage(null), 3000);
                   }}
                   messages={messages}
+                  warnings={warnings}
                 />
               ) : (
                 <div className="space-y-6">
