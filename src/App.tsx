@@ -84,6 +84,7 @@ import {
   meetingReachesGroup,
   messageReachesMember,
   parseDMY,
+  reportNameOf,
   sortMeetings,
 } from './data/musanzeData';
 
@@ -289,12 +290,13 @@ export default function App() {
 
   // Farmer reports:
   // "My reports" = reports where farmer matches currently active farmer profile
+  // Reports carry the short name ("Jean-Baptiste N."), so match on that and the farmer's sector
   const farmerMyReports = useMemo(
     () =>
-      reports.filter((r) =>
-        r.farmer.toLowerCase().includes(userSettings.fullName.toLowerCase())
+      reports.filter(
+        (r) => r.farmer === reportNameOf(userSettings.fullName) && r.sector === userSettings.sector
       ),
-    [reports, userSettings.fullName]
+    [reports, userSettings.fullName, userSettings.sector]
   );
 
   // Dynamic counts computed directly from shared store

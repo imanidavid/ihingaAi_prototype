@@ -20,5 +20,5 @@ Found during Task 1 (08/10/2026):
 - [ ] Meeting SMS invitations are a flag on the meeting (`smsInvite`); they are not added to the message history. Task 5 (Notifications) should list them with the other messages.
 - [ ] Farmer bell shows a cooperative message's English text as the subtitle; the drawer shows Kinyarwanda first. Decide one order for both.
 - [ ] Kinyarwanda strings added in Task 1 (training share messages in `TRAINING_MATERIALS`) need the owner's review.
-- [ ] `farmerMyReports` matches reports on the full name ("Jean-Baptiste Ndayisaba") but reports store "Jean-Baptiste N.", so officer feedback notifications never reach the farmer bell. Use `reportNameOf()` from `musanzeData.ts`.
+- [x] `farmerMyReports` matched reports on the full name, so officer feedback never reached the farmer bell — fixed (matches `reportNameOf()` + sector).
 - [ ] The Sep/Oct calendar shows sprayer bookings from Tue 29/09; booking slots before the spray window opens (Tue 14:00) only show a note, they are not blocked.
