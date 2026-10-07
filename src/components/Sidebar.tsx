@@ -14,6 +14,13 @@ import {
   Users,
   MessageSquare,
   GraduationCap,
+  UserCog,
+  ShieldCheck,
+  Database,
+  Workflow,
+  BellRing,
+  LineChart,
+  Table2,
 } from 'lucide-react';
 import { NavView, AppRole } from '../types';
 
@@ -26,6 +33,8 @@ interface SidebarProps {
   /** Cooperative members under an active warning (computed in App from the store). */
   coopMembersUnderWarning?: number;
   coopTotalMembers?: number;
+  /** Access requests waiting for an administrator (computed in App). */
+  pendingAccessRequests?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -36,9 +45,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   reportsToReviewCount = 3,
   coopMembersUnderWarning = 0,
   coopTotalMembers = 0,
+  pendingAccessRequests = 0,
 }) => {
   const isOfficer = role === 'officer';
   const isCoop = role === 'cooperative';
+  const isAdmin = role === 'admin';
+  const isResearcher = role === 'researcher';
 
   const farmerNavItems: { id: NavView; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -70,7 +82,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
-  const navItems = isOfficer ? officerNavItems : isCoop ? coopNavItems : farmerNavItems;
+  const adminNavItems: { id: NavView; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'users', label: 'Users & access', icon: UserCog },
+    { id: 'security', label: 'Security & audit', icon: ShieldCheck },
+    { id: 'data_sources', label: 'Data sources', icon: Database },
+    { id: 'processing', label: 'Data processing', icon: Workflow },
+    { id: 'notifications', label: 'Notifications', icon: BellRing },
+    { id: 'reports', label: 'Reports', icon: FileText },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+
+  const researcherNavItems: { id: NavView; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
+    { id: 'forecast', label: 'Risk forecast', icon: CloudRain },
+    { id: 'model_performance', label: 'Model performance', icon: LineChart },
+    { id: 'field_data', label: 'Field data', icon: Table2 },
+    { id: 'reports', label: 'Reports', icon: FileText },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+
+  const navItems = isOfficer
+    ? officerNavItems
+    : isCoop
+    ? coopNavItems
+    : isAdmin
+    ? adminNavItems
+    : isResearcher
+    ? researcherNavItems
+    : farmerNavItems;
 
   return (
     <aside className="w-[220px] flex-shrink-0 h-screen sticky top-0 bg-[#F4F6EF] border-r border-[rgba(31,74,52,0.08)] flex flex-col justify-between p-3.5 select-none overflow-hidden">
@@ -84,7 +123,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex flex-col">
             <span className="text-[14px] font-semibold text-[#17271D]">IHINGA AI</span>
             <span className="text-[10px] text-[#5B665E] font-medium tracking-normal -mt-0.5">
-              {isOfficer ? 'Musanze Officer Desk' : isCoop ? 'Cooperative Desk' : 'Rwanda Farmer Desk'}
+              {isOfficer
+                ? 'Musanze Officer Desk'
+                : isCoop
+                ? 'Cooperative Desk'
+                : isAdmin
+                ? 'Admin console'
+                : isResearcher
+                ? 'Research desk'
+                : 'Rwanda Farmer Desk'}
             </span>
           </div>
         </div>
@@ -118,7 +165,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Bottom Promo Card */}
       <div className="flex-shrink-0 pt-3">
-        {isOfficer ? (
+        {isAdmin || isResearcher ? (
+          <div className="bg-[#FBFCF8] rounded-[16px] p-3 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] relative overflow-hidden">
+            <div className="w-6 h-6 rounded-full bg-[#E4ECDB] border border-[rgba(31,74,52,0.12)] flex items-center justify-center mb-1.5">
+              {isAdmin ? (
+                <UserCog className="w-3 h-3 text-[#1F4A34]" strokeWidth={1.5} />
+              ) : (
+                <LineChart className="w-3 h-3 text-[#1F4A34]" strokeWidth={1.5} />
+              )}
+            </div>
+            <h4 className="text-[12px] font-semibold text-[#17271D] leading-tight">
+              {isAdmin
+                ? pendingAccessRequests === 0
+                  ? 'No access requests waiting'
+                  : `${pendingAccessRequests} access ${pendingAccessRequests === 1 ? 'request' : 'requests'} waiting`
+                : 'Prototype results'}
+            </h4>
+            <p className="text-[10.5px] text-[#5B665E] mt-0.5 leading-tight">
+              {isAdmin ? 'Approve or reject new staff accounts.' : 'Forecast checks use simulated data.'}
+            </p>
+            <div className="mt-2 flex justify-end">
+              <button
+                onClick={() => onSelectView(isAdmin ? 'users' : 'forecast')}
+                title={isAdmin ? 'Review access requests' : 'Open risk forecast'}
+                className="w-8 h-8 rounded-full bg-[#1F4A34] text-white flex items-center justify-center hover:bg-[#2C6343] transition-colors shadow-xs group cursor-pointer"
+              >
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" strokeWidth={1.5} />
+              </button>
+            </div>
+          </div>
+        ) : isOfficer ? (
           <div className="bg-[#FBFCF8] rounded-[16px] p-3 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] relative overflow-hidden">
             <div className="w-6 h-6 rounded-full bg-[#D9A032]/20 border border-[#D9A032]/30 flex items-center justify-center mb-1.5">
               <ClipboardList className="w-3 h-3 text-[#9E6905]" strokeWidth={1.5} />

@@ -21,6 +21,11 @@ import {
   EquipmentBooking,
   RegisteredFarmer,
   TrainingMaterial,
+  AppRole,
+  AuditEvent,
+  DataSourceStatus,
+  PermissionId,
+  RolePermissions,
   OfficerData,
   SectorOverviewItem,
   OfficerWarningDelivery,
@@ -2325,7 +2330,7 @@ const MEMBER_PLAN: GroupSeedPlan[] = [
       },
       { id: 'mem-odette', fullName: 'Odette Mukeshimana', cell: 'Susa', role: 'Group lead' },
       { id: 'mem-jean-claude', fullName: 'Jean Claude Niyonsaba', cell: 'Nyange', role: 'Secretary' },
-      { id: 'mem-faustin', fullName: 'Faustin Nzeyimana', cell: 'Bisoke', pending: true },
+      { id: 'mem-faustin', fullName: 'Faustin Nzeyimana', cell: 'Bisoke', phone: '+250 784 155 775', pending: true },
       { id: 'mem-emmanuel', fullName: 'Emmanuel Habimana', cell: 'Bisoke', pending: true },
       { fullName: 'Daphrose Mukamana', cell: 'Kaguhu', pending: true },
       { fullName: 'Callixte Karemera', cell: 'Nyange', pending: true },
@@ -2345,7 +2350,7 @@ const MEMBER_PLAN: GroupSeedPlan[] = [
     named: [
       { id: 'mem-theoneste', fullName: 'Theoneste Ndagijimana', cell: 'Gisesero', role: 'Group lead' },
       { id: 'mem-immaculee', fullName: 'Immaculee Ingabire', cell: 'Sahara', role: 'Treasurer' },
-      { id: 'mem-marie', fullName: 'Marie Uwase', cell: 'Sahara' },
+      { id: 'mem-marie', fullName: 'Marie Uwase', cell: 'Sahara', phone: '+250 785 410 233' },
       { id: 'mem-patrick', fullName: 'Patrick Tuyisenge', cell: 'Sahara' },
       { fullName: 'Innocent Nshimiyimana', cell: 'Gisesero', pending: true },
       { fullName: 'Valens Munyaneza', cell: 'Sahara', pending: true },
@@ -2971,3 +2976,70 @@ export const INITIAL_COOP_MESSAGES: CoopMessage[] = [
 ];
 
 
+
+// =========================================================================
+// ADMINISTRATION (users & access, permissions, audit, system status)
+// =========================================================================
+export const ROLE_LABELS: Record<AppRole, string> = {
+  farmer: 'Farmer',
+  cooperative: 'Cooperative leader',
+  officer: 'Agricultural officer',
+  researcher: 'Researcher',
+  admin: 'Administrator',
+};
+
+export const ROLE_ORDER: AppRole[] = ['farmer', 'cooperative', 'officer', 'researcher', 'admin'];
+
+export const PERMISSIONS: { id: PermissionId; label: string; hint: string }[] = [
+  { id: 'view_forecasts', label: 'View forecasts', hint: 'Risk forecast and warnings' },
+  { id: 'issue_warnings', label: 'Issue warnings', hint: 'Create, update and end warnings' },
+  { id: 'verify_reports', label: 'Verify reports', hint: 'Review farmer field reports' },
+  { id: 'message_members', label: 'Message members', hint: 'Cooperative broadcasts' },
+  { id: 'manage_members', label: 'Manage members', hint: 'Cooperative members and groups' },
+  { id: 'view_research_data', label: 'View research data', hint: 'Anonymised field data' },
+  { id: 'export_data', label: 'Export data', hint: 'Download reports and CSV files' },
+  { id: 'manage_users', label: 'Manage users', hint: 'Accounts, roles and access' },
+];
+
+export const INITIAL_ROLE_PERMISSIONS: RolePermissions = {
+  farmer: ['view_forecasts'],
+  cooperative: ['view_forecasts', 'message_members', 'manage_members'],
+  officer: ['view_forecasts', 'issue_warnings', 'verify_reports', 'export_data'],
+  researcher: ['view_forecasts', 'view_research_data', 'export_data'],
+  admin: PERMISSIONS.map((p) => p.id),
+};
+
+/** Seeded events before NOW; the store appends real events as the demo runs. */
+export const INITIAL_AUDIT_EVENTS: AuditEvent[] = [
+  { id: 'aud-1', at: '27/09/2026 10:15', actor: 'Esther Nyirabagenzi', actorRole: 'officer', action: 'Requested access', target: 'Agricultural officer · Musanze' },
+  { id: 'aud-2', at: '28/09/2026 07:55', actor: 'Grace Ingabire', actorRole: 'admin', action: 'Signed in', target: 'Admin console' },
+  { id: 'aud-3', at: '28/09/2026 08:10', actor: 'Claudine Mukamana', actorRole: 'officer', action: 'Signed in', target: 'Officer desk' },
+  { id: 'aud-4', at: '28/09/2026 09:40', actor: 'Celestin Ndayambaje', actorRole: 'cooperative', action: 'Requested access', target: 'Kinigi Bean Farmers Union' },
+  { id: 'aud-5', at: '28/09/2026 13:00', actor: 'System', actorRole: 'system', action: 'Issued warning', target: 'Late Blight Threat · High' },
+  { id: 'aud-6', at: '28/09/2026 13:40', actor: 'System', actorRole: 'system', action: 'Issued warning', target: 'Heavy Rain Influx · Watch' },
+];
+
+/** 'DD/MM/YYYY HH:MM' at NOW, for events created during the demo. */
+export const NOW_STAMP = `${NOW.dateFormatted} ${NOW.timeFormatted}`;
+
+/** Sortable key for 'DD/MM/YYYY HH:MM'. */
+export function stampSortKey(stamp: string): number {
+  const m = stamp.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+  return m ? Number(`${m[3]}${m[2]}${m[1]}${m[4]}${m[5]}`) : 0;
+}
+
+/** Data feeds behind the forecasts (all simulated in the prototype). */
+export const DATA_SOURCES: DataSourceStatus[] = [
+  { id: 'ds-stations', name: 'Weather station network', status: 'Healthy', lastSync: '28/09 13:55', note: '6 of 6 stations reporting' },
+  { id: 'ds-satellite', name: 'Satellite rainfall', status: 'Healthy', lastSync: '28/09 12:00', note: 'Daily estimate received' },
+  { id: 'ds-vegetation', name: 'Vegetation index', status: 'Healthy', lastSync: '27/09 06:00', note: 'Weekly composite' },
+  { id: 'ds-seasonal', name: 'Seasonal forecast', status: 'Healthy', lastSync: '01/09 08:00', note: 'Season 2026/27 A outlook' },
+  { id: 'ds-manual', name: 'Manual upload', status: 'Delayed', lastSync: '21/09 16:30', note: 'Weekly upload is overdue' },
+];
+
+export const LAST_PROCESSING_RUN = {
+  at: '28/09/2026 12:00',
+  status: 'Completed',
+  schedule: 'Every 6 hours',
+  nextAt: '28/09/2026 18:00',
+};

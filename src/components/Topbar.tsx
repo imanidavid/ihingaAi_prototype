@@ -26,7 +26,9 @@ import {
   OFFICER_DATA,
   COOPERATIVE_DATA,
 } from '../data/musanzeData';
-import { AlertItem, CropAdvisory, NavView, AppRole, NotificationItem } from '../types';
+import { AlertItem, CropAdvisory, NavView, AppRole, NotificationItem, UserAccount } from '../types';
+import { ROLE_LABELS } from '../data/musanzeData';
+import { DEMO_ACCOUNT_ID_BY_ROLE } from '../data/rwandaAdminData';
 
 type ViewType = NavView;
 
@@ -44,6 +46,8 @@ interface TopbarProps {
   notifications?: NotificationItem[];
   onNotificationClick?: (item: NotificationItem) => void;
   warnings?: AlertItem[];
+  /** Signed-in account (used for the administrator and researcher profile). */
+  account?: UserAccount;
 }
 
 interface SearchItem {
@@ -166,6 +170,43 @@ const OFFICER_APP_VIEWS: {
   },
 ];
 
+const ADMIN_APP_VIEWS: {
+  id: ViewType;
+  title: string;
+  subtitle: string;
+  keywords: string[];
+  icon: React.ReactNode;
+}[] = [
+  {
+    id: 'dashboard',
+    title: 'Admin dashboard',
+    subtitle: 'Users by role, access requests and system status',
+    keywords: ['dashboard', 'overview', 'admin', 'summary'],
+    icon: <Layers className="w-3.5 h-3.5 text-[#1F4A34]" />,
+  },
+  {
+    id: 'users',
+    title: 'Users & access',
+    subtitle: 'Accounts, roles, access requests, permissions and import',
+    keywords: ['users', 'access', 'roles', 'permissions', 'requests', 'approve', 'import', 'accounts'],
+    icon: <User className="w-3.5 h-3.5 text-[#1F4A34]" />,
+  },
+  {
+    id: 'reports',
+    title: 'Reports',
+    subtitle: 'System-wide reports',
+    keywords: ['reports', 'summary', 'export'],
+    icon: <FileText className="w-3.5 h-3.5 text-[#1F4A34]" />,
+  },
+  {
+    id: 'settings',
+    title: 'Settings',
+    subtitle: 'Profile and security preferences',
+    keywords: ['settings', 'profile', 'security', 'two-step'],
+    icon: <SettingsIcon className="w-3.5 h-3.5 text-[#5B665E]" />,
+  },
+];
+
 const COOP_APP_VIEWS: {
   id: ViewType;
   title: string;
@@ -245,34 +286,53 @@ export const Topbar: React.FC<TopbarProps> = ({
   notifications = [],
   onNotificationClick,
   warnings = [],
+  account,
 }) => {
   const isOfficer = role === 'officer';
   const isCoop = role === 'cooperative';
+  // Administrator and researcher profiles come from the signed-in account record
+  // (and for any account that is not the role's seeded demo profile, e.g. a newly approved officer)
+  const fromAccount =
+    account && (role === 'admin' || role === 'researcher' || account.id !== DEMO_ACCOUNT_ID_BY_ROLE[role])
+      ? account
+      : null;
   const appViews = isOfficer
     ? OFFICER_APP_VIEWS
     : isCoop
     ? COOP_APP_VIEWS
+    : role === 'admin'
+    ? ADMIN_APP_VIEWS
+    : role === 'researcher'
+    ? OFFICER_APP_VIEWS.filter((v) => v.id === 'forecast' || v.id === 'reports' || v.id === 'settings')
     : FARMER_APP_VIEWS;
 
-  const userInitials = isOfficer
+  const userInitials = fromAccount
+    ? fromAccount.fullName.split(' ').map((p) => p[0]).slice(0, 2).join('')
+    : isOfficer
     ? OFFICER_DATA.profile.initials
     : isCoop
     ? COOPERATIVE_DATA.leader.initials
     : 'JB';
 
-  const userFullName = isOfficer
+  const userFullName = fromAccount
+    ? fromAccount.fullName
+    : isOfficer
     ? OFFICER_DATA.profile.fullName
     : isCoop
     ? COOPERATIVE_DATA.leader.name
     : MUSANZE_RECORD.farmerFullName;
 
-  const userRoleTitle = isOfficer
+  const userRoleTitle = fromAccount
+    ? `${ROLE_LABELS[fromAccount.role]} · ${fromAccount.district}`
+    : isOfficer
     ? OFFICER_DATA.profile.roleTitle
     : isCoop
     ? COOPERATIVE_DATA.leader.roleTitle
     : 'Registered Farmer';
 
-  const userContact = isOfficer
+  const userContact = fromAccount
+    ? fromAccount.email || fromAccount.phone
+    : isOfficer
     ? 'claudine.m@ihinga.demo'
     : isCoop
     ? COOPERATIVE_DATA.leader.phone
@@ -737,6 +797,8 @@ export const Topbar: React.FC<TopbarProps> = ({
                           />
                         ) : item.type === 'feedback' ? (
                           <ShieldCheck className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
+                        ) : item.type === 'access_request' ? (
+                          <User className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
                         ) : item.type === 'meeting' ? (
                           <CalendarDays className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
                         ) : (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Monitor, Smartphone, Sprout, ShieldCheck, RotateCcw, Clock, Users } from 'lucide-react';
+import { Monitor, Smartphone, Sprout, ShieldCheck, RotateCcw, Clock, Users, UserCog } from 'lucide-react';
 import { AppRole } from '../types';
 
 export type PreviewMode = 'desktop' | 'mobile_m1' | 'mobile_m2';
@@ -31,7 +31,7 @@ export const FloatingDeviceSwitcher: React.FC<FloatingDeviceSwitcherProps> = ({
       }`}
     >
       <div className="bg-[#FBFCF8]/95 backdrop-blur-md p-1 rounded-full border border-[rgba(31,74,52,0.15)] shadow-[0_4px_20px_rgba(31,74,52,0.15)] flex items-center gap-1.5 text-[11px] font-medium">
-        {/* Role Switcher: [Farmer] [Cooperative] [Officer] */}
+        {/* Role Switcher: [Farmer] [Cooperative] [Officer] [Admin] */}
         <div className="flex items-center gap-0.5 bg-[#F4F6EF] p-0.5 rounded-full border border-[rgba(31,74,52,0.08)]">
           <button
             onClick={() => onRoleChange('farmer')}
@@ -68,6 +68,18 @@ export const FloatingDeviceSwitcher: React.FC<FloatingDeviceSwitcherProps> = ({
           >
             <ShieldCheck className="w-3 h-3" strokeWidth={1.75} />
             <span>Officer</span>
+          </button>
+          <button
+            onClick={() => onRoleChange('admin')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full transition-all cursor-pointer ${
+              role === 'admin'
+                ? 'bg-[#1F4A34] text-white shadow-xs font-semibold'
+                : 'text-[#5B665E] hover:text-[#17271D]'
+            }`}
+            title="Administrator console (Desktop only)"
+          >
+            <UserCog className="w-3 h-3" strokeWidth={1.75} />
+            <span>Admin</span>
           </button>
         </div>
 

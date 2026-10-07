@@ -129,7 +129,7 @@ export const CooperativeMembersView: React.FC<CooperativeMembersViewProps> = ({
   const addCandidates = useMemo(() => {
     const memberNames = new Set(members.map((m) => m.fullName.toLowerCase()));
     const fromAccounts: RegisteredFarmer[] = accounts
-      .filter((a) => a.role === 'farmer' && a.district === 'Musanze' && a.farmerDetails)
+      .filter((a) => a.role === 'farmer' && a.status === 'active' && a.district === 'Musanze' && a.farmerDetails)
       .map((a) => ({
         id: a.id,
         fullName: a.fullName,

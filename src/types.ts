@@ -1,5 +1,12 @@
 export type NavView =
   | 'dashboard'
+  | 'users'
+  | 'security'
+  | 'data_sources'
+  | 'processing'
+  | 'notifications'
+  | 'model_performance'
+  | 'field_data'
   | 'forecast'
   | 'warnings'
   | 'recommendations'
@@ -12,7 +19,11 @@ export type NavView =
   | 'meetings'
   | 'training';
 
-export type AppRole = 'farmer' | 'officer' | 'cooperative';
+/**
+ * The one set of role names, used by the app shell, accounts, sign-up and access requests.
+ * ('cooperative' = cooperative leader.)
+ */
+export type AppRole = 'farmer' | 'officer' | 'cooperative' | 'researcher' | 'admin';
 
 export type RiskLevel = 'Low' | 'Watch' | 'High' | 'Critical';
 
@@ -313,7 +324,7 @@ export interface UserProfileSettings {
 
 export interface NotificationItem {
   id: string;
-  type: 'warning' | 'feedback' | 'report_to_review' | 'message' | 'meeting';
+  type: 'warning' | 'feedback' | 'report_to_review' | 'message' | 'meeting' | 'access_request';
   title: string;
   subtitle: string;
   time: string;
@@ -549,19 +560,34 @@ export interface ScheduledReportItem {
 // =========================================================================
 // AUTHENTICATION & ACCESS REQUEST TYPES (Module 1, Parts 1 & 2)
 // =========================================================================
-export type SignUpRole = 'farmer' | 'cooperative_leader' | 'officer' | 'researcher';
+export type SignUpRole = Exclude<AppRole, 'admin'>;
+
+/** Roles that need an administrator's approval before they can sign in. */
+export type ApprovalRole = 'cooperative' | 'officer' | 'researcher';
+
+export type AccountStatus = 'active' | 'pending' | 'suspended' | 'rejected';
 
 export interface UserAccount {
   id: string;
-  role: 'farmer' | 'officer' | 'cooperative_leader' | 'researcher' | 'admin';
+  role: AppRole;
   fullName: string;
   phone: string;
   email?: string;
   password?: string;
   district: string;
   preferredLanguage: 'rw' | 'en';
-  status: 'active' | 'pending';
+  status: AccountStatus;
   createdAt: string;
+  /** 'DD/MM/YYYY HH:MM'; undefined = never signed in. */
+  lastSignIn?: string;
+  twoStepEnabled?: boolean;
+  /** Geographic access: the district, optionally limited to sectors, and/or one cooperative. */
+  scope?: {
+    district: string;
+    /** Empty = the whole district. */
+    sectors: string[];
+    cooperative?: string;
+  };
   farmerDetails?: {
     sector: string;
     cell: string;
@@ -589,12 +615,48 @@ export interface UserAccount {
 export interface AccessRequest {
   id: string;
   accountId: string;
-  role: 'cooperative_leader' | 'officer' | 'researcher';
+  role: ApprovalRole;
   fullName: string;
   phone: string;
   email: string;
   organizationOrArea: string;
   submittedAt: string;
   status: 'pending' | 'approved' | 'rejected';
+  /** Reason given when rejected (shown to the applicant at sign-in). */
+  decisionReason?: string;
+  decidedAt?: string;
+}
+
+export type PermissionId =
+  | 'view_forecasts'
+  | 'issue_warnings'
+  | 'verify_reports'
+  | 'message_members'
+  | 'manage_members'
+  | 'view_research_data'
+  | 'manage_users'
+  | 'export_data';
+
+/** Which permissions each role has (Permission matrix). */
+export type RolePermissions = Record<AppRole, PermissionId[]>;
+
+/** One recorded action (admin dashboard "latest audit events"; extended by Security & audit). */
+export interface AuditEvent {
+  id: string;
+  /** 'DD/MM/YYYY HH:MM' */
+  at: string;
+  actor: string;
+  actorRole: AppRole | 'system';
+  action: string;
+  target: string;
+}
+
+export interface DataSourceStatus {
+  id: string;
+  name: string;
+  status: 'Healthy' | 'Delayed' | 'Error';
+  /** 'DD/MM HH:MM' */
+  lastSync: string;
+  note: string;
 }
 
