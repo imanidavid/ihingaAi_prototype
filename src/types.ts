@@ -313,7 +313,7 @@ export interface UserProfileSettings {
 
 export interface NotificationItem {
   id: string;
-  type: 'warning' | 'feedback' | 'report_to_review' | 'message';
+  type: 'warning' | 'feedback' | 'report_to_review' | 'message' | 'meeting';
   title: string;
   subtitle: string;
   time: string;
@@ -324,12 +324,39 @@ export interface NotificationItem {
   targetData?: any;
 }
 
-/** A cooperative group as shown in the UI — computed by computeCoopGroups() from the warnings state. */
+export type CoopMemberRole = 'Leader' | 'Secretary' | 'Treasurer' | 'Group lead' | 'Member';
+
+/** One cooperative member. `acknowledged` is keyed by warning id (missing = not acknowledged). */
+export interface CoopMember {
+  id: string;
+  fullName: string;
+  groupId: string;
+  cell: string;
+  phone: string;
+  role: CoopMemberRole;
+  crops: string[];
+  acknowledged: Record<string, boolean>;
+  /** DD/MM/YYYY */
+  lastActive: string;
+}
+
+/** A group record in the store. Members, warnings and counts are computed, never stored here. */
+export interface CoopGroupRecord {
+  id: string;
+  name: string;
+  sector: string;
+  /** Member field reports earlier this season that are not in the 7-day reports store. */
+  reportsEarlierThisSeason: number;
+  isDemo?: boolean;
+}
+
+/** A cooperative group as shown in the UI — computed by computeCoopGroups(). */
 export interface CoopGroup {
   id: string;
   name: string;
   sector: string;
   membersCount: number;
+  leadName: string | null;
   warnings: {
     id: string;
     title: string;
@@ -344,24 +371,41 @@ export interface CoopGroup {
     totalCount: number;
     pct: number;
   }[];
+  /** Member field reports in the reports store (same records the officer sees). */
+  memberReports: ReportItem[];
   reports7Days: number;
-  /** Latest active warning covering the group; "not acknowledged" counts refer to it. */
+  reportsThisSeason: number;
+  /** Latest active warning covering the group; "not acknowledged" refers to it. */
   unacknowledgedWarningTitle: string | null;
   unacknowledgedCount: number;
-  /** Named members who have not acknowledged (the rest are shown as "+N other members"). */
+  /** "Name (Cell)" of every member who has not acknowledged the latest warning. */
   unacknowledgedMembers: string[];
 }
 
-/** Seeded group record. Warnings and levels are NOT stored here (they come from the warnings state). */
-export interface CoopGroupSeed {
+/** 'all' = every member of the cooperative. */
+export type CoopAudience = 'all' | string[];
+
+export interface CoopMeeting {
   id: string;
-  name: string;
-  sector: string;
-  membersCount: number;
-  /** Members who acknowledged each warning, by warning id. Missing id = 0. */
-  acknowledgedByWarning: Record<string, number>;
-  reports7Days: number;
-  pendingMemberNames: string[];
+  title: string;
+  /** DD/MM/YYYY */
+  date: string;
+  /** HH:MM */
+  time: string;
+  place: string;
+  audience: CoopAudience;
+  smsInvite: boolean;
+  isDemo?: boolean;
+}
+
+export interface EquipmentBooking {
+  id: string;
+  equipmentId: string;
+  /** DD/MM/YYYY */
+  date: string;
+  slot: string;
+  bookedFor: { type: 'group' | 'member'; id: string };
+  isDemo?: boolean;
 }
 
 export interface CoopMessage {
@@ -380,6 +424,8 @@ export interface CoopMessage {
   sentAt: string;
   channels: ('SMS' | 'Voice' | 'In-app')[];
   deliveredCount: number;
+  /** Direct message to specific members (member ids); groups then holds their names. */
+  recipientMemberIds?: string[];
   isDemo?: boolean;
 }
 
@@ -391,7 +437,6 @@ export interface CoopData {
     phone: string;
     initials: string;
   };
-  groups: CoopGroupSeed[];
   actions: {
     id: string;
     description: string;
