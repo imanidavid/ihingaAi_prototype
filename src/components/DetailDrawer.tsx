@@ -45,6 +45,7 @@ interface DetailDrawerProps {
   onToggleSave?: (id: string) => void;
   onRetrySendObservation?: (id: string) => void;
   onRemindGroup?: (group: CoopGroup) => void;
+  onMessageGroup?: (group: CoopGroup) => void;
 }
 
 export const DetailDrawer: React.FC<DetailDrawerProps> = ({
@@ -54,6 +55,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
   onToggleSave,
   onRetrySendObservation,
   onRemindGroup,
+  onMessageGroup,
 }) => {
   const [internalSaved, setInternalSaved] = useState(false);
   const [isAcknowledged, setIsAcknowledged] = useState(false);
@@ -565,7 +567,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                     {groupData.name}
                   </h2>
                   <p className="text-[12.5px] text-[#5B665E]">
-                    {groupData.membersCount} registered cooperative members
+                    {groupData.membersCount} members · Lead: {groupData.leadName || 'no group lead yet'}
                   </p>
                 </div>
 
@@ -677,6 +679,73 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
               </div>
             )}
 
+            {/* All members of the group */}
+            {isCoopGroup && groupData && (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[13.5px] font-semibold text-[#17271D]">Members</h3>
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#E4ECDB] text-[#1F4A34] font-semibold text-[11px] tabular-nums">
+                    {groupData.membersCount}
+                  </span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-white border border-[rgba(31,74,52,0.10)] divide-y divide-[rgba(31,74,52,0.06)] max-h-48 overflow-y-auto">
+                  {groupData.memberNames.map((name) => (
+                    <div key={name} className="py-1.5 first:pt-0 last:pb-0 text-[12px] text-[#17271D]">
+                      {name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Group field reports: the same records the officer reviews */}
+            {isCoopGroup && groupData && (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[13.5px] font-semibold text-[#17271D]">Member field reports</h3>
+                  <span className="text-[11.5px] text-[#5B665E] tabular-nums">
+                    {groupData.reports7Days} in 7 days · {groupData.reportsThisSeason} this season
+                  </span>
+                </div>
+                {groupData.memberReports.length === 0 ? (
+                  <p className="text-[12px] text-[#5B665E]">No member reports in the last 7 days.</p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(
+                        groupData.memberReports.reduce<Record<string, number>>((acc, r) => {
+                          acc[r.type] = (acc[r.type] || 0) + 1;
+                          return acc;
+                        }, {})
+                      ).map(([type, count]) => (
+                        <span
+                          key={type}
+                          className="px-2.5 py-0.5 rounded-full bg-[#E4ECDB] text-[#1F4A34] text-[11px] font-medium border border-[rgba(31,74,52,0.12)] tabular-nums"
+                        >
+                          {type} {count}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-white border border-[rgba(31,74,52,0.10)] divide-y divide-[rgba(31,74,52,0.06)]">
+                      {groupData.memberReports.slice(0, 3).map((r) => (
+                        <div key={r.id} className="py-2 first:pt-0 last:pb-0 text-[12px]">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-[#17271D]">{r.title}</span>
+                            <span className="text-[10.5px] text-[#5B665E] bg-white px-2 py-0.5 rounded-full border border-[rgba(31,74,52,0.16)] whitespace-nowrap">
+                              {r.status}
+                            </span>
+                          </div>
+                          <span className="text-[11.5px] text-[#5B665E] tabular-nums">
+                            {r.farmer} · {r.cell} · {r.type} · {r.date}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* VARIANT 5: COOPERATIVE MESSAGE DETAIL */}
             {isCoopMessage && messageData && (
               <div className="space-y-6">
@@ -763,10 +832,16 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={onClose}
-                  className="py-2.5 px-4 rounded-full border border-[rgba(31,74,52,0.20)] text-[#5B665E] hover:text-[#17271D] text-[12.5px] font-medium transition-colors cursor-pointer"
+                  onClick={() => {
+                    if (groupData && onMessageGroup) {
+                      onMessageGroup(groupData);
+                      onClose();
+                    }
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-full bg-white border border-[#1F4A34]/40 text-[#1F4A34] hover:bg-[#E4ECDB] text-[13px] font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  Close
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Message group</span>
                 </button>
               </div>
             ) : isCoopMessage ? (

@@ -331,6 +331,8 @@ export interface CoopMember {
   id: string;
   fullName: string;
   groupId: string;
+  /** Sector where the member farms (field reports are matched on name + sector). */
+  sector: string;
   cell: string;
   phone: string;
   role: CoopMemberRole;
@@ -338,6 +340,61 @@ export interface CoopMember {
   acknowledged: Record<string, boolean>;
   /** DD/MM/YYYY */
   lastActive: string;
+  /**
+   * First of the last four weeks (1 = oldest) from which the member has been active every week;
+   * null = not active in the last 30 days.
+   */
+  activeFromWeek: 1 | 2 | 3 | 4 | null;
+  isDemo?: boolean;
+}
+
+/** A registered Musanze farmer who is not (yet) a member — the "Add member" search pool. */
+export interface RegisteredFarmer {
+  id: string;
+  fullName: string;
+  sector: string;
+  cell: string;
+  phone: string;
+  crops: string[];
+}
+
+export interface CoopEquipment {
+  id: string;
+  name: string;
+  kind: string;
+}
+
+export interface TrainingMaterial {
+  id: string;
+  title: string;
+  format: 'Audio' | 'Video' | 'Guide';
+  language: 'Kinyarwanda' | 'English';
+  length: string;
+  summary: string;
+  /** Planned file path from docs/media-manifest.md; the UI shows an icon fallback until it exists. */
+  thumbnail: string;
+  shareMessageEn: string;
+  shareMessageRw: string;
+}
+
+export interface CoopDirectoryEntry {
+  id: string;
+  name: string;
+  sectors: string;
+  mainCrops: string;
+  /** null = our own cooperative; its member count is computed from the store. */
+  members: number | null;
+}
+
+/** A dated item on the cooperative calendar that is not a meeting or booking (from the crop calendar). */
+export interface CropWindow {
+  id: string;
+  title: string;
+  /** DD/MM/YYYY */
+  date: string;
+  /** HH:MM */
+  time: string;
+  note: string;
 }
 
 /** A group record in the store. Members, warnings and counts are computed, never stored here. */
@@ -357,6 +414,8 @@ export interface CoopGroup {
   sector: string;
   membersCount: number;
   leadName: string | null;
+  /** "Name (Cell)" of every member, officers of the group first. */
+  memberNames: string[];
   warnings: {
     id: string;
     title: string;

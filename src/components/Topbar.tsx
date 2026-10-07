@@ -17,6 +17,7 @@ import {
   FileText,
   LogOut,
   User,
+  CalendarDays,
 } from 'lucide-react';
 import {
   MUSANZE_RECORD,
@@ -736,6 +737,8 @@ export const Topbar: React.FC<TopbarProps> = ({
                           />
                         ) : item.type === 'feedback' ? (
                           <ShieldCheck className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
+                        ) : item.type === 'meeting' ? (
+                          <CalendarDays className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
                         ) : (
                           <Eye className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
                         )}

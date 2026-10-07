@@ -18,7 +18,14 @@ import {
   UserAccount,
   AccessRequest,
   CoopGroup,
+  CoopGroupRecord,
+  CoopMember,
+  CoopMemberRole,
+  CoopMeeting,
   CoopMessage,
+  EquipmentBooking,
+  RegisteredFarmer,
+  TrainingMaterial,
 } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -45,9 +52,12 @@ import { OfficerDashboardView } from './components/OfficerDashboardView';
 import { OfficerReportsView } from './components/OfficerReportsView';
 import { CooperativeDashboardView } from './components/CooperativeDashboardView';
 import { CooperativeMessagesView } from './components/CooperativeMessagesView';
+import { CooperativeMembersView } from './components/CooperativeMembersView';
+import { CooperativeMeetingsView } from './components/CooperativeMeetingsView';
+import { CooperativeTrainingView } from './components/CooperativeTrainingView';
+import { ScheduleMeetingModal } from './components/coop/ScheduleMeetingModal';
 import { MessageComposerModal } from './components/MessageComposerModal';
 import { SignInView } from './components/SignInView';
-import { PlaceholderView } from './components/PlaceholderView';
 import { INITIAL_GENERATED_REPORTS } from './data/reportsModuleData';
 import { INITIAL_USER_ACCOUNTS } from './data/rwandaAdminData';
 import {
@@ -58,8 +68,23 @@ import {
   INITIAL_52_REPORTS,
   computeSectorClimateRisk,
   isWarningRelevantToFarmer,
-  COOPERATIVE_DATA,
   INITIAL_COOP_MESSAGES,
+  INITIAL_COOP_MEMBERS,
+  INITIAL_COOP_GROUPS,
+  INITIAL_COOP_MEETINGS,
+  INITIAL_EQUIPMENT_BOOKINGS,
+  COOP_EQUIPMENT,
+  NOW,
+  NOW_DATE,
+  computeCoopGroups,
+  computeCoopSummary,
+  findMemberByName,
+  formatDayShort,
+  meetingInviteeCount,
+  meetingReachesGroup,
+  messageReachesMember,
+  parseDMY,
+  sortMeetings,
 } from './data/musanzeData';
 
 export default function App() {
@@ -83,7 +108,9 @@ export default function App() {
     group?: string;
     en?: string;
     rw?: string;
+    member?: CoopMember;
   }>({});
+  const [isScheduleMeetingOpen, setIsScheduleMeetingOpen] = useState(false);
 
   // Accounts & Access Requests in Shared Store
   const [accounts, setAccounts] = useState<UserAccount[]>(INITIAL_USER_ACCOUNTS);
@@ -221,6 +248,19 @@ export default function App() {
     'feedback-obs-5',
   ]);
 
+  // 7. COOPERATIVE: members, groups, meetings and shared sprayer bookings
+  const [coopMembers, setCoopMembers] = useState<CoopMember[]>(INITIAL_COOP_MEMBERS);
+  const [coopGroupRecords, setCoopGroupRecords] = useState<CoopGroupRecord[]>(INITIAL_COOP_GROUPS);
+  const [meetings, setMeetings] = useState<CoopMeeting[]>(INITIAL_COOP_MEETINGS);
+  const [equipmentBookings, setEquipmentBookings] = useState<EquipmentBooking[]>(INITIAL_EQUIPMENT_BOOKINGS);
+
+  // Groups with members, warnings, acknowledgement and member reports — computed once, used everywhere
+  const coopGroups = useMemo(
+    () => computeCoopGroups(warnings, coopMembers, coopGroupRecords, reports),
+    [warnings, coopMembers, coopGroupRecords, reports]
+  );
+  const coopSummary = useMemo(() => computeCoopSummary(coopGroups), [coopGroups]);
+
   // =========================================================================
   // DERIVED VIEWS FOR FARMER AND OFFICER ROLES
   // =========================================================================
@@ -268,6 +308,35 @@ export default function App() {
   // =========================================================================
   // BELL & NOTIFICATIONS COMPUTATION
   // =========================================================================
+  // The signed-in farmer's cooperative membership (none for farmers outside the cooperative)
+  const farmerMember = useMemo(
+    () => findMemberByName(coopMembers, userSettings.fullName),
+    [coopMembers, userSettings.fullName]
+  );
+  // Cooperative events shared to the farmer's crop calendar: upcoming meetings for their group
+  const farmerMeetings = useMemo(
+    () =>
+      farmerMember
+        ? sortMeetings(meetings).filter(
+            (m) =>
+              meetingReachesGroup(m, farmerMember.groupId) &&
+              parseDMY(m.date, m.time).getTime() >= NOW_DATE.getTime()
+          )
+        : [],
+    [meetings, farmerMember]
+  );
+  const farmerBookings = useMemo(
+    () =>
+      farmerMember
+        ? equipmentBookings.filter(
+            (b) =>
+              (b.bookedFor.type === 'member' && b.bookedFor.id === farmerMember.id) ||
+              (b.bookedFor.type === 'group' && b.bookedFor.id === farmerMember.groupId)
+          )
+        : [],
+    [equipmentBookings, farmerMember]
+  );
+
   // Farmer notifications: active warnings covering Kinigi + officer feedback for Jean-Baptiste
   const farmerNotifications: NotificationItem[] = useMemo(() => {
     return [
@@ -305,12 +374,9 @@ export default function App() {
           };
         }),
 
-      // 3. Broadcast messages from Musanze Potato Growers Cooperative
+      // 3. Cooperative messages that reach this farmer (all members, their group, or them directly)
       ...messages
-        .filter(
-          (m) =>
-            m.groups.some((g) => g.toLowerCase().includes('all') || g.toLowerCase().includes('kinigi'))
-        )
+        .filter((m) => !!farmerMember && messageReachesMember(m, farmerMember, coopGroupRecords))
         .map((m) => {
           const notifId = `coop-msg-${m.id}`;
           return {
@@ -324,8 +390,23 @@ export default function App() {
             targetData: m,
           };
         }),
+
+      // 4. Upcoming cooperative meetings for the farmer's group
+      ...farmerMeetings.map((m) => {
+        const notifId = `meeting-${m.id}`;
+        return {
+          id: notifId,
+          type: 'meeting' as const,
+          title: `Meeting: ${m.title}`,
+          subtitle: `${formatDayShort(m.date)} ${m.time} · ${m.place}`,
+          time: `${formatDayShort(m.date)} ${m.time}`,
+          isRead: readNotificationIds.includes(notifId),
+          targetId: m.id,
+          targetData: m,
+        };
+      }),
     ];
-  }, [farmerActiveAlerts, farmerMyReports, messages, readNotificationIds]);
+  }, [farmerActiveAlerts, farmerMyReports, messages, farmerMember, farmerMeetings, coopGroupRecords, readNotificationIds]);
 
   // Officer notifications: reports awaiting review + active officer warnings
   const officerNotifications: NotificationItem[] = useMemo(() => {
@@ -362,10 +443,10 @@ export default function App() {
   // Cooperative notifications: warnings covering coop sectors + broadcast messages sent
   const coopNotifications: NotificationItem[] = useMemo(() => {
     return [
-      // 1. Active warnings covering coop sectors (Kinigi, Busogo, Muhoza)
+      // 1. Active warnings covering the cooperative's group sectors
       ...officerActiveWarnings
         .filter((w) =>
-          ['Kinigi', 'Busogo', 'Muhoza'].some(
+          coopSummary.groupSectors.some(
             (sec) => w.affectedArea.includes(sec) || w.affectedArea.includes('Musanze')
           )
         )
@@ -396,7 +477,7 @@ export default function App() {
         };
       }),
     ];
-  }, [officerActiveWarnings, messages, readNotificationIds]);
+  }, [officerActiveWarnings, messages, coopSummary.groupSectors, readNotificationIds]);
 
   const currentRoleNotifications =
     role === 'officer'
@@ -422,6 +503,10 @@ export default function App() {
       setDrawerContent({ type: 'observation', data: item.targetData });
     } else if (item.type === 'message') {
       setDrawerContent({ type: 'coop_message', data: item.targetData });
+    } else if (item.type === 'meeting') {
+      // Meetings live on the farmer's crop calendar under "Cooperative events"
+      setCurrentView('calendar');
+      setPreviewMode('desktop');
     }
   };
 
@@ -429,6 +514,7 @@ export default function App() {
   const handleRoleChange = (newRole: AppRole) => {
     setRole(newRole);
     setCurrentView('dashboard');
+    setDrawerContent(null);
     setIsAuthenticated(true);
     if (newRole === 'officer' || newRole === 'cooperative') {
       setPreviewMode('desktop');
@@ -760,6 +846,102 @@ export default function App() {
     setThresholdRules(updatedRules);
   };
 
+  // =========================================================================
+  // COOPERATIVE MUTATION HANDLERS (members, groups, meetings, sprayer bookings)
+  // =========================================================================
+  const showToast = (msg: string, ms: number = 3000) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), ms);
+  };
+  const groupNameOf = (groupId: string) => coopGroupRecords.find((g) => g.id === groupId)?.name || '';
+
+  const handleAddCoopMember = (farmer: RegisteredFarmer, groupId: string) => {
+    const member: CoopMember = {
+      id: `mem-demo-${Date.now()}`,
+      fullName: farmer.fullName,
+      groupId,
+      sector: farmer.sector,
+      cell: farmer.cell,
+      phone: farmer.phone,
+      role: 'Member',
+      crops: farmer.crops,
+      acknowledged: {},
+      lastActive: NOW.dateFormatted,
+      activeFromWeek: 4,
+      isDemo: true,
+    };
+    setCoopMembers((prev) => [...prev, member]);
+    showToast(`${farmer.fullName} added to ${groupNameOf(groupId)}`);
+  };
+
+  const handleChangeCoopRole = (memberId: string, role: CoopMemberRole) => {
+    const target = coopMembers.find((m) => m.id === memberId);
+    if (!target) return;
+    setCoopMembers((prev) =>
+      prev.map((m) => {
+        if (m.id === memberId) return { ...m, role };
+        // One group lead per group; one secretary and one treasurer for the cooperative
+        const replaced =
+          (role === 'Group lead' && m.role === 'Group lead' && m.groupId === target.groupId) ||
+          ((role === 'Secretary' || role === 'Treasurer') && m.role === role);
+        return replaced ? { ...m, role: 'Member' as const } : m;
+      })
+    );
+    showToast(`${target.fullName} is now ${role === 'Member' ? 'a member' : role.toLowerCase()}`);
+  };
+
+  const handleRemoveCoopMember = (memberId: string) => {
+    const target = coopMembers.find((m) => m.id === memberId);
+    if (!target || target.role === 'Leader') return;
+    setCoopMembers((prev) => prev.filter((m) => m.id !== memberId));
+    showToast(`${target.fullName} removed from ${groupNameOf(target.groupId)}`);
+  };
+
+  const handleCreateCoopGroup = (input: { name: string; leadId: string; memberIds: string[] }) => {
+    const lead = coopMembers.find((m) => m.id === input.leadId);
+    if (!lead) return;
+    const group: CoopGroupRecord = {
+      id: `grp-demo-${Date.now()}`,
+      name: input.name,
+      sector: lead.sector,
+      reportsEarlierThisSeason: 0,
+      isDemo: true,
+    };
+    const moving = new Set([input.leadId, ...input.memberIds]);
+    setCoopGroupRecords((prev) => [...prev, group]);
+    setCoopMembers((prev) =>
+      prev.map((m) => {
+        if (m.id === input.leadId) return { ...m, groupId: group.id, role: 'Group lead' as const };
+        if (!moving.has(m.id)) return m;
+        // A group lead who moves into the new group becomes a member there
+        return { ...m, groupId: group.id, role: m.role === 'Group lead' ? ('Member' as const) : m.role };
+      })
+    );
+    showToast(`${input.name} created with ${moving.size} ${moving.size === 1 ? 'member' : 'members'}`);
+  };
+
+  const handleScheduleMeeting = (meeting: CoopMeeting) => {
+    setMeetings((prev) => [...prev, meeting]);
+    setIsScheduleMeetingOpen(false);
+    const invited = meetingInviteeCount(meeting, coopMembers);
+    showToast(
+      meeting.smsInvite
+        ? `Meeting scheduled · SMS invitation to ${invited} members`
+        : `Meeting scheduled for ${invited} members`
+    );
+  };
+
+  const handleBookEquipment = (booking: EquipmentBooking) => {
+    setEquipmentBookings((prev) => [...prev, booking]);
+    const eq = COOP_EQUIPMENT.find((e) => e.id === booking.equipmentId);
+    showToast(`${eq?.name} booked · ${formatDayShort(booking.date)} ${booking.slot}`);
+  };
+
+  const openComposer = (prefill: { group?: string; en?: string; rw?: string; member?: CoopMember }) => {
+    setMessageComposerPrefill(prefill);
+    setIsMessageComposerOpen(true);
+  };
+
   const handleResetDemo = () => {
     setWarnings(INITIAL_WARNINGS);
     setReports(INITIAL_52_REPORTS);
@@ -771,6 +953,12 @@ export default function App() {
     setMessages(INITIAL_COOP_MESSAGES);
     setSavedItemIds(['plan-4']);
     setReadNotificationIds(['feedback-obs-3', 'feedback-obs-5']);
+    setCoopMembers(INITIAL_COOP_MEMBERS);
+    setCoopGroupRecords(INITIAL_COOP_GROUPS);
+    setMeetings(INITIAL_COOP_MEETINGS);
+    setEquipmentBookings(INITIAL_EQUIPMENT_BOOKINGS);
+    setIsScheduleMeetingOpen(false);
+    setIsMessageComposerOpen(false);
     setDrawerContent(null);
     setIsTimeoutModalOpen(false);
     setToastMessage('Demo state reset to initial data');
@@ -824,6 +1012,8 @@ export default function App() {
           onOpenReportModal={handleOpenReportModal}
           role={role}
           reportsToReviewCount={reportsToReviewCount}
+          coopMembersUnderWarning={coopSummary.membersUnderWarning}
+          coopTotalMembers={coopSummary.totalMembers}
         />
       )}
 
@@ -887,10 +1077,11 @@ export default function App() {
                 />
               ) : role === 'cooperative' ? (
                 <CooperativeDashboardView
-                  onOpenMessageComposer={(prefillGroup, prefillEn, prefillRw) => {
-                    setMessageComposerPrefill({ group: prefillGroup, en: prefillEn, rw: prefillRw });
-                    setIsMessageComposerOpen(true);
-                  }}
+                  groups={coopGroups}
+                  onScheduleMeeting={() => setIsScheduleMeetingOpen(true)}
+                  onOpenMessageComposer={(prefillGroup, prefillEn, prefillRw) =>
+                    openComposer({ group: prefillGroup, en: prefillEn, rw: prefillRw })
+                  }
                   onSelectGroup={(group) => {
                     setDrawerContent({ type: 'coop_group', data: group });
                   }}
@@ -902,7 +1093,6 @@ export default function App() {
                     setTimeout(() => setToastMessage(null), 3000);
                   }}
                   messages={messages}
-                  warnings={warnings}
                 />
               ) : (
                 <div className="space-y-6">
@@ -993,10 +1183,19 @@ export default function App() {
               ))}
 
             {currentView === 'members' && (
-              <PlaceholderView
-                viewId="members"
-                title="Members & groups"
-                onBackToDashboard={() => setCurrentView('dashboard')}
+              <CooperativeMembersView
+                members={coopMembers}
+                groupRecords={coopGroupRecords}
+                groups={coopGroups}
+                messages={messages}
+                accounts={accounts}
+                onAddMember={handleAddCoopMember}
+                onChangeRole={handleChangeCoopRole}
+                onRemoveMember={handleRemoveCoopMember}
+                onCreateGroup={handleCreateCoopGroup}
+                onMessageMember={(member) => openComposer({ member })}
+                onMessageGroup={(groupName) => openComposer({ group: groupName })}
+                onOpenGroup={(group) => setDrawerContent({ type: 'coop_group', data: group })}
               />
             )}
 
@@ -1014,22 +1213,36 @@ export default function App() {
             )}
 
             {currentView === 'meetings' && (
-              <PlaceholderView
-                viewId="meetings"
-                title="Meetings"
-                onBackToDashboard={() => setCurrentView('dashboard')}
+              <CooperativeMeetingsView
+                meetings={meetings}
+                bookings={equipmentBookings}
+                members={coopMembers}
+                groupRecords={coopGroupRecords}
+                onScheduleMeeting={() => setIsScheduleMeetingOpen(true)}
               />
             )}
 
             {currentView === 'training' && (
-              <PlaceholderView
-                viewId="training"
-                title="Training"
-                onBackToDashboard={() => setCurrentView('dashboard')}
+              <CooperativeTrainingView
+                bookings={equipmentBookings}
+                members={coopMembers}
+                groupRecords={coopGroupRecords}
+                onBook={handleBookEquipment}
+                onShareMaterial={(material: TrainingMaterial) =>
+                  openComposer({ group: 'All groups', en: material.shareMessageEn, rw: material.shareMessageRw })
+                }
               />
             )}
 
-            {currentView === 'calendar' && <CropCalendarView />}
+            {currentView === 'calendar' && (
+              <CropCalendarView
+                cooperativeMeetings={farmerMeetings}
+                cooperativeBookings={farmerBookings}
+                memberName={farmerMember?.fullName}
+                groupName={farmerMember ? coopGroupRecords.find((g) => g.id === farmerMember.groupId)?.name : undefined}
+                groupRecords={coopGroupRecords}
+              />
+            )}
 
             {currentView === 'recommendations' && (
               <RecommendationsView
@@ -1113,14 +1326,14 @@ export default function App() {
         savedItemIds={savedItemIds}
         onToggleSave={handleToggleSaveItem}
         onRetrySendObservation={handleRetrySendObservation}
-        onRemindGroup={(group) => {
-          setMessageComposerPrefill({
+        onRemindGroup={(group) =>
+          openComposer({
             group: group.name,
             en: `Advisory reminder for ${group.name}: Please acknowledge active hazard warnings and follow blight prevention steps.`,
             rw: `Kwibutsa abahinzi bo muri ${group.name}: Mukore kwemeza imburagihe z'akaga kandi mukurikize amabwiriza yo kwirinda imvura n'imvura y'umurengera.`,
-          });
-          setIsMessageComposerOpen(true);
-        }}
+          })
+        }
+        onMessageGroup={(group) => openComposer({ group: group.name })}
       />
 
       {/* Message Composer Modal for Cooperative Member Broadcasts */}
@@ -1131,13 +1344,24 @@ export default function App() {
           setMessages((prev) => [newMsg, ...prev]);
           const split = newMsg.channelSplit || { sms: 67, voice: 6, inApp: 9 };
           setToastMessage(
-            `Sent to ${newMsg.recipientCount} members (SMS ${split.sms} · Voice ${split.voice} · In-app ${split.inApp})`
+            `Sent to ${newMsg.recipientCount} ${newMsg.recipientCount === 1 ? 'member' : 'members'} (SMS ${split.sms} · Voice ${split.voice} · In-app ${split.inApp})`
           );
           setTimeout(() => setToastMessage(null), 4000);
         }}
         prefillTargetGroup={messageComposerPrefill.group}
         prefillEn={messageComposerPrefill.en}
         prefillRw={messageComposerPrefill.rw}
+        prefillMember={messageComposerPrefill.member}
+        groups={coopGroups}
+      />
+
+      {/* Schedule meeting (cooperative leader) — shared to members' crop calendars and bells */}
+      <ScheduleMeetingModal
+        isOpen={isScheduleMeetingOpen}
+        onClose={() => setIsScheduleMeetingOpen(false)}
+        groupRecords={coopGroupRecords}
+        members={coopMembers}
+        onSchedule={handleScheduleMeeting}
       />
 
       {/* Report Observation Modal */}
