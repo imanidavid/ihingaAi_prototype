@@ -29,6 +29,13 @@ import {
   AccountStatus,
   AuditEvent,
   RolePermissions,
+  DataSourceStatus,
+  LoginAttempt,
+  MessageTemplate,
+  ProcessingRun,
+  ProcessingSettings,
+  SecuritySettings,
+  VoiceSettings,
 } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -100,7 +107,18 @@ import {
   INITIAL_AUDIT_EVENTS,
   NOW_STAMP,
   ROLE_LABELS,
+  INITIAL_LOGIN_ATTEMPTS,
+  INITIAL_SECURITY_SETTINGS,
+  INITIAL_DATA_SOURCES,
+  INITIAL_PROCESSING_RUNS,
+  INITIAL_PROCESSING_SETTINGS,
+  INITIAL_MESSAGE_TEMPLATES,
+  INITIAL_VOICE_SETTINGS,
 } from './data/musanzeData';
+import { AdminSecurityView } from './components/AdminSecurityView';
+import { AdminDataSourcesView } from './components/AdminDataSourcesView';
+import { AdminProcessingView } from './components/AdminProcessingView';
+import { AdminNotificationsView } from './components/AdminNotificationsView';
 
 export default function App() {
   const [role, setRole] = useState<AppRole>('farmer');
@@ -133,6 +151,14 @@ export default function App() {
   // Administration: permissions per role and the audit trail of real store events
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(INITIAL_ROLE_PERMISSIONS);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>(INITIAL_AUDIT_EVENTS);
+  // Security, data sources, processing and notification settings (admin pages)
+  const [loginAttempts, setLoginAttempts] = useState<LoginAttempt[]>(INITIAL_LOGIN_ATTEMPTS);
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>(INITIAL_SECURITY_SETTINGS);
+  const [dataSources, setDataSources] = useState<DataSourceStatus[]>(INITIAL_DATA_SOURCES);
+  const [processingRuns, setProcessingRuns] = useState<ProcessingRun[]>(INITIAL_PROCESSING_RUNS);
+  const [processingSettings, setProcessingSettings] = useState<ProcessingSettings>(INITIAL_PROCESSING_SETTINGS);
+  const [messageTemplates, setMessageTemplates] = useState<MessageTemplate[]>(INITIAL_MESSAGE_TEMPLATES);
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(INITIAL_VOICE_SETTINGS);
   // Who is signed in (UI state): the account behind `role`
   const [currentAccountId, setCurrentAccountId] = useState<string>(DEMO_ACCOUNT_ID_BY_ROLE.farmer);
 
@@ -194,6 +220,19 @@ export default function App() {
     setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, lastSignIn: NOW_STAMP } : a)));
     if (account) {
       logAudit('Signed in', ROLE_LABELS[signedInRole], { name: account.fullName, role: signedInRole });
+      setLoginAttempts((prev) => [
+        ...prev,
+        {
+          id: `la-demo-${Date.now()}`,
+          at: NOW_STAMP,
+          identifier: account.email || account.phone,
+          accountName: account.fullName,
+          role: signedInRole,
+          success: true,
+          device: 'This browser',
+          location: account.scope?.sectors[0] || account.district,
+        },
+      ]);
     }
     // If a farmer signed in:
     if (signedInRole === 'farmer' && userAccount) {
@@ -204,6 +243,24 @@ export default function App() {
       }
     }
     resetInactivityTimer();
+  };
+
+  // Failed sign-ins reported by the sign-in form (wrong password, suspended, rejected, unknown)
+  const handleSignInFailed = (identifier: string, reason: string, account?: UserAccount) => {
+    setLoginAttempts((prev) => [
+      ...prev,
+      {
+        id: `la-demo-${Date.now()}-${prev.length}`,
+        at: NOW_STAMP,
+        identifier,
+        accountName: account?.fullName,
+        role: account?.role,
+        success: false,
+        device: 'This browser',
+        location: account?.scope?.sectors[0] || account?.district || 'Unknown',
+        reason,
+      },
+    ]);
   };
 
   // Activity listeners to track idle duration
@@ -232,17 +289,15 @@ export default function App() {
     const interval = setInterval(() => {
       const idleTimeMs = Date.now() - lastActivityRef.current;
       // Inactivity timeout: officer 15 min (warn at 14 min), farmer 60 min (warn at 59 min)
-      const warningThresholdMs =
-        role === 'officer' || role === 'admin'
-          ? (15 * 60 - 60) * 1000
-          : (60 * 60 - 60) * 1000;
+      // Timeouts come from Security & audit settings (officer 15 min, farmer 60 min by default)
+      const warningThresholdMs = (securitySettings.timeoutMinutes[role] * 60 - 60) * 1000;
       if (idleTimeMs >= warningThresholdMs) {
         setIsTimeoutModalOpen(true);
         setTimeoutCountdown(60);
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [isAuthenticated, role, isTimeoutModalOpen]);
+  }, [isAuthenticated, role, isTimeoutModalOpen, securitySettings]);
 
   // Live 60s countdown timer when timeout modal is open
   useEffect(() => {
@@ -1081,6 +1136,79 @@ export default function App() {
     showToast(`${imported.length} farmers imported`);
   };
 
+  // Data sources, processing and notifications
+  const handleRefreshSource = (sourceId: string) => {
+    const source = dataSources.find((d) => d.id === sourceId);
+    setDataSources((prev) =>
+      prev.map((d) =>
+        d.id === sourceId
+          ? { ...d, status: 'Healthy' as const, lastSync: NOW_STAMP.slice(0, 5) + NOW_STAMP.slice(10), recordsToday: d.expectedToday, note: 'Synced just now' }
+          : d
+      )
+    );
+    logAudit('Refreshed data source', source?.name || sourceId);
+    showToast(`${source?.name} synced`);
+  };
+
+  const handleAddSource = (source: DataSourceStatus) => {
+    setDataSources((prev) => [...prev, source]);
+    logAudit('Connected data source', source.name);
+    showToast(`${source.name} connected`);
+  };
+
+  const handleManualUpload = (rows: number) => {
+    setDataSources((prev) =>
+      prev.map((d) =>
+        d.kind === 'File upload'
+          ? (() => {
+              const recordsToday = Math.min(d.expectedToday, d.recordsToday + rows);
+              const missing = d.expectedToday - recordsToday;
+              return {
+                ...d,
+                // Healthy only once the week's readings are complete
+                status: missing > 0 ? ('Delayed' as const) : ('Healthy' as const),
+                lastSync: NOW_STAMP.slice(0, 5) + NOW_STAMP.slice(10),
+                recordsToday,
+                note: missing > 0 ? `${rows} readings uploaded · ${missing} still missing` : 'All readings uploaded',
+              };
+            })()
+          : d
+      )
+    );
+    logAudit('Uploaded data', `${rows} rain gauge readings`);
+    showToast(`${rows} readings uploaded`);
+  };
+
+  const handleProcessingRun = (run: ProcessingRun) => {
+    setProcessingRuns((prev) => [...prev, run]);
+    logAudit(run.trigger === 'Reprocess' ? 'Reprocessed data' : 'Ran processing', `${run.recordsIn} records`);
+    showToast(`Processing finished · ${run.recordsIn} records ready for the forecast`);
+  };
+
+  const handleSaveProcessingSettings = (next: ProcessingSettings) => {
+    setProcessingSettings(next);
+    logAudit('Saved processing settings', `${next.gapMethod} · ${next.outlierThresholdSd} SD`);
+    showToast('Processing settings saved');
+  };
+
+  const handleSaveSecuritySettings = (next: SecuritySettings) => {
+    setSecuritySettings(next);
+    logAudit('Saved security settings', `Two-step: ${next.twoStepRoles.map((r) => ROLE_LABELS[r]).join(', ')}`);
+    showToast('Security settings saved');
+  };
+
+  const handleSaveTemplate = (template: MessageTemplate) => {
+    setMessageTemplates((prev) => prev.map((t) => (t.id === template.id ? template : t)));
+    logAudit('Edited template', template.name);
+    showToast(`${template.name} template saved`);
+  };
+
+  const handleSaveVoiceSettings = (next: VoiceSettings) => {
+    setVoiceSettings(next);
+    logAudit('Saved voice settings', next.enabled ? `${next.voice} · ${next.callWindow}` : 'Voice calls off');
+    showToast('Voice settings saved');
+  };
+
   const handleResetDemo = () => {
     setWarnings(INITIAL_WARNINGS);
     setReports(INITIAL_52_REPORTS);
@@ -1090,6 +1218,13 @@ export default function App() {
     setAccessRequests(INITIAL_ACCESS_REQUESTS);
     setRolePermissions(INITIAL_ROLE_PERMISSIONS);
     setAuditEvents(INITIAL_AUDIT_EVENTS);
+    setLoginAttempts(INITIAL_LOGIN_ATTEMPTS);
+    setSecuritySettings(INITIAL_SECURITY_SETTINGS);
+    setDataSources(INITIAL_DATA_SOURCES);
+    setProcessingRuns(INITIAL_PROCESSING_RUNS);
+    setProcessingSettings(INITIAL_PROCESSING_SETTINGS);
+    setMessageTemplates(INITIAL_MESSAGE_TEMPLATES);
+    setVoiceSettings(INITIAL_VOICE_SETTINGS);
     setCurrentAccountId(DEMO_ACCOUNT_ID_BY_ROLE[role]);
     setGeneratedReports(INITIAL_GENERATED_REPORTS);
     setMessages(INITIAL_COOP_MESSAGES);
@@ -1117,6 +1252,9 @@ export default function App() {
           accessRequests={accessRequests}
           onAddNewAccount={handleAddNewAccount}
           onAddAccessRequest={handleAddAccessRequest}
+          onSignInFailed={handleSignInFailed}
+          twoStepRoles={securitySettings.twoStepRoles}
+          lockAfterFailed={securitySettings.lockAfterFailed}
         />
 
         {/* Floating Device Switcher stays as demo shortcut: it signs in as that demo account */}
@@ -1212,6 +1350,8 @@ export default function App() {
             {/* View routing */}
             {currentView === 'dashboard' && role === 'admin' && (
               <AdminDashboardView
+                dataSources={dataSources}
+                lastRun={processingRuns[processingRuns.length - 1]}
                 accounts={accounts}
                 accessRequests={accessRequests}
                 auditEvents={auditEvents}
@@ -1238,12 +1378,54 @@ export default function App() {
               />
             )}
 
+            {currentView === 'security' && (
+              <AdminSecurityView
+                auditEvents={auditEvents}
+                loginAttempts={loginAttempts}
+                accounts={accounts}
+                securitySettings={securitySettings}
+                onSaveSettings={handleSaveSecuritySettings}
+                onExport={(what) => logAudit('Exported data', what)}
+              />
+            )}
+
+            {currentView === 'data_sources' && (
+              <AdminDataSourcesView
+                dataSources={dataSources}
+                onRefresh={handleRefreshSource}
+                onAddSource={handleAddSource}
+                onManualUpload={handleManualUpload}
+              />
+            )}
+
+            {currentView === 'processing' && (
+              <AdminProcessingView
+                runs={processingRuns}
+                settings={processingSettings}
+                dataSources={dataSources}
+                onRun={handleProcessingRun}
+                onSaveSettings={handleSaveProcessingSettings}
+              />
+            )}
+
+            {currentView === 'notifications' && (
+              <AdminNotificationsView
+                warnings={warnings}
+                messages={messages}
+                meetings={meetings}
+                members={coopMembers}
+                groupRecords={coopGroupRecords}
+                userSettings={userSettings}
+                templates={messageTemplates}
+                voiceSettings={voiceSettings}
+                onSaveTemplate={handleSaveTemplate}
+                onSaveVoiceSettings={handleSaveVoiceSettings}
+                onOpenComposer={() => openComposer({ group: 'All groups' })}
+              />
+            )}
+
             {(
               [
-                ['security', 'Security & audit'],
-                ['data_sources', 'Data sources'],
-                ['processing', 'Data processing'],
-                ['notifications', 'Notifications'],
                 ['model_performance', 'Model performance'],
                 ['field_data', 'Field data'],
               ] as const
@@ -1464,6 +1646,7 @@ export default function App() {
               (role === 'officer' ? (
                 <OfficerObservationsView
                   reports={reports}
+                  onOpenReport={(r) => logAudit('Opened farmer report', `${r.farmer} · ${r.title}`)}
                   onVerifyReport={handleOfficerVerifyReport}
                   onAskMoreInfo={handleOfficerAskMoreInfo}
                   onRejectReport={handleOfficerRejectReport}
@@ -1488,6 +1671,9 @@ export default function App() {
                 reportsList={generatedReports}
                 onReportsListChange={setGeneratedReports}
                 onShowToast={(msg) => {
+                  // Export tracking: downloads and PDF exports go to the audit log
+                  if (msg.startsWith('Downloaded ')) logAudit('Exported report', msg.replace('Downloaded ', ''));
+                  if (msg.includes('PDF export')) logAudit('Exported report', 'PDF');
                   setToastMessage(msg);
                   setTimeout(() => setToastMessage(null), 3000);
                 }}

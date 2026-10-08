@@ -654,9 +654,93 @@ export interface AuditEvent {
 export interface DataSourceStatus {
   id: string;
   name: string;
+  kind: 'Station network' | 'Satellite' | 'Forecast model' | 'File upload';
   status: 'Healthy' | 'Delayed' | 'Error';
   /** 'DD/MM HH:MM' */
   lastSync: string;
   note: string;
+  /** Where the (simulated) feed comes from. */
+  endpoint: string;
+  schedule: string;
+  recordsToday: number;
+  expectedToday: number;
+  isDemo?: boolean;
+}
+
+export interface LoginAttempt {
+  id: string;
+  /** 'DD/MM/YYYY HH:MM' */
+  at: string;
+  identifier: string;
+  accountName?: string;
+  role?: AppRole;
+  success: boolean;
+  device: string;
+  location: string;
+  reason?: string;
+}
+
+export interface SecuritySettings {
+  twoStepRoles: AppRole[];
+  timeoutMinutes: Record<AppRole, number>;
+  passwordMinLength: number;
+  passwordNeedsNumber: boolean;
+  lockAfterFailed: number;
+  retentionMonths: number;
+}
+
+export interface ProcessingRun {
+  id: string;
+  /** 'DD/MM/YYYY HH:MM' */
+  startedAt: string;
+  trigger: 'Scheduled' | 'Run now' | 'Reprocess';
+  status: 'Completed' | 'Completed with warnings';
+  durationMin: number;
+  recordsIn: number;
+  gapsFilled: number;
+  outliersFlagged: number;
+}
+
+export interface ProcessingSettings {
+  gapMethod: 'Linear between neighbours' | 'Nearest station' | 'Climatology for the day';
+  outlierThresholdSd: number;
+  interpolation: 'Inverse distance' | 'Nearest station' | 'Kriging (simulated)';
+  aggregation: 'Daily' | 'Dekadal' | 'Monthly';
+}
+
+export interface MessageTemplate {
+  id: string;
+  kind: 'Warning' | 'Advisory' | 'Cooperative' | 'Meeting';
+  name: string;
+  en: string;
+  rw: string;
+}
+
+export interface VoiceSettings {
+  enabled: boolean;
+  voice: 'Female voice' | 'Male voice';
+  retries: number;
+  callWindow: string;
+}
+
+export interface SmsReply {
+  id: string;
+  /** 'DD/MM/YYYY HH:MM' */
+  at: string;
+  fromName: string;
+  phone: string;
+  text: string;
+  meaning: 'Acknowledged' | 'Question' | 'Stop SMS';
+  relatedTo: string;
+}
+
+export interface SmsOptOut {
+  id: string;
+  name: string;
+  phone: string;
+  sector: string;
+  /** DD/MM/YYYY */
+  since: string;
+  via: string;
 }
 

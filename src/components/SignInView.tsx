@@ -29,6 +29,12 @@ interface SignInViewProps {
   onAddNewAccount?: (account: UserAccount) => void;
   onAddAccessRequest?: (account: UserAccount, request: AccessRequest) => void;
   initialLanguage?: SignInLanguage;
+  /** Failed sign-ins are recorded for Security & audit. */
+  onSignInFailed?: (identifier: string, reason: string, account?: UserAccount) => void;
+  /** Roles that must enter the two-step code (Security & audit settings). */
+  twoStepRoles?: AppRole[];
+  /** Sign-in form locks after this many failed attempts (Security & audit settings). */
+  lockAfterFailed?: number;
 }
 
 export type AuthMode = 'sign_in' | 'two_step' | 'sign_up' | 'forgot_password' | 'waiting_approval';
@@ -40,6 +46,9 @@ export const SignInView: React.FC<SignInViewProps> = ({
   onAddNewAccount = () => {},
   onAddAccessRequest = () => {},
   initialLanguage = 'en',
+  onSignInFailed = () => {},
+  twoStepRoles = ['officer', 'admin'],
+  lockAfterFailed = 5,
 }) => {
   const [lang, setLang] = useState<SignInLanguage>(initialLanguage);
   const [authMode, setAuthMode] = useState<AuthMode>('sign_in');
@@ -147,7 +156,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
   // Handle Submit Sign-in Form
   const handleSubmitSignIn = (e: React.FormEvent) => {
     e.preventDefault();
-    if (failedAttempts >= 5) {
+    if (failedAttempts >= lockAfterFailed) {
       setErrorMessage(t.errorTooManyAttempts);
       return;
     }
@@ -172,6 +181,11 @@ export const SignInView: React.FC<SignInViewProps> = ({
 
       // Suspended or rejected accounts cannot sign in
       if (resolution && resolution.role === 'blocked_role') {
+        onSignInFailed(
+          identifier,
+          resolution.account?.status === 'rejected' ? 'Access request rejected' : 'Account suspended',
+          resolution.account
+        );
         if (resolution.account?.status === 'rejected') {
           const reason = accessRequests.find((r) => r.accountId === resolution.account?.id)?.decisionReason;
           setErrorMessage(reason ? `${t.errorRejected} ${reason}` : t.errorRejected);
@@ -184,9 +198,10 @@ export const SignInView: React.FC<SignInViewProps> = ({
       const isValidPassword = password.trim() === 'demo1234' || password.trim().length >= 4;
 
       if (!resolution || !isValidPassword) {
+        onSignInFailed(identifier, resolution ? 'Wrong password' : 'Unknown account', resolution?.account);
         const nextAttempts = failedAttempts + 1;
         setFailedAttempts(nextAttempts);
-        if (nextAttempts >= 5) {
+        if (nextAttempts >= lockAfterFailed) {
           setErrorMessage(t.errorTooManyAttempts);
         } else {
           setErrorMessage(t.errorIncorrect);
@@ -195,8 +210,8 @@ export const SignInView: React.FC<SignInViewProps> = ({
       }
 
       // Valid credentials
-      if (resolution.role === 'officer' || resolution.role === 'admin') {
-        // Officers and administrators require two-step verification
+      if (resolution.role !== 'pending_role' && resolution.role !== 'blocked_role' && twoStepRoles.includes(resolution.role)) {
+        // Roles chosen in Security & audit (officers and administrators by default) need the code
         setTwoStepTarget({ role: resolution.role, account: resolution.account });
         setAuthMode('two_step');
       } else if (resolution.role === 'pending_role' || resolution.role === 'blocked_role') {
@@ -325,7 +340,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder={t.phoneOrEmailPlaceholder}
-                    disabled={failedAttempts >= 5}
+                    disabled={failedAttempts >= lockAfterFailed}
                     className="w-full py-2.5 px-3.5 rounded-xl bg-white border border-[rgba(31,74,52,0.20)] text-[#17271D] text-[13px] placeholder:text-[#5B665E]/60 focus:outline-hidden focus:border-[#1F4A34] transition-colors"
                     required
                   />
@@ -351,7 +366,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder={t.passwordPlaceholder}
-                      disabled={failedAttempts >= 5}
+                      disabled={failedAttempts >= lockAfterFailed}
                       className="w-full py-2.5 pl-3.5 pr-10 rounded-xl bg-white border border-[rgba(31,74,52,0.20)] text-[#17271D] text-[13px] placeholder:text-[#5B665E]/60 focus:outline-hidden focus:border-[#1F4A34] transition-colors"
                       required
                     />
@@ -373,7 +388,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 {/* Submit Sign In Button */}
                 <button
                   type="submit"
-                  disabled={isLoading || failedAttempts >= 5}
+                  disabled={isLoading || failedAttempts >= lockAfterFailed}
                   className="w-full py-3 px-4 rounded-full bg-[#1F4A34] text-white text-[13px] font-semibold hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-98"
                 >
                   {isLoading ? <span>{t.signingIn}</span> : <span>{t.signInButton}</span>}

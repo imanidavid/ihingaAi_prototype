@@ -11,9 +11,9 @@ Review target date: ~28/10/2026. Each task: follow the `ihinga-new-page` skill, 
 - [ ] Task B — PillSelect + DatePicker, replace 17 native selects (folded into Task 9). The two components now exist (built in Task 1); only the replacement is left.
 - [x] Task 1 — Cooperative leader part 2 (Module 11 + Module 8 sharing): Members & groups (Members · Groups · Performance · Directory), Meetings (shared calendar, schedule meeting → farmer crop calendar + bell), Training (materials, shared sprayer bookings with double booking blocked), dashboard fixes, `PillSelect` + `DatePicker` — 08/10/2026
 - [x] Task 2 — Admin: shell, dashboard, Users & access (Module 13, Module 2): Grace's account (two-step), admin sidebar, dashboard, Users · Access requests · Permission matrix · Bulk import, approval lets the account sign in, one set of role names, `auditEvents` store — 08/10/2026
-- [ ] Task 3 — Admin: Security & audit (Module 14)
-- [ ] Task 4 — Admin: Data sources + Data processing (Modules 3, 4)
-- [ ] Task 5 — Admin: Notifications, SMS & voice (Module 10)
+- [x] Task 3 — Admin: Security & audit (Module 14): audit log (filters, CSV, user timeline), login activity + failed sign-in alert, data access & export tracking, live security settings — 08/10/2026
+- [x] Task 4 — Admin: Data sources + Data processing (Modules 3, 4): source cards, missing-data alerts, connection wizard, manual CSV upload; pipeline with Run now / Reprocess, run history, quality metrics, settings — 08/10/2026
+- [x] Task 5 — Admin: Notifications, SMS & voice (Module 10): message history + delivery by channel, templates (EN/RW, 160-char counters), voice settings, opt-outs (Jean-Baptiste joins when he stops SMS), SMS inbox, scheduled messages, broadcast composer — 08/10/2026
 - [ ] Task 6 — Researcher role (Module 5 model performance, Module 12 research reports)
 - [ ] Task 7 — Crop calendar gaps (Module 8)
 - [ ] Task 8 — Fix-in-code-later list (`docs/fix-in-code-later.md`)

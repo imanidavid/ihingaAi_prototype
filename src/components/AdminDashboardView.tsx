@@ -13,10 +13,9 @@ import {
   Workflow,
   X,
 } from 'lucide-react';
-import { AccessRequest, AuditEvent, NavView, UserAccount } from '../types';
+import { AccessRequest, AuditEvent, DataSourceStatus, NavView, ProcessingRun, UserAccount } from '../types';
 import {
-  DATA_SOURCES,
-  LAST_PROCESSING_RUN,
+  PROCESSING_SCHEDULE,
   ROLE_LABELS,
   ROLE_ORDER,
   officerHeroImg,
@@ -26,6 +25,8 @@ import { CARD_CLASS, EmptyState, IconCircle, NeutralChip, PRIMARY_BUTTON, SECOND
 import { RejectRequestModal } from './admin/RejectRequestModal';
 
 interface AdminDashboardViewProps {
+  dataSources: DataSourceStatus[];
+  lastRun?: ProcessingRun;
   accounts: UserAccount[];
   accessRequests: AccessRequest[];
   auditEvents: AuditEvent[];
@@ -37,6 +38,8 @@ interface AdminDashboardViewProps {
 }
 
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
+  dataSources,
+  lastRun,
   accounts,
   accessRequests,
   auditEvents,
@@ -59,7 +62,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const totalUsers = usersByRole.reduce((sum, r) => sum + r.count, 0);
   const suspended = accounts.filter((a) => a.status === 'suspended').length;
   const pending = accessRequests.filter((r) => r.status === 'pending');
-  const healthy = DATA_SOURCES.filter((d) => d.status === 'Healthy').length;
+  const healthy = dataSources.filter((d) => d.status === 'Healthy').length;
   // Newest first; events in the same minute keep the order they happened in (later = higher)
   const latestEvents = auditEvents
     .map((e, i) => ({ e, i }))
@@ -84,14 +87,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     {
       icon: Database,
       label: 'Data sources healthy',
-      value: `${healthy} of ${DATA_SOURCES.length}`,
-      caption: DATA_SOURCES.filter((d) => d.status !== 'Healthy').map((d) => `${d.name}: ${d.status.toLowerCase()}`).join(' · ') || 'All feeds on time',
+      value: `${healthy} of ${dataSources.length}`,
+      caption: dataSources.filter((d) => d.status !== 'Healthy').map((d) => `${d.name}: ${d.status.toLowerCase()}`).join(' · ') || 'All feeds on time',
     },
     {
       icon: Workflow,
       label: 'Last processing run',
-      value: LAST_PROCESSING_RUN.at.slice(11),
-      caption: `${LAST_PROCESSING_RUN.status} · next ${LAST_PROCESSING_RUN.nextAt.slice(11)} · ${LAST_PROCESSING_RUN.schedule.toLowerCase()}`,
+      value: lastRun ? lastRun.startedAt.slice(11) : '—',
+      caption: lastRun
+        ? `${lastRun.status} · next ${PROCESSING_SCHEDULE.nextAt.slice(11)} · ${PROCESSING_SCHEDULE.every.toLowerCase()}`
+        : 'No run yet',
     },
   ];
 
@@ -200,7 +205,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             </span>
           </div>
           <div className="divide-y divide-[rgba(31,74,52,0.06)]">
-            {DATA_SOURCES.map((d) => (
+            {dataSources.map((d) => (
               <div key={d.id} className="py-2.5 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <span className="block text-[13px] font-medium text-[#17271D]">{d.name}</span>

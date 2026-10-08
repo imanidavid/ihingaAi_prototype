@@ -24,6 +24,14 @@ import {
   AppRole,
   AuditEvent,
   DataSourceStatus,
+  LoginAttempt,
+  MessageTemplate,
+  ProcessingRun,
+  ProcessingSettings,
+  SecuritySettings,
+  SmsOptOut,
+  SmsReply,
+  VoiceSettings,
   PermissionId,
   RolePermissions,
   OfficerData,
@@ -3029,17 +3037,205 @@ export function stampSortKey(stamp: string): number {
 }
 
 /** Data feeds behind the forecasts (all simulated in the prototype). */
-export const DATA_SOURCES: DataSourceStatus[] = [
-  { id: 'ds-stations', name: 'Weather station network', status: 'Healthy', lastSync: '28/09 13:55', note: '6 of 6 stations reporting' },
-  { id: 'ds-satellite', name: 'Satellite rainfall', status: 'Healthy', lastSync: '28/09 12:00', note: 'Daily estimate received' },
-  { id: 'ds-vegetation', name: 'Vegetation index', status: 'Healthy', lastSync: '27/09 06:00', note: 'Weekly composite' },
-  { id: 'ds-seasonal', name: 'Seasonal forecast', status: 'Healthy', lastSync: '01/09 08:00', note: 'Season 2026/27 A outlook' },
-  { id: 'ds-manual', name: 'Manual upload', status: 'Delayed', lastSync: '21/09 16:30', note: 'Weekly upload is overdue' },
+export const INITIAL_DATA_SOURCES: DataSourceStatus[] = [
+  { id: 'ds-stations', name: 'Weather station network', kind: 'Station network', status: 'Healthy', lastSync: '28/09 13:55', note: '6 of 6 stations reporting', endpoint: 'stations.ihinga.demo/musanze', schedule: 'Every 15 minutes', recordsToday: 336, expectedToday: 336 },
+  { id: 'ds-satellite', name: 'Satellite rainfall', kind: 'Satellite', status: 'Healthy', lastSync: '28/09 12:00', note: 'Daily estimate received', endpoint: 'satellite.ihinga.demo/rain-daily', schedule: 'Daily at 12:00', recordsToday: 15, expectedToday: 15 },
+  { id: 'ds-vegetation', name: 'Vegetation index', kind: 'Satellite', status: 'Healthy', lastSync: '27/09 06:00', note: 'Weekly composite', endpoint: 'satellite.ihinga.demo/ndvi-weekly', schedule: 'Weekly on Sunday', recordsToday: 15, expectedToday: 15 },
+  { id: 'ds-seasonal', name: 'Seasonal forecast', kind: 'Forecast model', status: 'Healthy', lastSync: '01/09 08:00', note: 'Season 2026/27 A outlook', endpoint: 'forecast.ihinga.demo/seasonal', schedule: 'Monthly on day 1', recordsToday: 15, expectedToday: 15 },
+  { id: 'ds-manual', name: 'Manual upload', kind: 'File upload', status: 'Delayed', lastSync: '21/09 16:30', note: 'Weekly rain gauge upload is overdue', endpoint: 'Upload in the console', schedule: 'Weekly (manual)', recordsToday: 0, expectedToday: 42 },
 ];
 
-export const LAST_PROCESSING_RUN = {
-  at: '28/09/2026 12:00',
-  status: 'Completed',
-  schedule: 'Every 6 hours',
-  nextAt: '28/09/2026 18:00',
+/** Kept for the admin dashboard; reads the seeded list. */
+export const DATA_SOURCES = INITIAL_DATA_SOURCES;
+
+/** % of expected records received today. */
+export function sourceCompleteness(source: DataSourceStatus): number {
+  return source.expectedToday > 0 ? Math.round((source.recordsToday / source.expectedToday) * 100) : 100;
+}
+
+
+
+// =========================================================================
+// SECURITY & AUDIT
+// =========================================================================
+export const INITIAL_LOGIN_ATTEMPTS: LoginAttempt[] = [
+  { id: 'la-1', at: '27/09/2026 16:20', identifier: 'innocent.m@ihinga.demo', accountName: 'Innocent Mugabo', role: 'officer', success: true, device: 'Laptop · Chrome', location: 'Muhoza' },
+  { id: 'la-2', at: '28/09/2026 06:41', identifier: '+250 786 902 117', accountName: 'Theophile Nsabimana', role: 'farmer', success: false, device: 'Phone · SMS app', location: 'Muhoza', reason: 'Account suspended' },
+  { id: 'la-3', at: '28/09/2026 07:55', identifier: 'grace.i@ihinga.demo', accountName: 'Grace Ingabire', role: 'admin', success: true, device: 'Laptop · Firefox', location: 'Muhoza' },
+  { id: 'la-4', at: '28/09/2026 08:10', identifier: 'claudine.m@ihinga.demo', accountName: 'Claudine Mukamana', role: 'officer', success: true, device: 'Laptop · Chrome', location: 'Muhoza' },
+  { id: 'la-5', at: '28/09/2026 09:25', identifier: '+250 788 000 034', accountName: 'Aline Uwimana', role: 'cooperative', success: true, device: 'Phone · Android', location: 'Kinigi' },
+  // Five failed attempts in a few minutes on one officer account -> anomaly alert
+  { id: 'la-6', at: '28/09/2026 11:02', identifier: 'innocent.m@ihinga.demo', accountName: 'Innocent Mugabo', role: 'officer', success: false, device: 'Unknown · Chrome', location: 'Outside Musanze', reason: 'Wrong password' },
+  { id: 'la-7', at: '28/09/2026 11:03', identifier: 'innocent.m@ihinga.demo', accountName: 'Innocent Mugabo', role: 'officer', success: false, device: 'Unknown · Chrome', location: 'Outside Musanze', reason: 'Wrong password' },
+  { id: 'la-8', at: '28/09/2026 11:03', identifier: 'innocent.m@ihinga.demo', accountName: 'Innocent Mugabo', role: 'officer', success: false, device: 'Unknown · Chrome', location: 'Outside Musanze', reason: 'Wrong password' },
+  { id: 'la-9', at: '28/09/2026 11:04', identifier: 'innocent.m@ihinga.demo', accountName: 'Innocent Mugabo', role: 'officer', success: false, device: 'Unknown · Chrome', location: 'Outside Musanze', reason: 'Wrong password' },
+  { id: 'la-10', at: '28/09/2026 11:05', identifier: 'innocent.m@ihinga.demo', accountName: 'Innocent Mugabo', role: 'officer', success: false, device: 'Unknown · Chrome', location: 'Outside Musanze', reason: 'Wrong password' },
+  { id: 'la-11', at: '28/09/2026 13:40', identifier: '+250 788 000 012', accountName: 'Jean-Baptiste Ndayisaba', role: 'farmer', success: true, device: 'Phone · Android', location: 'Kinigi' },
+];
+
+/** N failed sign-ins on one identifier = an anomaly alert. */
+export const FAILED_SIGN_IN_ALERT_AT = 5;
+
+export function computeSignInAnomalies(attempts: LoginAttempt[]) {
+  const byIdentifier = new Map<string, LoginAttempt[]>();
+  attempts.filter((a) => !a.success && a.reason === 'Wrong password').forEach((a) =>
+    byIdentifier.set(a.identifier, [...(byIdentifier.get(a.identifier) || []), a])
+  );
+  return Array.from(byIdentifier.entries())
+    .filter(([, list]) => list.length >= FAILED_SIGN_IN_ALERT_AT)
+    .map(([identifier, list]) => ({
+      identifier,
+      accountName: list[0].accountName || identifier,
+      count: list.length,
+      first: list[0].at,
+      last: list[list.length - 1].at,
+      location: list[list.length - 1].location,
+    }));
+}
+
+export const INITIAL_SECURITY_SETTINGS: SecuritySettings = {
+  twoStepRoles: ['officer', 'admin'],
+  timeoutMinutes: { farmer: 60, cooperative: 60, researcher: 30, officer: 15, admin: 15 },
+  passwordMinLength: 8,
+  passwordNeedsNumber: true,
+  lockAfterFailed: 5,
+  retentionMonths: 24,
 };
+
+/** Simulated security status shown on the settings tab. */
+export const ENCRYPTION_STATUS = [
+  { id: 'enc-rest', label: 'Data encrypted at rest', detail: 'Simulated — no real database in the prototype' },
+  { id: 'enc-transit', label: 'Connections encrypted (HTTPS)', detail: 'Simulated' },
+  { id: 'enc-backup', label: 'Daily encrypted backup', detail: 'Simulated · last 28/09 02:00' },
+];
+
+// =========================================================================
+// DATA PROCESSING
+// =========================================================================
+export const PROCESSING_STAGES = [
+  { id: 'ingest', label: 'Ingest', detail: 'Collect records from every source' },
+  { id: 'clean', label: 'Clean', detail: 'Remove duplicates and impossible values' },
+  { id: 'gaps', label: 'Fill gaps', detail: 'Estimate missing hours and days' },
+  { id: 'outliers', label: 'Check outliers', detail: 'Flag values far from neighbours' },
+  { id: 'aggregate', label: 'Aggregate', detail: 'Daily, dekadal and monthly totals' },
+  { id: 'normals', label: 'Climate normals', detail: 'Compare with the long-term average' },
+  { id: 'ready', label: 'Ready for forecast', detail: 'Hand over to the risk model' },
+] as const;
+
+export const INITIAL_PROCESSING_RUNS: ProcessingRun[] = [
+  { id: 'run-1', startedAt: '27/09/2026 18:00', trigger: 'Scheduled', status: 'Completed', durationMin: 4, recordsIn: 412, gapsFilled: 6, outliersFlagged: 1 },
+  { id: 'run-2', startedAt: '28/09/2026 00:00', trigger: 'Scheduled', status: 'Completed', durationMin: 4, recordsIn: 398, gapsFilled: 3, outliersFlagged: 0 },
+  { id: 'run-3', startedAt: '28/09/2026 06:00', trigger: 'Scheduled', status: 'Completed with warnings', durationMin: 5, recordsIn: 405, gapsFilled: 11, outliersFlagged: 2 },
+  { id: 'run-4', startedAt: '28/09/2026 12:00', trigger: 'Scheduled', status: 'Completed', durationMin: 4, recordsIn: 381, gapsFilled: 4, outliersFlagged: 1 },
+];
+
+export const PROCESSING_SCHEDULE = { every: 'Every 6 hours', nextAt: '28/09/2026 18:00' };
+
+export const INITIAL_PROCESSING_SETTINGS: ProcessingSettings = {
+  gapMethod: 'Linear between neighbours',
+  outlierThresholdSd: 3,
+  interpolation: 'Inverse distance',
+  aggregation: 'Daily',
+};
+
+/** Sample manual rain-gauge upload: 4 valid rows, 2 with problems. */
+export const SAMPLE_RAIN_GAUGE_CSV = [
+  'station,date,rain_mm',
+  'Kinigi gauge,27/09/2026,18.5',
+  'Busogo gauge,27/09/2026,15.0',
+  'Muhoza gauge,27/09/2026,9.5',
+  'Remera gauge,27/09/2026,21.0',
+  'Kinigi gauge,31/09/2026,12.0',
+  'Busogo gauge,27/09/2026,-4',
+].join('\n');
+
+export const RAIN_GAUGES = ['Kinigi gauge', 'Busogo gauge', 'Muhoza gauge', 'Remera gauge', 'Cyuve gauge', 'Nyange gauge'];
+
+export function parseRainGaugeCsv(text: string) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const header = (lines[0] || '').toLowerCase().split(',').map((h) => h.trim());
+  const missing = ['station', 'date', 'rain_mm'].filter((c) => !header.includes(c));
+  if (missing.length > 0) return { rows: [], headerError: `Missing columns: ${missing.join(', ')}.` };
+  const rows = lines.slice(1).map((line, i) => {
+    const cells = line.split(',').map((c) => c.trim());
+    const get = (n: string) => cells[header.indexOf(n)] || '';
+    const station = get('station');
+    const date = get('date');
+    const rain = Number(get('rain_mm'));
+    const errors: string[] = [];
+    if (!RAIN_GAUGES.includes(station)) errors.push(`${station || 'Station'} is not a known gauge`);
+    const m = date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const d = m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
+    if (!m || !d || d.getDate() !== Number(m[1])) errors.push('Date must be a real DD/MM/YYYY date');
+    else if (d.getTime() > NOW_DATE.getTime()) errors.push('Date is after today');
+    if (get('rain_mm') === '' || Number.isNaN(rain) || rain < 0 || rain > 300) errors.push('Rain must be 0–300 mm');
+    return { line: i + 2, station, date, rainMm: rain, errors };
+  });
+  return { rows, headerError: null as string | null };
+}
+
+// =========================================================================
+// NOTIFICATIONS, SMS & VOICE
+// =========================================================================
+export const SMS_MAX_CHARS = 160;
+
+export const INITIAL_MESSAGE_TEMPLATES: MessageTemplate[] = [
+  {
+    id: 'tpl-warning',
+    kind: 'Warning',
+    name: 'Weather warning',
+    en: '{level} warning for {sector}: {hazard}, {time}. {action} Reply 1 if you got this.',
+    rw: 'Imburira ({level}) muri {sector}: {hazard}, {time}. {action} Subiza 1 niba wabibonye.',
+  },
+  {
+    id: 'tpl-advisory',
+    kind: 'Advisory',
+    name: 'Crop advisory',
+    en: '{crop}: {advice}. Why: {reason}. Reply 2 for a call from your officer.',
+    rw: '{crop}: {advice}. Impamvu: {reason}. Subiza 2 niba ushaka guhamagarwa.',
+  },
+  {
+    id: 'tpl-coop',
+    kind: 'Cooperative',
+    name: 'Cooperative notice',
+    en: '{cooperative}: {message}',
+    rw: '{cooperative}: {message}',
+  },
+  {
+    id: 'tpl-meeting',
+    kind: 'Meeting',
+    name: 'Meeting invitation',
+    en: 'Meeting: {title}, {day} {time} at {place}. Reply 1 to confirm.',
+    rw: 'Inama: {title}, {day} saa {time} kuri {place}. Subiza 1 wemeze.',
+  },
+];
+
+export const INITIAL_VOICE_SETTINGS: VoiceSettings = {
+  enabled: true,
+  voice: 'Female voice',
+  retries: 2,
+  callWindow: '07:00–19:00',
+};
+
+/** Farmers who replied STOP before the demo (Jean-Baptiste joins when he stops SMS in Settings). */
+export const SEEDED_SMS_OPT_OUTS: SmsOptOut[] = [
+  { id: 'opt-1', name: 'Theogene Bagirishya', phone: '+250 783 220 194', sector: 'Muhoza', since: '14/09/2026', via: 'Replied STOP' },
+  { id: 'opt-2', name: 'Valens Munyaneza', phone: '+250 785 607 332', sector: 'Busogo', since: '19/09/2026', via: 'Replied STOP' },
+  { id: 'opt-3', name: 'Speciose Nyiraharerimana', phone: '+250 782 941 058', sector: 'Kinigi', since: '23/09/2026', via: 'Asked the officer' },
+];
+
+/** Two-way SMS: replies received today. "1" = acknowledged. */
+export const SMS_REPLIES: SmsReply[] = [
+  { id: 'sms-1', at: '28/09/2026 13:44', fromName: 'Jean-Baptiste Ndayisaba', phone: '+250 788 000 012', text: '1', meaning: 'Acknowledged', relatedTo: 'Heavy Rain Influx' },
+  { id: 'sms-2', at: '28/09/2026 13:47', fromName: 'Odette Mukeshimana', phone: '+250 781 240 417', text: '1', meaning: 'Acknowledged', relatedTo: 'Heavy Rain Influx' },
+  { id: 'sms-3', at: '28/09/2026 13:52', fromName: 'Marie Uwase', phone: '+250 785 410 233', text: '1', meaning: 'Acknowledged', relatedTo: 'Heavy Rain Influx' },
+  { id: 'sms-4', at: '28/09/2026 13:09', fromName: 'Eric Habyarimana', phone: '+250 784 318 650', text: 'Can I spray on Wednesday morning?', meaning: 'Question', relatedTo: 'Late Blight Threat' },
+  { id: 'sms-5', at: '28/09/2026 13:21', fromName: 'Josiane Uwamariya', phone: '+250 786 113 902', text: '1', meaning: 'Acknowledged', relatedTo: 'Late Blight Threat' },
+  { id: 'sms-6', at: '28/09/2026 13:58', fromName: 'Valens Munyaneza', phone: '+250 785 607 332', text: 'STOP', meaning: 'Stop SMS', relatedTo: 'Heavy Rain Influx' },
+];
+
+/** Messages queued for later (meeting reminders are added from the meetings store). */
+export const SCHEDULED_MESSAGES = [
+  { id: 'sch-1', at: '29/09/2026 06:00', title: 'Reminder: heavy rain until 14:00 today', audience: 'Kinigi, Busogo, Remera · 1,640 farmers', channel: 'SMS + voice' },
+  { id: 'sch-2', at: '29/09/2026 14:30', title: 'Spray window is open (potato growers)', audience: 'Kinigi, Muhoza potato growers · 690 farmers', channel: 'SMS' },
+];

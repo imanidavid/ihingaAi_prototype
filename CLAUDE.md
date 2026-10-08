@@ -31,7 +31,8 @@ module, no context and no reducer; state is passed down as props. Fields:
 `warnings` · `reports` · `thresholdRules` · `userSettings` · `messages` · `accounts` ·
 `accessRequests` · `generatedReports` · `savedItemIds` · `readNotificationIds` ·
 `coopMembers` · `coopGroupRecords` · `meetings` · `equipmentBookings` · `rolePermissions` ·
-`auditEvents`
+`auditEvents` · `loginAttempts` · `securitySettings` · `dataSources` · `processingRuns` ·
+`processingSettings` · `messageTemplates` · `voiceSettings`
 
 Derived once in `App.tsx` and passed down: `coopGroups` (`computeCoopGroups`), `coopSummary`
 (`computeCoopSummary`), and for the farmer `farmerMember`, `farmerMeetings`, `farmerBookings`.
@@ -61,7 +62,11 @@ Seed data lives in four files, not one:
   approval), `INITIAL_ACCESS_REQUESTS` (2), `DEMO_ACCOUNT_ID_BY_ROLE`, sector/cell lists,
   `validateRwandaPhone`, `maskPhone`, `maskEmail`, `SAMPLE_MEMBER_IMPORT_CSV`, `parseMemberCsv`.
   Admin data in `musanzeData.ts`: `ROLE_LABELS`, `ROLE_ORDER`, `PERMISSIONS`,
-  `INITIAL_ROLE_PERMISSIONS`, `INITIAL_AUDIT_EVENTS`, `DATA_SOURCES`, `LAST_PROCESSING_RUN`.
+  `INITIAL_ROLE_PERMISSIONS`, `INITIAL_AUDIT_EVENTS`, `INITIAL_LOGIN_ATTEMPTS`,
+  `INITIAL_SECURITY_SETTINGS`, `INITIAL_DATA_SOURCES`, `INITIAL_PROCESSING_RUNS`,
+  `INITIAL_PROCESSING_SETTINGS`, `PROCESSING_STAGES`, `INITIAL_MESSAGE_TEMPLATES`,
+  `INITIAL_VOICE_SETTINGS`, `SEEDED_SMS_OPT_OUTS`, `SMS_REPLIES`, `SCHEDULED_MESSAGES`,
+  `SAMPLE_RAIN_GAUGE_CSV` / `parseRainGaugeCsv`, `computeSignInAnomalies`.
 
 Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a component.
 
@@ -102,7 +107,7 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
     keep it at ≥ 96px.
 14. **Reset demo** (`handleResetDemo`, `App.tsx`) must restore every store field to its
     initial value, including anything created during the demo. It currently resets all
-    sixteen fields; add every new field you introduce.
+    twenty-three fields; add every new field you introduce.
 
 ## Roles (one shared store, desktop unless noted)
 
@@ -194,10 +199,13 @@ members under warning" sidebar card, and the farmer bell's hard-coded `'kinigi'`
 
 Task 2 (admin) added: the administrator role and shell, Users & access (Users · Access
 requests · Permission matrix · Bulk import), and one role naming (`'cooperative_leader'` is
-gone). The admin pages Security & audit, Data sources, Data processing and Notifications, and
-the researcher pages Model performance and Field data, are still `PlaceholderView`
-(Tasks 3–6). `auditEvents` already records sign-ins, warnings, report decisions, messages,
-meetings, bookings and every admin action — Task 3 builds the full log on it.
+gone). Tasks 3–5 followed in the same branch: `AdminSecurityView` (Audit log · Login
+activity · Data access · Security settings), `AdminDataSourcesView`, `AdminProcessingView`,
+`AdminNotificationsView` (Message history · Templates · Opt-outs · SMS inbox · Scheduled).
+`auditEvents` records sign-ins, warnings, report decisions and opens, exports, messages,
+meetings, bookings and every admin action. Security settings are live: the two-step roles,
+lock-after-N-failures and the inactivity timeouts drive sign-in and the session timer.
+Only the researcher pages Model performance and Field data are still `PlaceholderView` (Task 6).
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 
