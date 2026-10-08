@@ -32,6 +32,8 @@ import {
   SmsOptOut,
   SmsReply,
   VoiceSettings,
+  SectorRainForecast,
+  StationReading,
   PermissionId,
   RolePermissions,
   OfficerData,
@@ -381,7 +383,8 @@ export const CROP_RISK_MATRIX: CropRiskMatrixRow[] = [
  * - Beans: "Strengthen bean stakes today" / "Wet soil and wind can knock plants over." (closes Mon 18:00 · 4h)
  * - Maize: "Clear drainage channels before Tuesday" / "Standing water damages young maize roots." (before Tue 02:00 · 12h)
  */
-export const CROP_ADVISORIES_DATA: CropAdvisory[] = [
+/** Crop advice written by officers (store field `cropAdvisories`). Each is linked to a warning. */
+export const INITIAL_CROP_ADVISORIES: CropAdvisory[] = [
   {
     id: 'adv-potato',
     crop: 'Irish Potato',
@@ -402,6 +405,9 @@ export const CROP_ADVISORIES_DATA: CropAdvisory[] = [
     location: 'Kinigi · Bisoke',
     timing: 'Spray window opens Tue 14:00 · Opens in 24h',
     riskSummary: 'Late blight, High',
+    linkedWarningId: 'alert-blight',
+    sectors: ['Kinigi', 'Muhoza'],
+    authorName: 'Claudine M.',
     mitigationSteps: [
       'Do not spray before Tuesday 14:00.',
       'Spray on a dry afternoon, Tue to Thu.',
@@ -428,6 +434,9 @@ export const CROP_ADVISORIES_DATA: CropAdvisory[] = [
     location: 'Kinigi · Bisoke',
     timing: 'closes Mon 18:00 · 4h remaining',
     riskSummary: 'Terrace runoff & lodging, Watch',
+    linkedWarningId: 'alert-rain',
+    sectors: ['Kinigi', 'Busogo', 'Remera'],
+    authorName: 'Claudine M.',
     mitigationSteps: [
       'Inspect eucalyptus stake anchors along hillside rows.',
       'Tie loose bean stems using dried banana fiber strips.',
@@ -454,6 +463,9 @@ export const CROP_ADVISORIES_DATA: CropAdvisory[] = [
     location: 'Kinigi · Bisoke',
     timing: 'before Tue 02:00 · 12h remaining',
     riskSummary: 'Furrow waterlogging, Watch',
+    linkedWarningId: 'alert-rain',
+    sectors: ['Kinigi', 'Busogo', 'Remera'],
+    authorName: 'Claudine M.',
     mitigationSteps: [
       'Dig 15 cm drainage outlets at slope bottoms.',
       'Clear volcanic mud blockages from trench junctions.',
@@ -461,6 +473,29 @@ export const CROP_ADVISORIES_DATA: CropAdvisory[] = [
     ],
   },
 ];
+
+/** Kept for plan-ahead items, which point at the seeded advice. */
+export const CROP_ADVISORIES_DATA = INITIAL_CROP_ADVISORIES;
+
+/** Advice a farmer sees: its warning is active, it covers their sector and one of their crops. */
+export function visibleAdvisories(
+  advisories: CropAdvisory[],
+  warnings: WarningItem[],
+  sector: string,
+  crops: string[]
+): CropAdvisory[] {
+  const active = new Set(warnings.filter((w) => w.status === 'Active').map((w) => w.id));
+  return advisories.filter(
+    (a) => active.has(a.linkedWarningId) && a.sectors.includes(sector) && (crops.length === 0 || crops.includes(a.crop))
+  );
+}
+
+/** Photo for officer-written advice, by crop. */
+export const CROP_IMAGES: Record<string, string> = {
+  'Irish Potato': potatoImg,
+  'Climbing Beans': beansImg,
+  Maize: maizeImg,
+};
 
 /**
  * PLAN AHEAD ITEMS
@@ -1961,9 +1996,9 @@ export const INITIAL_THRESHOLD_RULES: ThresholdRuleItem[] = [
     description: 'Triggers multi-channel early warning when forecasted or measured 24 h rainfall breaches thresholds.',
     lastTriggered: '28/09 13:35',
     thresholdsList: [
-      { label: '40 mm → Watch', level: 'Watch' },
-      { label: '60 mm → High', level: 'High' },
-      { label: '80 mm → Critical', level: 'Critical' },
+      { label: '40 mm → Watch', level: 'Watch', value: 40, unit: 'mm' },
+      { label: '60 mm → High', level: 'High', value: 60, unit: 'mm' },
+      { label: '80 mm → Critical', level: 'Critical', value: 80, unit: 'mm' },
     ],
   },
   {
@@ -2127,31 +2162,51 @@ export const RISK_LEVEL_WEIGHT: Record<RiskLevel, number> = {
   Low: 1,
 };
 
-export const SECTOR_BASE_FORECAST_RISK: Record<string, RiskLevel> = {
-  Kinigi: 'Watch',
-  Busogo: 'Watch',
-  Remera: 'Watch',
-  Muhoza: 'Watch', // forecast: basin ponding
-  Cyuve: 'Low',
-  Gacaca: 'Low',
-  Gashaki: 'Low',
-  Gataraga: 'Low',
-  Kimonyi: 'Low',
-  Musanze: 'Low',
-  Muko: 'Low',
-  Nkotsi: 'Low',
-  Nyange: 'Low',
-  Rwaza: 'Low',
-  Shingiro: 'Low',
-};
+// =========================================================================
+// SECTOR FORECAST RISK — from the forecast series and the officer's threshold rules
+// =========================================================================
+/** Days of the forecast that count for the sector forecast risk (the 10-day outlook). */
+export const FORECAST_RISK_DAYS = 10;
+
+/** The rain rule's numeric thresholds, lowest first (empty when the rule is off). */
+export function rainThresholds(rules: ThresholdRuleItem[]): { level: RiskLevel; value: number }[] {
+  const rule = rules.find((r) => r.id === 'rule-rain');
+  if (!rule || !rule.isEnabled) return [];
+  return rule.thresholdsList
+    .filter((t) => typeof t.value === 'number')
+    .map((t) => ({ level: t.level, value: t.value as number }))
+    .sort((a, b) => a.value - b.value);
+}
+
+/** Highest level a 24 h rain amount reaches under the thresholds. */
+export function riskForRain(mm: number, thresholds: { level: RiskLevel; value: number }[]): RiskLevel {
+  let level: RiskLevel = 'Low';
+  for (const t of thresholds) if (mm >= t.value && RISK_LEVEL_WEIGHT[t.level] > RISK_LEVEL_WEIGHT[level]) level = t.level;
+  return level;
+}
+
+/** Each sector's forecast risk = the highest level its forecast reaches in the next FORECAST_RISK_DAYS days. */
+export function computeSectorForecastRisk(
+  rules: ThresholdRuleItem[],
+  forecasts: SectorRainForecast[]
+): Record<string, RiskLevel> {
+  const thresholds = rainThresholds(rules);
+  const result: Record<string, RiskLevel> = {};
+  for (const f of forecasts) {
+    const peak = Math.max(0, ...f.dailyMm.slice(0, FORECAST_RISK_DAYS));
+    result[f.sector] = riskForRain(peak, thresholds);
+  }
+  return result;
+}
 
 export function computeSectorClimateRisk(
   sectorName: string,
-  activeWarnings: OfficerActiveWarning[]
+  activeWarnings: OfficerActiveWarning[],
+  forecastRisk: Record<string, RiskLevel>
 ): RiskLevel {
-  // Sector climate risk = the higher of (a) the sector's forecast risk on the Risk Forecast page
+  // Sector climate risk = the higher of (a) the sector's forecast risk (forecast series + threshold rules)
   // and (b) active WEATHER warnings covering it.
-  const baseForecastRisk: RiskLevel = SECTOR_BASE_FORECAST_RISK[sectorName] || 'Low';
+  const baseForecastRisk: RiskLevel = forecastRisk[sectorName] || 'Low';
 
   // Only WEATHER warnings: Excess rain, Dry spell, Temperature
   // Pest / disease warnings do NOT change climate risk
@@ -2185,16 +2240,141 @@ export function computeSectorClimateRisk(
 
 export function computeDistrictClimateRisk(
   sectors: string[],
-  activeWarnings: OfficerActiveWarning[]
+  activeWarnings: OfficerActiveWarning[],
+  forecastRisk: Record<string, RiskLevel>
 ): RiskLevel {
   let highest: RiskLevel = 'Low';
   for (const s of sectors) {
-    const sRisk = computeSectorClimateRisk(s, activeWarnings);
+    const sRisk = computeSectorClimateRisk(s, activeWarnings, forecastRisk);
     if (RISK_LEVEL_WEIGHT[sRisk] > RISK_LEVEL_WEIGHT[highest]) {
       highest = sRisk;
     }
   }
   return highest;
+}
+
+/** Sectors at Watch or above, highest risk first (then forecast order). */
+export function computeAffectedSectors(
+  sectors: string[],
+  activeWarnings: OfficerActiveWarning[],
+  forecastRisk: Record<string, RiskLevel>
+): { sector: string; risk: RiskLevel }[] {
+  return sectors
+    .map((sector) => ({ sector, risk: computeSectorClimateRisk(sector, activeWarnings, forecastRisk) }))
+    .filter((s) => s.risk !== 'Low')
+    .sort((a, b) => RISK_LEVEL_WEIGHT[b.risk] - RISK_LEVEL_WEIGHT[a.risk]);
+}
+
+/** Why a sector is (or isn't) at risk — descriptive notes shown next to the computed level. */
+export const SECTOR_RISK_NOTES: Record<string, string> = {
+  Kinigi: 'Volcanic foothill slope runoff',
+  Busogo: 'Hillside terraced plot overflow',
+  Remera: 'Terrace contour drainage seepage',
+  Muhoza: 'Low-lying volcanic depression ponding',
+  Cyuve: 'Well-drained volcanic ash soil structure',
+  Gacaca: 'Optimal field capacity & rapid percolation',
+  Gashaki: 'Stable lakeside topography with moderate runoff',
+  Gataraga: 'Standard hillside terraced infiltration rate',
+  Kimonyi: 'Protected foothill terrain',
+  Muko: 'Normal soil porosity & no pooling',
+  Musanze: 'Urban peripheral storm channels unobstructed',
+  Nkotsi: 'Low erosion hazard under present conditions',
+  Nyange: 'Standard terraced contour resistance',
+  Rwaza: 'Southern basin drainage flowing smoothly',
+  Shingiro: 'Upper foothill permeable volcanic cinder',
+};
+
+// =========================================================================
+// RAIN FORECAST SERIES (store field `rainForecasts`) — one 30-day series per sector
+// =========================================================================
+/** Kinigi's series is the 30-day outlook; other sectors follow the same storm at their own strength (simulated). */
+const SECTOR_RAIN_FACTOR: Record<string, number> = {
+  Kinigi: 1,
+  Busogo: 0.96,
+  Remera: 0.92,
+  Muhoza: 0.875,
+  Cyuve: 0.7,
+  Gacaca: 0.65,
+  Gashaki: 0.6,
+  Gataraga: 0.72,
+  Kimonyi: 0.68,
+  Musanze: 0.66,
+  Muko: 0.62,
+  Nkotsi: 0.58,
+  Nyange: 0.74,
+  Rwaza: 0.55,
+  Shingiro: 0.7,
+};
+
+export const INITIAL_RAIN_FORECASTS: SectorRainForecast[] = Object.entries(SECTOR_RAIN_FACTOR).map(([sector, f]) => ({
+  sector,
+  startDate: NOW.dateFormatted,
+  dailyMm: RAINFALL_MONTH_30D.map((d) => Math.round(d.rainfallMm * f)),
+  source: 'Seasonal model run 28/09 12:00 (simulated)',
+}));
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** A sector's forecast as chart days (peak = wettest of the first FORECAST_RISK_DAYS days). */
+export function forecastDays(forecasts: SectorRainForecast[], sector: string): WeatherForecastDay[] {
+  const f = forecasts.find((x) => x.sector === sector) || forecasts[0];
+  if (!f) return [];
+  const start = parseDMY(f.startDate);
+  const window = f.dailyMm.slice(0, FORECAST_RISK_DAYS);
+  const peakIdx = window.indexOf(Math.max(...window));
+  return f.dailyMm.map((mm, i) => {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const ref = RAINFALL_MONTH_30D[i];
+    return {
+      day: DAY_NAMES[d.getDay()],
+      fullDate: `${SHORT_MONTHS[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}`,
+      rainfallMm: mm,
+      isPeak: i === peakIdx,
+      temp: ref ? ref.temp : 0,
+      humidity: ref ? ref.humidity : 0,
+    };
+  });
+}
+
+/** "Heavy rain expected Tuesday." when a day in the next 3 reaches the rain rule's Watch level. */
+export function weatherSummaryFrom(days: WeatherForecastDay[], rules: ThresholdRuleItem[]): string {
+  const watch = rainThresholds(rules)[0];
+  const start = parseDMY(NOW.dateFormatted);
+  const idx = watch ? days.slice(0, 3).findIndex((d) => d.rainfallMm >= watch.value) : -1;
+  if (idx < 0) return 'No heavy rain in the next 3 days.';
+  if (idx === 0) return 'Heavy rain expected today.';
+  const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + idx);
+  return `Heavy rain expected ${DAY_NAMES_FULL[d.getDay()]}.`;
+}
+
+// =========================================================================
+// WEATHER STATION READINGS (store field `stationReadings`; admin manual upload adds more)
+// =========================================================================
+export const STATION_SECTOR: Record<string, string> = {
+  'Kinigi gauge': 'Kinigi',
+  'Busogo gauge': 'Busogo',
+  'Muhoza gauge': 'Muhoza',
+  'Remera gauge': 'Remera',
+  'Cyuve gauge': 'Cyuve',
+  'Nyange gauge': 'Nyange',
+};
+
+export const INITIAL_STATION_READINGS: StationReading[] = [
+  { id: 'st-1', station: 'Kinigi gauge', sector: 'Kinigi', date: '28/09/2026', time: '13:55', tempC: 22, humidityPct: 78, rainMm: 12, source: 'Station network' },
+  { id: 'st-2', station: 'Busogo gauge', sector: 'Busogo', date: '28/09/2026', time: '13:55', tempC: 21, humidityPct: 80, rainMm: 11, source: 'Station network' },
+  { id: 'st-3', station: 'Muhoza gauge', sector: 'Muhoza', date: '28/09/2026', time: '13:55', tempC: 23, humidityPct: 76, rainMm: 9, source: 'Station network' },
+  { id: 'st-4', station: 'Remera gauge', sector: 'Remera', date: '28/09/2026', time: '13:55', tempC: 22, humidityPct: 79, rainMm: 10, source: 'Station network' },
+  { id: 'st-5', station: 'Cyuve gauge', sector: 'Cyuve', date: '28/09/2026', time: '13:55', tempC: 23, humidityPct: 74, rainMm: 7, source: 'Station network' },
+  { id: 'st-6', station: 'Nyange gauge', sector: 'Nyange', date: '28/09/2026', time: '13:55', tempC: 22, humidityPct: 77, rainMm: 8, source: 'Station network' },
+];
+
+/** Latest reading for a sector's station (falls back to the newest reading anywhere). */
+export function latestReading(readings: StationReading[], sector: string): StationReading | undefined {
+  const key = (r: StationReading) => stampSortKey(`${r.date} ${r.time}`);
+  const sorted = readings.map((r, i) => ({ r, i })).sort((a, b) => key(b.r) - key(a.r) || b.i - a.i).map(({ r }) => r);
+  return sorted.find((r) => r.sector === sector) || sorted[0];
 }
 
 // =========================================================================
@@ -3138,38 +3318,84 @@ export const INITIAL_PROCESSING_SETTINGS: ProcessingSettings = {
   aggregation: 'Daily',
 };
 
-/** Sample manual rain-gauge upload: 4 valid rows, 2 with problems. */
+/** Sample manual station upload: 4 valid rows, 2 with problems. Kinigi's 13:58 reading becomes the latest. */
 export const SAMPLE_RAIN_GAUGE_CSV = [
-  'station,date,rain_mm',
-  'Kinigi gauge,27/09/2026,18.5',
-  'Busogo gauge,27/09/2026,15.0',
-  'Muhoza gauge,27/09/2026,9.5',
-  'Remera gauge,27/09/2026,21.0',
-  'Kinigi gauge,31/09/2026,12.0',
-  'Busogo gauge,27/09/2026,-4',
+  'station,date,time,rain_mm,temp_c,humidity_pct',
+  'Kinigi gauge,28/09/2026,13:58,14.5,21,84',
+  'Busogo gauge,28/09/2026,13:58,13.0,20,85',
+  'Muhoza gauge,27/09/2026,18:00,9.5,19,82',
+  'Remera gauge,27/09/2026,18:00,21.0,18,88',
+  'Kinigi gauge,31/09/2026,12:00,12.0,22,80',
+  'Busogo gauge,27/09/2026,18:00,-4,23,140',
 ].join('\n');
 
-export const RAIN_GAUGES = ['Kinigi gauge', 'Busogo gauge', 'Muhoza gauge', 'Remera gauge', 'Cyuve gauge', 'Nyange gauge'];
+export const RAIN_GAUGES = Object.keys(STATION_SECTOR);
 
 export function parseRainGaugeCsv(text: string) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const header = (lines[0] || '').toLowerCase().split(',').map((h) => h.trim());
-  const missing = ['station', 'date', 'rain_mm'].filter((c) => !header.includes(c));
+  const missing = ['station', 'date', 'time', 'rain_mm', 'temp_c', 'humidity_pct'].filter((c) => !header.includes(c));
   if (missing.length > 0) return { rows: [], headerError: `Missing columns: ${missing.join(', ')}.` };
   const rows = lines.slice(1).map((line, i) => {
     const cells = line.split(',').map((c) => c.trim());
     const get = (n: string) => cells[header.indexOf(n)] || '';
     const station = get('station');
     const date = get('date');
+    const time = get('time');
     const rain = Number(get('rain_mm'));
+    const temp = Number(get('temp_c'));
+    const humidity = Number(get('humidity_pct'));
     const errors: string[] = [];
     if (!RAIN_GAUGES.includes(station)) errors.push(`${station || 'Station'} is not a known gauge`);
     const m = date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     const d = m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
+    const t = time.match(/^(\d{2}):(\d{2})$/);
     if (!m || !d || d.getDate() !== Number(m[1])) errors.push('Date must be a real DD/MM/YYYY date');
-    else if (d.getTime() > NOW_DATE.getTime()) errors.push('Date is after today');
+    else if (!t || Number(t[1]) > 23 || Number(t[2]) > 59) errors.push('Time must be HH:MM');
+    else if (parseDMY(date, time).getTime() > NOW_DATE.getTime()) errors.push('Reading is after now');
     if (get('rain_mm') === '' || Number.isNaN(rain) || rain < 0 || rain > 300) errors.push('Rain must be 0–300 mm');
-    return { line: i + 2, station, date, rainMm: rain, errors };
+    if (get('temp_c') === '' || Number.isNaN(temp) || temp < -5 || temp > 40) errors.push('Temperature must be -5 to 40 °C');
+    if (get('humidity_pct') === '' || Number.isNaN(humidity) || humidity < 0 || humidity > 100) errors.push('Humidity must be 0–100%');
+    return { line: i + 2, station, date, time, rainMm: rain, tempC: temp, humidityPct: humidity, errors };
+  });
+  return { rows, headerError: null as string | null };
+}
+
+/** Sample forecast upload: replaces days in the store's 30-day series (2 rows with problems). */
+export const SAMPLE_FORECAST_CSV = [
+  'sector,date,rain_mm',
+  'Kinigi,29/09/2026,65',
+  'Kinigi,30/09/2026,34',
+  'Busogo,29/09/2026,62',
+  'Remera,29/09/2026,52',
+  'Muhoza,29/09/2026,45',
+  'Kinigi,27/09/2026,20',
+  'Nyabihu,29/09/2026,30',
+].join('\n');
+
+export function parseForecastCsv(text: string, forecasts: SectorRainForecast[]) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const header = (lines[0] || '').toLowerCase().split(',').map((h) => h.trim());
+  const missing = ['sector', 'date', 'rain_mm'].filter((c) => !header.includes(c));
+  if (missing.length > 0) return { rows: [], headerError: `Missing columns: ${missing.join(', ')}.` };
+  const rows = lines.slice(1).map((line, i) => {
+    const cells = line.split(',').map((c) => c.trim());
+    const get = (n: string) => cells[header.indexOf(n)] || '';
+    const sector = get('sector');
+    const date = get('date');
+    const rain = Number(get('rain_mm'));
+    const errors: string[] = [];
+    const f = forecasts.find((x) => x.sector === sector);
+    let dayIndex = -1;
+    if (!f) errors.push(`${sector || 'Sector'} is not a Musanze sector`);
+    const m = date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) errors.push('Date must be DD/MM/YYYY');
+    else if (f) {
+      dayIndex = Math.round((parseDMY(date).getTime() - parseDMY(f.startDate).getTime()) / 86400000);
+      if (dayIndex < 0 || dayIndex >= f.dailyMm.length) errors.push(`Date must be within the ${f.dailyMm.length}-day forecast from ${f.startDate}`);
+    }
+    if (get('rain_mm') === '' || Number.isNaN(rain) || rain < 0 || rain > 300) errors.push('Rain must be 0–300 mm');
+    return { line: i + 2, sector, date, rainMm: rain, dayIndex, errors };
   });
   return { rows, headerError: null as string | null };
 }

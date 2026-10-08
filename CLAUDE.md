@@ -32,10 +32,13 @@ module, no context and no reducer; state is passed down as props. Fields:
 `accessRequests` · `generatedReports` · `savedItemIds` · `readNotificationIds` ·
 `coopMembers` · `coopGroupRecords` · `meetings` · `equipmentBookings` · `rolePermissions` ·
 `auditEvents` · `loginAttempts` · `securitySettings` · `dataSources` · `processingRuns` ·
-`processingSettings` · `messageTemplates` · `voiceSettings`
+`processingSettings` · `messageTemplates` · `voiceSettings` · `rainForecasts` ·
+`stationReadings` · `cropAdvisories`
 
 Derived once in `App.tsx` and passed down: `coopGroups` (`computeCoopGroups`), `coopSummary`
-(`computeCoopSummary`), and for the farmer `farmerMember`, `farmerMeetings`, `farmerBookings`.
+(`computeCoopSummary`), `sectorForecastRisk` (`computeSectorForecastRisk`), `affectedSectors`,
+`districtClimateRisk`, and for the farmer `farmerMember`, `farmerMeetings`, `farmerBookings`,
+`farmerForecast`, `farmerReading`, `farmerWeatherSummary`, `farmerAdvisories`.
 
 UI-only state alongside them: `role`, `currentAccountId` (who is signed in), `currentView`,
 `previewMode`, `drawerContent`,
@@ -84,11 +87,14 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
    Never for decoration, counts, status chips or progress bars.
 5. **Risk scale is exactly:** Low · Watch · High · Critical (`RiskLevel` in `src/types.ts`).
    Nothing else ("Moderate", "Normal" are bugs).
-6. **Sector climate risk** = the higher of (a) the sector's forecast risk
-   (`SECTOR_BASE_FORECAST_RISK`) and (b) active *weather* warnings covering it.
+6. **Sector climate risk** = the higher of (a) the sector's forecast risk and (b) active
+   *weather* warnings covering it. Forecast risk = the highest level the sector's 10-day rain
+   forecast (`rainForecasts`) reaches under the officer's rain rule in `thresholdRules`
+   (24 h: 40 Watch · 60 High · 80 Critical), computed by `computeSectorForecastRisk`.
    Pest/disease warnings do not change climate risk.
    District risk = highest sector climate risk. Implemented in `computeSectorClimateRisk` /
-   `computeDistrictClimateRisk` — use those, never re-derive risk in a component.
+   `computeDistrictClimateRisk` (both take the forecast-risk map) — use those, never re-derive
+   risk in a component.
 7. **Sentence case** for every label, heading and button. No ALL-CAPS text.
    Exception: the brand is always written **IHINGA AI**.
    (Sidebar labels are sentence case; some page headings and KPI labels are still Title Case — Task 9.)
@@ -107,7 +113,7 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
     keep it at ≥ 96px.
 14. **Reset demo** (`handleResetDemo`, `App.tsx`) must restore every store field to its
     initial value, including anything created during the demo. It currently resets all
-    twenty-three fields; add every new field you introduce.
+    twenty-six fields; add every new field you introduce.
 
 ## Roles (one shared store, desktop unless noted)
 
@@ -213,6 +219,17 @@ permission matrix (`view_research_data`, `export_data`). Reports offers research
 `FORECAST_VS_OBSERVED`, `computeForecastSkill`, `LONG_HORIZON_ACCURACY` (illustrative),
 `computeWarningHitRate`, `computeReportValidation`, `anonymisedReportId`. No page is a
 `PlaceholderView` any more.
+
+Farmer dashboard data sources (after Task 6): weather = latest `stationReadings` entry for the
+farmer's sector (admin Data sources → Manual upload adds readings with temperature and
+humidity); rainfall outlook = the sector's series in `rainForecasts` (admin "Rain forecast
+upload" replaces days); "N mm total" = sum of the 30-day series; affected sectors = sectors at
+Watch or above (`computeAffectedSectors`); crop advice = `cropAdvisories`, written by the
+officer on an active warning (Warnings → "Add crop advice"), shown to a farmer only while
+that warning is active and only for their sector and crops (`visibleAdvisories`); the map
+colours Musanze with `computeDistrictClimateRisk`. `SECTOR_BASE_FORECAST_RISK`,
+`SECTORS_WATCH_LIST` and `SECTORS_LOW_LIST` are gone. Sources still missing are listed in
+`docs/fix-in-code-later.md`.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 

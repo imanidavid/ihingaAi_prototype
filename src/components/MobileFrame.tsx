@@ -37,12 +37,11 @@ import {
   CROP_RISK_MATRIX,
   CROP_ADVISORIES_DATA,
   PLAN_AHEAD_DATA,
-  SECTORS_WATCH_LIST,
-  SECTORS_LOW_LIST,
+  RISK_LEVEL_COLORS,
   ALL_30_RWANDA_DISTRICTS,
   MUSANZE_SECTORS_CELLS,
 } from '../data/musanzeData';
-import { CropAdvisory, AlertItem, ObservationItem, RiskLevel, NotificationItem } from '../types';
+import { WeatherForecastDay, CropAdvisory, AlertItem, ObservationItem, RiskLevel, NotificationItem } from '../types';
 
 interface MobileFrameProps {
   alerts?: AlertItem[];
@@ -55,6 +54,19 @@ interface MobileFrameProps {
   onSubmitObservation?: (report: ObservationItem) => void;
   notifications?: NotificationItem[];
   onNotificationClick?: (item: NotificationItem) => void;
+  /** Latest station reading text, e.g. "22°C / 78%", and the forecast weather line. */
+  weatherLine: string;
+  weatherSummary: string;
+  /** The farmer's sector forecast (30 days) from the store. */
+  forecastSeries: WeatherForecastDay[];
+  /** Sectors at Watch or above (with level) and the Low ones, computed from the forecast risk. */
+  riskSectors: { name: string; level: RiskLevel; reason: string; isUserSector: boolean }[];
+  lowSectors: string[];
+  /** Officer advice for active warnings in the farmer's area. */
+  advisories: CropAdvisory[];
+  /** Farmer's current climate risk and first name. */
+  riskLevel: RiskLevel;
+  firstName: string;
 }
 
 export const MobileFrame: React.FC<MobileFrameProps> = ({
@@ -64,7 +76,16 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
   onSubmitObservation,
   notifications = [],
   onNotificationClick,
+  weatherLine,
+  weatherSummary,
+  forecastSeries,
+  riskSectors,
+  lowSectors,
+  advisories,
+  riskLevel,
+  firstName,
 }) => {
+  const monthTotal = forecastSeries.reduce((sum, d) => sum + d.rainfallMm, 0);
   const currentAlerts = alerts || [];
   const [mobileView, setMobileView] = useState<'m1' | 'm2'>(initialSubView);
   const [activeTab, setActiveTab] = useState<'home' | 'forecast' | 'warnings' | 'advice'>('home');
@@ -217,7 +238,12 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
   };
 
   // Active Horizon Package
-  const currentHorizonPkg = FORECAST_HORIZONS[forecastHorizon];
+  // 10-day and month charts read the store forecast; the season chart stays monthly totals
+  const basePkg = FORECAST_HORIZONS[forecastHorizon];
+  const currentHorizonPkg =
+    forecastHorizon === 'season'
+      ? basePkg
+      : { ...basePkg, chartData: forecastHorizon === '10d' ? forecastSeries.slice(0, 10) : forecastSeries };
   const chartPointsData = currentHorizonPkg.chartData;
 
   // Chart coordinates mapping (0-50mm or scaled to max in series)
@@ -407,12 +433,15 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                       <span className="text-[11px] text-[#E4ECDB] font-medium">
                         {MUSANZE_RECORD.season}
                       </span>
-                      <span className="px-2 py-0.5 rounded-full bg-[#D9A032] text-[#17271D] text-[10px] font-semibold">
-                        {MUSANZE_RECORD.riskLevel}
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[#17271D] text-[10px] font-semibold"
+                        style={{ backgroundColor: RISK_LEVEL_COLORS[riskLevel] }}
+                      >
+                        {riskLevel}
                       </span>
                     </div>
                     <h2 className="text-[15px] font-normal leading-snug text-white">
-                      {NOW.greeting}
+                      Good afternoon, {firstName}. {weatherSummary}
                     </h2>
                     <div className="mt-3 flex items-center gap-2">
                       <button
@@ -451,9 +480,9 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                     <div className="bg-[#FBFCF8] rounded-[14px] p-3 border border-[rgba(31,74,52,0.10)] shadow-xs">
                       <span className="text-[11px] text-[#5B665E] block">Upcoming Weather</span>
                       <span className="text-[18px] font-semibold text-[#17271D] block mt-0.5">
-                        {NOW.weatherString}
+                        {weatherLine}
                       </span>
-                      <span className="text-[10px] text-[#5B665E] block mt-0.5 font-medium">Rain Tue</span>
+                      <span className="text-[10px] text-[#5B665E] block mt-0.5 font-medium">{weatherSummary}</span>
                     </div>
 
                     {/* 3. Warnings */}
@@ -478,12 +507,16 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                       <span className="text-[11px] text-[#5B665E] block">Affected Sectors</span>
                       <div className="flex items-baseline gap-1 mt-0.5">
                         <span className="text-[18px] font-semibold text-[#17271D]">
-                          {MUSANZE_RECORD.affectedSectorsCount}
+                          {riskSectors.length}
                         </span>
-                        <span className="text-[12px] text-[#5B665E]">/ {MUSANZE_RECORD.totalSectorsCount}</span>
+                        <span className="text-[12px] text-[#5B665E]">/ {riskSectors.length + lowSectors.length}</span>
                       </div>
                       <span className="text-[10px] text-[#5B665E] block mt-0.5">
-                        {MUSANZE_RECORD.affectedSectorsCaption}
+                        {riskSectors.length === 0
+                          ? 'None at Watch or above'
+                          : riskSectors.length === 1
+                          ? riskSectors[0].name
+                          : `${riskSectors[0].name} +${riskSectors.length - 1} more`}
                       </span>
                     </div>
                   </div>
@@ -642,7 +675,10 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                       </button>
                     </div>
                     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-                      {CROP_ADVISORIES_DATA.map((adv) => (
+                      {advisories.length === 0 && (
+                        <p className="text-[11px] text-[#5B665E] py-2">No crop advice right now.</p>
+                      )}
+                      {advisories.map((adv) => (
                         <div
                           key={adv.id}
                           onClick={() => handleOpenAdvisory(adv)}
@@ -922,7 +958,7 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                           <g transform={`translate(${peakChartPt.x}, ${peakChartPt.y - 12})`}>
                             <rect x="-35" y="-12" width="70" height="13" rx="6.5" fill="#1F4A34" />
                             <text x="0" y="-3" textAnchor="middle" className="text-[7.5px] font-bold fill-white">
-                              300 mm total
+                              {monthTotal} mm total
                             </text>
                           </g>
                         )}
@@ -934,13 +970,13 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                   <div className="bg-[#FBFCF8] rounded-[16px] p-3.5 border border-[rgba(31,74,52,0.10)] shadow-xs space-y-2.5">
                     <div className="flex items-center justify-between">
                       <h4 className="text-[13px] font-semibold text-[#17271D]">Sector Risk ({MUSANZE_RECORD.districtName})</h4>
-                      <span className="text-[10px] text-[#D9A032] font-semibold">
-                        {SECTORS_WATCH_LIST.length} at Watch
+                      <span className="text-[10px] text-[#5B665E] font-semibold">
+                        {riskSectors.length} at Watch or above
                       </span>
                     </div>
 
                     <div className="space-y-1.5">
-                      {SECTORS_WATCH_LIST.map((s) => (
+                      {riskSectors.map((s) => (
                         <div key={s.name} className="flex items-center justify-between p-2 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.06)] text-[11px]">
                           <div>
                             <span className="font-semibold text-[#17271D] block">
@@ -948,8 +984,11 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                             </span>
                             <span className="text-[10px] text-[#5B665E]">{s.reason}</span>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-semibold bg-[#D9A032]/20 text-[#9E6905]">
-                            Watch
+                          <span
+                            className="px-2 py-0.5 rounded-full text-[9px] font-semibold text-[#17271D] border"
+                            style={{ backgroundColor: `${RISK_LEVEL_COLORS[s.level]}33`, borderColor: `${RISK_LEVEL_COLORS[s.level]}66` }}
+                          >
+                            {s.level}
                           </span>
                         </div>
                       ))}
@@ -960,7 +999,7 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                         onClick={() => setShowLowRiskSectors(!showLowRiskSectors)}
                         className="w-full flex items-center justify-between py-1 text-[11px] font-medium text-[#1F4A34] hover:text-[#2C6343] cursor-pointer"
                       >
-                        <span>{SECTORS_LOW_LIST.length} sectors at Low risk</span>
+                        <span>{lowSectors.length} sectors at Low risk</span>
                         <span className="flex items-center gap-1 font-semibold underline">
                           {showLowRiskSectors ? 'Hide' : 'Show'}
                           {showLowRiskSectors ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -969,9 +1008,9 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
 
                       {showLowRiskSectors && (
                         <div className="mt-2 space-y-1 pl-1">
-                          {SECTORS_LOW_LIST.map((sec) => (
-                            <div key={sec.name} className="flex items-center justify-between text-[10px] text-[#5B665E] py-0.5 border-b border-[rgba(31,74,52,0.04)]">
-                              <span>{sec.name}</span>
+                          {lowSectors.map((name) => (
+                            <div key={name} className="flex items-center justify-between text-[10px] text-[#5B665E] py-0.5 border-b border-[rgba(31,74,52,0.04)]">
+                              <span>{name}</span>
                               <span className="text-[#3E8E55] font-medium">Low risk</span>
                             </div>
                           ))}
@@ -1156,7 +1195,7 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                       <span className="text-[10px] text-[#5B665E]">Swipe →</span>
                     </div>
                     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-                      {CROP_ADVISORIES_DATA.filter((adv) => {
+                      {advisories.filter((adv) => {
                         if (adviceCropFilter === 'All') return true;
                         return adv.crop.toLowerCase().includes(adviceCropFilter.toLowerCase());
                       }).map((adv) => (

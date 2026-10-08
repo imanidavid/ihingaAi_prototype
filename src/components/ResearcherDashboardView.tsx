@@ -13,7 +13,7 @@ import {
   Target,
   X,
 } from 'lucide-react';
-import { DataSourceStatus, NavView, ReportItem, UserAccount, WarningItem } from '../types';
+import { DataSourceStatus, NavView, ReportItem, RiskLevel, UserAccount, WarningItem } from '../types';
 import {
   FORECAST_VS_OBSERVED,
   anonymisedReportId,
@@ -34,6 +34,7 @@ interface ResearcherDashboardViewProps {
   dataSources: DataSourceStatus[];
   currentAccount?: UserAccount;
   onNavigateView: (view: NavView) => void;
+  forecastRisk: Record<string, RiskLevel>;
 }
 
 /** 'DD/MM HH:MM' (2026) -> sortable */
@@ -45,12 +46,13 @@ export const ResearcherDashboardView: React.FC<ResearcherDashboardViewProps> = (
   dataSources,
   currentAccount,
   onNavigateView,
+  forecastRisk,
 }) => {
   const firstName = currentAccount?.fullName.split(' ')[0];
   const skill = useMemo(() => computeForecastSkill(FORECAST_VS_OBSERVED), []);
   const hitRate = useMemo(() => computeWarningHitRate(warnings), [warnings]);
   const validation = useMemo(() => computeReportValidation(reports), [reports]);
-  const districtRisk = computeDistrictClimateRisk([...MUSANZE_SECTORS], warnings);
+  const districtRisk = computeDistrictClimateRisk([...MUSANZE_SECTORS], warnings, forecastRisk);
   const healthy = dataSources.filter((d) => d.status === 'Healthy').length;
   const latest = [...validation.reports].sort((a, b) => reportKey(b.date) - reportKey(a.date)).slice(0, 5);
 

@@ -28,7 +28,11 @@ import {
   WarningHistoryItem,
   ThresholdRuleItem,
   RiskLevel,
+  CropAdvisory,
+  SectorRainForecast,
 } from '../types';
+import { RISK_LEVEL_WEIGHT, computeSectorForecastRisk, FORECAST_RISK_DAYS } from '../data/musanzeData';
+import { CropAdviceModal } from './officer/CropAdviceModal';
 
 interface OfficerWarningsViewProps {
   activeWarnings: OfficerActiveWarning[];
@@ -39,6 +43,13 @@ interface OfficerWarningsViewProps {
   onUpdateWarning: (warning: OfficerActiveWarning) => void;
   onSaveRules: (updatedRules: ThresholdRuleItem[]) => void;
   onShowToast: (message: string) => void;
+  /** Crop advice written by officers, each linked to a warning. */
+  cropAdvisories: CropAdvisory[];
+  onSaveAdvice: (advice: CropAdvisory) => void;
+  onRemoveAdvice: (adviceId: string) => void;
+  authorName: string;
+  /** Forecast series, so the thresholds tab can preview which sectors each setting puts at risk. */
+  rainForecasts: SectorRainForecast[];
 }
 
 const MUSANZE_SECTORS_DATA: { name: string; farmers: number }[] = [
@@ -79,7 +90,13 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
   onUpdateWarning,
   onSaveRules,
   onShowToast,
+  cropAdvisories,
+  onSaveAdvice,
+  onRemoveAdvice,
+  authorName,
+  rainForecasts,
 }) => {
+  const [adviceFor, setAdviceFor] = useState<OfficerActiveWarning | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'history' | 'thresholds'>('active');
 
   // Modals & Drawers state
@@ -283,9 +300,25 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
     setWarningToEnd(null);
   };
 
+  /** Numeric thresholds must rise with the level (Watch < High < Critical). */
+  const ruleError = (rule: ThresholdRuleItem): string | null => {
+    const numeric = rule.thresholdsList
+      .filter((t) => typeof t.value === 'number')
+      .sort((a, b) => RISK_LEVEL_WEIGHT[a.level] - RISK_LEVEL_WEIGHT[b.level]);
+    for (let i = 1; i < numeric.length; i++) {
+      if ((numeric[i].value as number) <= (numeric[i - 1].value as number)) {
+        return `${numeric[i].level} must be more than ${numeric[i - 1].level} (${numeric[i - 1].value} ${numeric[i - 1].unit || ''}).`;
+      }
+    }
+    if (numeric.some((t) => (t.value as number) <= 0)) return 'Each number must be more than 0.';
+    return null;
+  };
+  const rulesInvalid = rulesState.some((r) => ruleError(r) !== null);
+
   const handleSaveThresholdRules = () => {
+    if (rulesInvalid) return;
     onSaveRules(rulesState);
-    onShowToast('Rules saved. Applied at the next forecast run (every 6 hours).');
+    onShowToast('Rules saved. Sector forecast risk is updated now.');
   };
 
   const getLevelChip = (lvl: RiskLevel) => {
@@ -487,6 +520,53 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                   </div>
                 </div>
 
+                {/* Crop advice linked to this warning (farmers see it while the warning is active) */}
+                {(() => {
+                  const linked = cropAdvisories.filter((a) => a.linkedWarningId === warning.id);
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-[13px] font-semibold text-[#17271D]">
+                          Crop advice for farmers ({linked.length})
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setAdviceFor(warning)}
+                          className="px-3.5 py-1.5 rounded-full bg-white text-[#1F4A34] border border-[#1F4A34]/40 hover:bg-[#E4ECDB] text-[12px] font-semibold transition-colors cursor-pointer"
+                        >
+                          Add crop advice
+                        </button>
+                      </div>
+                      {linked.length === 0 ? (
+                        <p className="text-[12.5px] text-[#5B665E]">No crop advice yet. Farmers only see the warning.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                          {linked.map((a) => (
+                            <div key={a.id} className="p-3 rounded-xl bg-[#F4F6EF]/70 border border-[rgba(31,74,52,0.06)] text-[12.5px] space-y-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="font-semibold text-[#17271D]">{a.title}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => onRemoveAdvice(a.id)}
+                                  aria-label={`Remove advice ${a.title}`}
+                                  title="Remove advice"
+                                  className="p-1 rounded-full text-[#5B665E] hover:text-[#17271D] hover:bg-[#E4ECDB] cursor-pointer flex-shrink-0"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              <span className="block text-[#5B665E]">
+                                {a.crop} · {a.sectors.join(', ')}
+                                {a.authorName ? ` · ${a.authorName}` : ''}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Delivery by Channel & Acknowledged by Sector in 2 Columns */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
                   {/* Left: Delivery by Channel Table (5 cols) */}
@@ -687,11 +767,49 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                           key={thIdx}
                           className="flex items-center justify-between p-2.5 rounded-xl bg-[#F4F6EF]/70 border border-[rgba(31,74,52,0.06)] text-[12.5px]"
                         >
-                          <span className="font-medium text-[#17271D]">{th.label}</span>
+                          {typeof th.value === 'number' ? (
+                            <span className="flex items-center gap-2 font-medium text-[#17271D]">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                aria-label={`${rule.name}: ${th.level} from`}
+                                value={String(th.value)}
+                                onChange={(e) => {
+                                  const n = Number(e.target.value.replace(/[^0-9]/g, '') || 0);
+                                  const updated = [...rulesState];
+                                  updated[idx] = {
+                                    ...rule,
+                                    thresholdsList: rule.thresholdsList.map((t, j) =>
+                                      j === thIdx ? { ...t, value: n, label: `${n} ${t.unit || ''} → ${t.level}`.replace('  ', ' ') } : t
+                                    ),
+                                  };
+                                  setRulesState(updated);
+                                }}
+                                className="w-16 h-8 px-3 rounded-full bg-white border border-[rgba(31,74,52,0.18)] text-[12.5px] text-[#17271D] tabular-nums focus:outline-none focus:border-[#1F4A34]"
+                              />
+                              <span>{th.unit} or more → {th.level}</span>
+                            </span>
+                          ) : (
+                            <span className="font-medium text-[#17271D]">{th.label}</span>
+                          )}
                           {getLevelChip(th.level)}
                         </div>
                       ))}
                     </div>
+                    {ruleError(rule) && <p className="text-[12px] text-[#17271D] font-medium">{ruleError(rule)}</p>}
+                    {rule.id === 'rule-rain' && (
+                      <p className="text-[12px] text-[#5B665E]">
+                        {(() => {
+                          const preview = computeSectorForecastRisk(rulesState, rainForecasts);
+                          const atRisk = Object.entries(preview)
+                            .filter(([, lvl]) => lvl !== 'Low')
+                            .sort((a, b) => RISK_LEVEL_WEIGHT[b[1]] - RISK_LEVEL_WEIGHT[a[1]]);
+                          return atRisk.length === 0
+                            ? `With these numbers no sector's ${FORECAST_RISK_DAYS}-day forecast reaches Watch.`
+                            : `With these numbers the ${FORECAST_RISK_DAYS}-day forecast puts ${atRisk.map(([sec, lvl]) => `${sec} (${lvl})`).join(', ')} at risk.`;
+                        })()}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -707,7 +825,8 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
           <div className="pt-2 flex justify-end">
             <button
               onClick={handleSaveThresholdRules}
-              className="px-6 py-2.5 rounded-full bg-[#1F4A34] text-white text-[13px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer active:scale-98"
+              disabled={rulesInvalid}
+              className="px-6 py-2.5 rounded-full bg-[#1F4A34] text-white text-[13px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Save rules
             </button>
@@ -1284,6 +1403,15 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
           </div>
         </div>
       )}
+      <CropAdviceModal
+        warning={adviceFor}
+        authorName={authorName}
+        onClose={() => setAdviceFor(null)}
+        onSave={(advice) => {
+          onSaveAdvice(advice);
+          setAdviceFor(null);
+        }}
+      />
     </div>
   );
 };

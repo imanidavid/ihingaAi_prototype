@@ -12,7 +12,7 @@ import {
   Check,
 } from 'lucide-react';
 import { CropAdvisory, UserProfileSettings } from '../types';
-import { CROP_ADVISORIES_DATA as CROP_ADVISORIES, PLAN_AHEAD_DATA as PLAN_AHEAD_ITEMS } from '../data/musanzeData';
+import { PLAN_AHEAD_DATA as PLAN_AHEAD_ITEMS } from '../data/musanzeData';
 
 interface RecommendationsViewProps {
   settings: UserProfileSettings;
@@ -20,10 +20,13 @@ interface RecommendationsViewProps {
   onSelectAdvisory: (advisory: CropAdvisory) => void;
   savedItemIds: string[];
   onToggleSaveItem: (id: string) => void;
+  /** Officer advice for active warnings in the farmer's area. */
+  advisories: CropAdvisory[];
 }
 
 export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
   settings,
+  advisories: CROP_ADVISORIES,
   onOpenSettingsNotifications,
   onSelectAdvisory,
   savedItemIds,

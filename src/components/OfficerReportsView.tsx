@@ -22,6 +22,7 @@ import {
   ScheduledReportItem,
   GeneratedReportType,
   ReportSectionConfig,
+  RiskLevel,
 } from '../types';
 import {
   INITIAL_GENERATED_REPORTS,
@@ -43,6 +44,8 @@ interface OfficerReportsViewProps {
   reportTypes?: GeneratedReportType[];
   /** Short name of the signed-in author, e.g. "Claudine M.". */
   authorName?: string;
+  /** Each sector's forecast risk (forecast series + threshold rules). */
+  forecastRisk: Record<string, RiskLevel>;
 }
 
 export const DISTRICT_REPORT_TYPES: GeneratedReportType[] = [
@@ -148,6 +151,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   onShowToast,
   reportTypes = DISTRICT_REPORT_TYPES,
   authorName = 'Claudine M.',
+  forecastRisk,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'library' | 'scheduled'>('overview');
   const [internalReportsList, setInternalReportsList] = useState<GeneratedReport[]>(INITIAL_GENERATED_REPORTS);
@@ -209,8 +213,8 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   const allSectorNames = useMemo(() => OFFICER_DATA.sectorOverviews.map((s) => s.name), []);
   const activeWarnings = useMemo(() => warnings.filter((w) => w.status === 'Active'), [warnings]);
   const districtRisk = useMemo(
-    () => computeDistrictClimateRisk(allSectorNames, activeWarnings),
-    [allSectorNames, activeWarnings]
+    () => computeDistrictClimateRisk(allSectorNames, activeWarnings, forecastRisk),
+    [allSectorNames, activeWarnings, forecastRisk]
   );
 
   // Original 5 warnings in Musanze store have full delivery data (acknowledged 65%, 58%, 66%, 71%, 52% -> average 62%)
@@ -245,7 +249,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   // 15 Sectors computed table data
   const sectorRows = useMemo(() => {
     return OFFICER_DATA.sectorOverviews.map((sec) => {
-      const risk = computeSectorClimateRisk(sec.name, activeWarnings);
+      const risk = computeSectorClimateRisk(sec.name, activeWarnings, forecastRisk);
       const activeWarningsForSector = activeWarnings.filter((w) => {
         return (
           (w.sectors && (w.sectors.includes(sec.name) || w.sectors.length === 15)) ||

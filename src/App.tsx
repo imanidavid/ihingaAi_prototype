@@ -36,6 +36,8 @@ import {
   ProcessingSettings,
   SecuritySettings,
   VoiceSettings,
+  SectorRainForecast,
+  StationReading,
 } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -108,6 +110,19 @@ import {
   NOW_STAMP,
   ROLE_LABELS,
   INITIAL_LOGIN_ATTEMPTS,
+  INITIAL_RAIN_FORECASTS,
+  MUSANZE_RECORD,
+  STATION_SECTOR,
+  SECTOR_RISK_NOTES,
+  INITIAL_STATION_READINGS,
+  INITIAL_CROP_ADVISORIES,
+  computeSectorForecastRisk,
+  computeDistrictClimateRisk,
+  computeAffectedSectors,
+  forecastDays,
+  weatherSummaryFrom,
+  latestReading,
+  visibleAdvisories,
   INITIAL_SECURITY_SETTINGS,
   INITIAL_DATA_SOURCES,
   INITIAL_PROCESSING_RUNS,
@@ -341,6 +356,17 @@ export default function App() {
   // 3. THRESHOLD RULES: Hazard detection rules
   const [thresholdRules, setThresholdRules] = useState<ThresholdRuleItem[]>(INITIAL_THRESHOLD_RULES);
 
+  // 3b. FORECAST, STATION READINGS AND CROP ADVICE (farmer dashboard sources)
+  const [rainForecasts, setRainForecasts] = useState<SectorRainForecast[]>(INITIAL_RAIN_FORECASTS);
+  const [stationReadings, setStationReadings] = useState<StationReading[]>(INITIAL_STATION_READINGS);
+  const [cropAdvisories, setCropAdvisories] = useState<CropAdvisory[]>(INITIAL_CROP_ADVISORIES);
+
+  // Each sector's forecast risk = highest level its forecast reaches under the officer's rain rule
+  const sectorForecastRisk = useMemo(
+    () => computeSectorForecastRisk(thresholdRules, rainForecasts),
+    [thresholdRules, rainForecasts]
+  );
+
   // 4. USER SETTINGS: Profile & notification preferences for Jean-Baptiste N.
   const [userSettings, setUserSettings] = useState<UserProfileSettings>(INITIAL_USER_SETTINGS);
 
@@ -409,7 +435,25 @@ export default function App() {
   const reportsToReviewCount = reports.filter((r) => r.status === 'Under review').length;
 
   // Compute climate risk for the farmer's sector from active weather warnings
-  const kinigiClimateRisk = computeSectorClimateRisk(userSettings.sector || 'Kinigi', warnings);
+  const farmerSector = userSettings.sector || 'Kinigi';
+  const farmerClimateRisk = computeSectorClimateRisk(farmerSector, warnings, sectorForecastRisk);
+  const allSectorNames = MUSANZE_RECORD.allSectors;
+  const districtClimateRisk = computeDistrictClimateRisk(allSectorNames, warnings, sectorForecastRisk);
+  // Highest risk first, then the wettest 10-day forecast first
+  const sectorsByForecastPeak = [...rainForecasts]
+    .sort((x, y) => Math.max(...y.dailyMm.slice(0, 10)) - Math.max(...x.dailyMm.slice(0, 10)))
+    .map((f) => f.sector);
+  const affectedSectors = computeAffectedSectors(sectorsByForecastPeak, warnings, sectorForecastRisk);
+  const farmerForecast = useMemo(() => forecastDays(rainForecasts, farmerSector), [rainForecasts, farmerSector]);
+  const farmerWeatherSummary = weatherSummaryFrom(farmerForecast, thresholdRules);
+  const farmerReading = latestReading(stationReadings, farmerSector);
+  const districtReading = latestReading(stationReadings, '');
+  const farmerAdvisories = useMemo(
+    () => visibleAdvisories(cropAdvisories, warnings, farmerSector, userSettings.cropsGrown),
+    [cropAdvisories, warnings, farmerSector, userSettings.cropsGrown]
+  );
+  // Map: Musanze's "expected 24 h rain" = wettest sector tomorrow
+  const districtRainTomorrow = Math.max(0, ...rainForecasts.map((f) => f.dailyMm[1] ?? 0));
 
   // =========================================================================
   // BELL & NOTIFICATIONS COMPUTATION
@@ -979,6 +1023,11 @@ export default function App() {
 
   const handleSaveRules = (updatedRules: ThresholdRuleItem[]) => {
     setThresholdRules(updatedRules);
+    const rain = updatedRules.find((r) => r.id === 'rule-rain');
+    logAudit(
+      'Saved threshold rules',
+      rain ? `Rain 24 h: ${rain.thresholdsList.map((t) => `${t.value ?? '—'} ${t.level}`).join(', ')}` : 'Rules'
+    );
   };
 
   // =========================================================================
@@ -1212,10 +1261,48 @@ export default function App() {
     showToast('Voice settings saved');
   };
 
+  // Crop advice (officer) and weather data uploads (admin)
+  const handleSaveAdvice = (advice: CropAdvisory) => {
+    setCropAdvisories((prev) => [...prev, advice]);
+    logAudit('Published crop advice', `${advice.crop} · ${advice.title}`);
+    showToast(`Advice published to ${advice.crop} growers in ${advice.sectors.join(', ')}`);
+  };
+
+  const handleRemoveAdvice = (adviceId: string) => {
+    const advice = cropAdvisories.find((a) => a.id === adviceId);
+    setCropAdvisories((prev) => prev.filter((a) => a.id !== adviceId));
+    logAudit('Removed crop advice', advice ? `${advice.crop} · ${advice.title}` : adviceId);
+    showToast('Advice removed');
+  };
+
+  const handleUploadReadings = (readings: StationReading[]) => {
+    setStationReadings((prev) => [...prev, ...readings]);
+  };
+
+  const handleUploadForecast = (updates: { sector: string; dayIndex: number; rainMm: number }[]) => {
+    setRainForecasts((prev) =>
+      prev.map((f) => {
+        const mine = updates.filter((u) => u.sector === f.sector);
+        if (mine.length === 0) return f;
+        const dailyMm = [...f.dailyMm];
+        mine.forEach((u) => {
+          dailyMm[u.dayIndex] = u.rainMm;
+        });
+        return { ...f, dailyMm, source: `Admin upload ${NOW_STAMP}` };
+      })
+    );
+    const sectors = Array.from(new Set(updates.map((u) => u.sector)));
+    logAudit('Uploaded forecast', `${updates.length} days · ${sectors.join(', ')}`);
+    showToast(`Forecast updated for ${sectors.join(', ')}`);
+  };
+
   const handleResetDemo = () => {
     setWarnings(INITIAL_WARNINGS);
     setReports(INITIAL_52_REPORTS);
     setThresholdRules(INITIAL_THRESHOLD_RULES);
+    setRainForecasts(INITIAL_RAIN_FORECASTS);
+    setStationReadings(INITIAL_STATION_READINGS);
+    setCropAdvisories(INITIAL_CROP_ADVISORIES);
     setUserSettings(INITIAL_USER_SETTINGS);
     setAccounts(INITIAL_USER_ACCOUNTS);
     setAccessRequests(INITIAL_ACCESS_REQUESTS);
@@ -1334,12 +1421,27 @@ export default function App() {
           onNotificationClick={handleNotificationClick}
           warnings={role === 'farmer' ? farmerWarnings : warnings}
           account={accounts.find((a) => a.id === currentAccountId)}
+          advisories={role === 'farmer' ? farmerAdvisories : cropAdvisories}
+          atRiskSectors={affectedSectors.map((a) => a.sector)}
         />
 
         {/* View Switcher: Mobile Frames vs Desktop Layout */}
         {previewMode === 'mobile_m1' || previewMode === 'mobile_m2' ? (
           <main className="flex-1 p-4 md:p-8 flex items-center justify-center pb-32">
             <MobileFrame
+              weatherLine={farmerReading ? `${farmerReading.tempC}°C / ${farmerReading.humidityPct}%` : '—'}
+              weatherSummary={farmerWeatherSummary}
+              forecastSeries={farmerForecast}
+              riskSectors={affectedSectors.map((a) => ({
+                name: a.sector,
+                level: a.risk,
+                reason: SECTOR_RISK_NOTES[a.sector] || '',
+                isUserSector: a.sector === farmerSector,
+              }))}
+              lowSectors={allSectorNames.filter((n) => !affectedSectors.some((a) => a.sector === n))}
+              advisories={farmerAdvisories}
+              riskLevel={farmerClimateRisk}
+              firstName={userSettings.fullName.split(' ')[0]}
               alerts={farmerWarnings}
               initialSubView={previewMode === 'mobile_m1' ? 'm1' : 'm2'}
               onSubmitObservation={handleSubmitObservation}
@@ -1397,7 +1499,24 @@ export default function App() {
                 dataSources={dataSources}
                 onRefresh={handleRefreshSource}
                 onAddSource={handleAddSource}
-                onManualUpload={handleManualUpload}
+                onManualUpload={(rows) => {
+                  handleManualUpload(rows.length);
+                  handleUploadReadings(
+                    rows.map((r, i) => ({
+                      id: `st-demo-${Date.now()}-${i}`,
+                      station: r.station,
+                      sector: STATION_SECTOR[r.station],
+                      date: r.date,
+                      time: r.time,
+                      tempC: r.tempC,
+                      humidityPct: r.humidityPct,
+                      rainMm: r.rainMm,
+                      source: 'Manual upload' as const,
+                    }))
+                  );
+                }}
+                rainForecasts={rainForecasts}
+                onUploadForecast={handleUploadForecast}
               />
             )}
 
@@ -1429,6 +1548,7 @@ export default function App() {
 
             {currentView === 'dashboard' && role === 'researcher' && (
               <ResearcherDashboardView
+                forecastRisk={sectorForecastRisk}
                 warnings={warnings}
                 reports={reports}
                 dataSources={dataSources}
@@ -1450,6 +1570,7 @@ export default function App() {
             {currentView === 'dashboard' && role !== 'admin' && role !== 'researcher' &&
               (role === 'officer' ? (
                 <OfficerDashboardView
+                  forecastRisk={sectorForecastRisk}
                   activeWarningsCount={officerActiveCount}
                   activeWarnings={officerActiveWarnings}
                   reportsToReviewCount={reportsToReviewCount}
@@ -1483,7 +1604,10 @@ export default function App() {
                 <div className="space-y-6">
                   {/* Band 1 — Hero Banner */}
                   <HeroBanner
-                    riskLevel={kinigiClimateRisk}
+                    riskLevel={farmerClimateRisk}
+                    firstName={userSettings.fullName.split(' ')[0]}
+                    sector={farmerSector}
+                    weatherSummary={farmerWeatherSummary}
                     onViewForecast={handleViewForecast}
                     onGetRecommendations={handleGetRecommendations}
                     onReportObservation={handleOpenReportModal}
@@ -1492,7 +1616,12 @@ export default function App() {
                   {/* Band 2 — 4 KPI Cards with dynamic active count */}
                   <KpiStrip
                     activeWarningsCount={farmerActiveCount}
-                    riskLevel={kinigiClimateRisk}
+                    riskLevel={farmerClimateRisk}
+                    sector={farmerSector}
+                    reading={farmerReading}
+                    weatherSummary={farmerWeatherSummary}
+                    affectedSectors={affectedSectors.map((a) => a.sector)}
+                    totalSectors={allSectorNames.length}
                     onSelectWarningKpi={() => setCurrentView('warnings')}
                     onSelectRiskKpi={() => setCurrentView('forecast')}
                   />
@@ -1500,7 +1629,7 @@ export default function App() {
                   {/* Band 3 — 2/3 Rainfall Chart + 1/3 Recent Alerts List */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                     <div className="lg:col-span-8">
-                      <RainfallChartCard />
+                      <RainfallChartCard days={farmerForecast} />
                     </div>
                     <div className="lg:col-span-4">
                       <RecentAlertsCard
@@ -1513,6 +1642,7 @@ export default function App() {
 
                   {/* Band 4 — Crop Advisories (3 Photo Cards) */}
                   <CropAdvisoriesSection
+                    advisories={farmerAdvisories}
                     onSelectAdvisory={handleSelectAdvisory}
                     onViewAll={() => setCurrentView('recommendations')}
                   />
@@ -1522,11 +1652,14 @@ export default function App() {
                     <div className="lg:col-span-8">
                       <RwandaRiskMapCard
                         onViewFullMap={() => setCurrentView('forecast')}
-                        musanzeRiskLevel={
-                          computeSectorClimateRisk('Muhoza', officerActiveWarnings) === 'High'
-                            ? 'High'
-                            : kinigiClimateRisk
-                        }
+                        musanzeRiskLevel={districtClimateRisk}
+                        musanzeLive={{
+                          temp: districtReading ? `${districtReading.tempC}°C` : undefined,
+                          humidity: districtReading ? `${districtReading.humidityPct}%` : undefined,
+                          rainfall24h: districtRainTomorrow,
+                          affectedSectorsCount: affectedSectors.length,
+                          affectedSectorsList: affectedSectors.map((a) => a.sector),
+                        }}
                       />
                     </div>
                     <div className="lg:col-span-4">
@@ -1545,6 +1678,9 @@ export default function App() {
                 hideUserSectorChip={role !== 'farmer'}
                 onOpenWarning={() => setCurrentView('warnings')}
                 activeWarnings={officerActiveWarnings}
+                forecastRisk={sectorForecastRisk}
+                userSector={role === 'farmer' ? farmerSector : undefined}
+                forecastSeries={farmerForecast}
               />
             )}
 
@@ -1554,6 +1690,11 @@ export default function App() {
                   activeWarnings={officerActiveWarnings}
                   warningHistory={officerWarningHistory}
                   thresholdRules={thresholdRules}
+                  cropAdvisories={cropAdvisories}
+                  onSaveAdvice={handleSaveAdvice}
+                  onRemoveAdvice={handleRemoveAdvice}
+                  authorName={reportNameOf(accounts.find((a) => a.id === currentAccountId)?.fullName || 'Claudine Mukamana')}
+                  rainForecasts={rainForecasts}
                   onIssueWarning={handleIssueWarning}
                   onEndWarning={handleEndWarning}
                   onUpdateWarning={handleUpdateWarning}
@@ -1631,6 +1772,7 @@ export default function App() {
 
             {currentView === 'recommendations' && (
               <RecommendationsView
+                advisories={farmerAdvisories}
                 settings={userSettings}
                 onOpenSettingsNotifications={() => setCurrentView('settings')}
                 onSelectAdvisory={handleSelectAdvisory}
@@ -1672,6 +1814,7 @@ export default function App() {
 
             {currentView === 'reports' && (
               <OfficerReportsView
+                forecastRisk={sectorForecastRisk}
                 authorName={reportNameOf(accounts.find((a) => a.id === currentAccountId)?.fullName || 'Claudine Mukamana')}
                 reportTypes={
                   role === 'researcher' ? ['Model validation', 'Field data summary', 'Seasonal forecast'] : undefined

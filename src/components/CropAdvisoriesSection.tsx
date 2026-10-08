@@ -1,14 +1,15 @@
 import React from 'react';
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import { CropAdvisory } from '../types';
-import { CROP_ADVISORIES_DATA as CROP_ADVISORIES } from '../data/musanzeData';
-
 interface CropAdvisoriesSectionProps {
+  /** Officer advice linked to warnings that are active for this farmer. */
+  advisories: CropAdvisory[];
   onSelectAdvisory: (advisory: CropAdvisory) => void;
   onViewAll?: () => void;
 }
 
 export const CropAdvisoriesSection: React.FC<CropAdvisoriesSectionProps> = ({
+  advisories,
   onSelectAdvisory,
   onViewAll,
 }) => {
@@ -19,7 +20,7 @@ export const CropAdvisoriesSection: React.FC<CropAdvisoriesSectionProps> = ({
         <div>
           <h2 className="text-[16px] font-semibold text-[#17271D]">Crop Advisories</h2>
           <p className="text-[12px] text-[#5B665E]">
-            Hyperlocal action windows based on Tuesday rain forecast
+            Advice from your officer for the warnings in your area
           </p>
         </div>
         <button
@@ -31,9 +32,18 @@ export const CropAdvisoriesSection: React.FC<CropAdvisoriesSectionProps> = ({
         </button>
       </div>
 
-      {/* 3 Photo Cards Grid */}
+      {advisories.length === 0 && (
+        <div className="bg-[#FBFCF8] rounded-[16px] border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] p-8 flex flex-col items-center text-center gap-2">
+          <div className="w-10 h-10 rounded-full bg-[#E4ECDB] border border-[rgba(31,74,52,0.12)] flex items-center justify-center">
+            <ArrowRight className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
+          </div>
+          <p className="text-[13px] text-[#5B665E]">No crop advice right now. You will see it here when there is a warning.</p>
+        </div>
+      )}
+
+      {/* Photo cards: one per piece of advice */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {CROP_ADVISORIES.map((advisory) => (
+        {advisories.map((advisory) => (
           <div
             key={advisory.id}
             onClick={() => onSelectAdvisory(advisory)}

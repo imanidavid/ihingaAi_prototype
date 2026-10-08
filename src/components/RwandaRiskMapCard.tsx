@@ -12,11 +12,14 @@ import { RWANDA_DISTRICTS } from '../data/musanzeData';
 interface RwandaRiskMapCardProps {
   onViewFullMap?: () => void;
   musanzeRiskLevel?: RiskLevel;
+  /** Musanze's live values from the store (other districts keep their seeded values). */
+  musanzeLive?: Partial<Pick<DistrictData, 'temp' | 'humidity' | 'rainfall24h' | 'affectedSectorsCount' | 'affectedSectorsList'>>;
 }
 
 export const RwandaRiskMapCard: React.FC<RwandaRiskMapCardProps> = ({
   onViewFullMap,
   musanzeRiskLevel,
+  musanzeLive,
 }) => {
   const [selectedDistrictId, setSelectedDistrictId] = useState<string>('musanze');
   const [hoveredDistrict, setHoveredDistrict] = useState<DistrictData | null>(null);
@@ -24,14 +27,16 @@ export const RwandaRiskMapCard: React.FC<RwandaRiskMapCardProps> = ({
   const rawSelected =
     RWANDA_DISTRICTS.find((d) => d.id === selectedDistrictId) || RWANDA_DISTRICTS[0];
   const selectedDistrict =
-    rawSelected.id === 'musanze' && musanzeRiskLevel
-      ? { ...rawSelected, risk: musanzeRiskLevel }
+    rawSelected.id === 'musanze'
+      ? { ...rawSelected, ...musanzeLive, ...(musanzeRiskLevel ? { risk: musanzeRiskLevel } : {}) }
       : rawSelected;
 
   const rawMusanze = RWANDA_DISTRICTS.find((d) => d.id === 'musanze')!;
-  const musanzeDistrict = musanzeRiskLevel
-    ? { ...rawMusanze, risk: musanzeRiskLevel }
-    : rawMusanze;
+  const musanzeDistrict = {
+    ...rawMusanze,
+    ...musanzeLive,
+    ...(musanzeRiskLevel ? { risk: musanzeRiskLevel } : {}),
+  };
 
   const getRiskColor = (risk: RiskLevel) => {
     switch (risk) {
