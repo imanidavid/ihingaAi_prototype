@@ -1,5 +1,5 @@
 import React from 'react';
-import { Monitor, Smartphone, Sprout, ShieldCheck, RotateCcw, Clock, Users, UserCog } from 'lucide-react';
+import { Monitor, Smartphone, Sprout, ShieldCheck, RotateCcw, Clock, Users, UserCog, FlaskConical } from 'lucide-react';
 import { AppRole } from '../types';
 
 export type PreviewMode = 'desktop' | 'mobile_m1' | 'mobile_m2';
@@ -80,6 +80,18 @@ export const FloatingDeviceSwitcher: React.FC<FloatingDeviceSwitcherProps> = ({
           >
             <UserCog className="w-3 h-3" strokeWidth={1.75} />
             <span>Admin</span>
+          </button>
+          <button
+            onClick={() => onRoleChange('researcher')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full transition-all cursor-pointer ${
+              role === 'researcher'
+                ? 'bg-[#1F4A34] text-white shadow-xs font-semibold'
+                : 'text-[#5B665E] hover:text-[#17271D]'
+            }`}
+            title="Researcher desk (Desktop only)"
+          >
+            <FlaskConical className="w-3 h-3" strokeWidth={1.75} />
+            <span>Researcher</span>
           </button>
         </div>
 

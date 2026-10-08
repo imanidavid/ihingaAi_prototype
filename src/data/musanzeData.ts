@@ -3239,3 +3239,77 @@ export const SCHEDULED_MESSAGES = [
   { id: 'sch-1', at: '29/09/2026 06:00', title: 'Reminder: heavy rain until 14:00 today', audience: 'Kinigi, Busogo, Remera · 1,640 farmers', channel: 'SMS + voice' },
   { id: 'sch-2', at: '29/09/2026 14:30', title: 'Spray window is open (potato growers)', audience: 'Kinigi, Muhoza potato growers · 690 farmers', channel: 'SMS' },
 ];
+
+// =========================================================================
+// RESEARCH (model performance — simulated results for the prototype)
+// =========================================================================
+/** Kinigi: forecast made the day before vs gauge-observed rainfall, last 14 days (simulated). */
+export const FORECAST_VS_OBSERVED: { date: string; forecastMm: number; observedMm: number }[] = [
+  { date: '14/09/2026', forecastMm: 6, observedMm: 5 },
+  { date: '15/09/2026', forecastMm: 4, observedMm: 3 },
+  { date: '16/09/2026', forecastMm: 0, observedMm: 1 },
+  { date: '17/09/2026', forecastMm: 2, observedMm: 2 },
+  { date: '18/09/2026', forecastMm: 9, observedMm: 11 },
+  { date: '19/09/2026', forecastMm: 12, observedMm: 10 },
+  { date: '20/09/2026', forecastMm: 15, observedMm: 18 },
+  { date: '21/09/2026', forecastMm: 10, observedMm: 9 },
+  { date: '22/09/2026', forecastMm: 7, observedMm: 8 },
+  { date: '23/09/2026', forecastMm: 11, observedMm: 17 },
+  { date: '24/09/2026', forecastMm: 14, observedMm: 13 },
+  { date: '25/09/2026', forecastMm: 18, observedMm: 26 },
+  { date: '26/09/2026', forecastMm: 16, observedMm: 15 },
+  { date: '27/09/2026', forecastMm: 20, observedMm: 22 },
+];
+
+/** A day "hits" when the forecast is within 3 mm or 20% of what fell. */
+export function forecastDayHit(d: { forecastMm: number; observedMm: number }): boolean {
+  return Math.abs(d.forecastMm - d.observedMm) <= Math.max(3, d.observedMm * 0.2);
+}
+
+export function computeForecastSkill(days: { forecastMm: number; observedMm: number }[]) {
+  const last10 = days.slice(-10);
+  const hits = last10.filter(forecastDayHit).length;
+  const errors = days.map((d) => d.forecastMm - d.observedMm);
+  return {
+    hits,
+    days: last10.length,
+    pct: last10.length > 0 ? Math.round((hits / last10.length) * 100) : 0,
+    meanAbsErrorMm: Math.round((errors.reduce((s, e) => s + Math.abs(e), 0) / Math.max(1, errors.length)) * 10) / 10,
+    biasMm: Math.round((errors.reduce((s, e) => s + e, 0) / Math.max(1, errors.length)) * 10) / 10,
+    forecastTotal: days.reduce((s, d) => s + d.forecastMm, 0),
+    observedTotal: days.reduce((s, d) => s + d.observedMm, 0),
+  };
+}
+
+/** Longer horizons need past seasons the prototype does not hold, so they are illustrative. */
+export const LONG_HORIZON_ACCURACY = [
+  { horizon: 'Month', pct: 72, basis: 'Last 6 months, rain above or below normal', illustrative: true },
+  { horizon: 'Season', pct: 64, basis: 'Last 4 seasons, onset within 7 days', illustrative: true },
+];
+
+/** Warning hit rate: warnings later confirmed by farmers' field reports (computed from the store). */
+export function computeWarningHitRate(warnings: WarningItem[]) {
+  const confirmed = warnings.filter((w) => w.confirmedByReports).length;
+  return { confirmed, total: warnings.length, pct: warnings.length > 0 ? Math.round((confirmed / warnings.length) * 100) : 0 };
+}
+
+const VALIDATION_REPORT_TYPES = ['Rainfall', 'Flood / damage'];
+
+/**
+ * Report-based validation: weather field reports (rainfall, flood/damage) that reached an officer,
+ * and how many matched the forecast for that day and sector.
+ */
+export function computeReportValidation(reports: ObservationItem[]) {
+  const used = reports.filter(
+    (r) => VALIDATION_REPORT_TYPES.includes(r.type) && !['Not sent', 'Waiting to send'].includes(r.status)
+  );
+  const matched = used.filter((r) => r.isConsistent).length;
+  return { used: used.length, matched, pct: used.length > 0 ? Math.round((matched / used.length) * 100) : 0, reports: used };
+}
+
+/** Anonymised report id for research exports (no farmer names). */
+export function anonymisedReportId(reportId: string): string {
+  let h = 0;
+  for (let i = 0; i < reportId.length; i++) h = (h * 31 + reportId.charCodeAt(i)) >>> 0;
+  return `R-${String(h % 100000).padStart(5, '0')}`;
+}

@@ -35,3 +35,9 @@ Found during Tasks 3–5 (08/10/2026):
 - [ ] Data processing runs are simulated: "Run now" walks the stages and records a run, but does not change forecast numbers. The climate normal shown (13 mm/day) is still the undecided value.
 - [ ] Message templates are stored and editable but the composers don't use them yet.
 - [ ] Data retention and password policy settings are recorded only (no data is deleted, passwords are not re-checked).
+
+Found during Task 6 (08/10/2026):
+- [ ] Report-based validation is computed from the store: weather reports (rainfall, flood/damage) that reached an officer = 34, matched 33 (97%). The task spec said 38 / 33 / 87%; the seeded reports don't support that. Decide whether to change the seed data or keep the computed figure.
+- [ ] Month and season accuracy (72%, 64%) are labelled "Illustrative" — the prototype holds no past seasons. Forecast vs observed covers Kinigi only (simulated gauge).
+- [ ] A warning issued during the demo counts as "Not confirmed" in the hit rate until reports confirm it (no flow sets `confirmedByReports` yet).
+

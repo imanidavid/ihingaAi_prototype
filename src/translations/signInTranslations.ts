@@ -27,6 +27,7 @@ export interface SignInTranslationStrings {
   researcherRole: string;
   adminRole: string;
   adminName: string;
+  researcherName: string;
   errorSuspended: string;
   errorRejected: string;
   designedInNextIteration: string;
@@ -169,6 +170,7 @@ export const SIGN_IN_TRANSLATIONS: Record<SignInLanguage, SignInTranslationStrin
     researcherRole: 'Researcher',
     adminRole: 'Administrator',
     adminName: 'Grace Ingabire',
+    researcherName: 'Dr. Diane Uwase',
     errorSuspended: 'This account is suspended. Contact your administrator.',
     errorRejected: 'Your access request was not approved.',
     designedInNextIteration: 'Designed in next iteration',
@@ -331,6 +333,7 @@ export const SIGN_IN_TRANSLATIONS: Record<SignInLanguage, SignInTranslationStrin
     // to be reviewed by a native speaker
     adminRole: 'Umuyobozi wa sisitemu',
     adminName: 'Grace Ingabire',
+    researcherName: 'Dr. Diane Uwase',
     errorSuspended: "Iyi konti yarahagaritswe. Vugana n'umuyobozi wa sisitemu.",
     errorRejected: 'Icyifuzo cyawe cyo kwinjira nticyemewe.',
     // to be reviewed by a native speaker

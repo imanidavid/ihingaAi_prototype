@@ -94,6 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const researcherNavItems: { id: NavView; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'forecast', label: 'Risk forecast', icon: CloudRain },
     { id: 'model_performance', label: 'Model performance', icon: LineChart },
     { id: 'field_data', label: 'Field data', icon: Table2 },
@@ -186,8 +187,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </p>
             <div className="mt-2 flex justify-end">
               <button
-                onClick={() => onSelectView(isAdmin ? 'users' : 'forecast')}
-                title={isAdmin ? 'Review access requests' : 'Open risk forecast'}
+                onClick={() => onSelectView(isAdmin ? 'users' : 'model_performance')}
+                title={isAdmin ? 'Review access requests' : 'Open model performance'}
                 className="w-8 h-8 rounded-full bg-[#1F4A34] text-white flex items-center justify-center hover:bg-[#2C6343] transition-colors shadow-xs group cursor-pointer"
               >
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" strokeWidth={1.5} />

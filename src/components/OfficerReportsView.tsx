@@ -39,7 +39,19 @@ interface OfficerReportsViewProps {
   reportsList?: GeneratedReport[];
   onReportsListChange?: React.Dispatch<React.SetStateAction<GeneratedReport[]>>;
   onShowToast: (message: string) => void;
+  /** Report types offered in "New report" (officer/admin: the five district types; researcher: research types). */
+  reportTypes?: GeneratedReportType[];
+  /** Short name of the signed-in author, e.g. "Claudine M.". */
+  authorName?: string;
 }
+
+export const DISTRICT_REPORT_TYPES: GeneratedReportType[] = [
+  'District risk summary',
+  'Seasonal forecast',
+  'Warning effectiveness',
+  'Farmer engagement',
+  'Situation report',
+];
 
 // Preset section configurations and descriptions per report type
 const REPORT_TYPE_PRESETS: Record<
@@ -93,6 +105,28 @@ const REPORT_TYPE_PRESETS: Record<
       cropLossEstimate: false,
     },
   },
+  'Model validation': {
+    description: 'Model validation — executive summary, warnings and whether field reports confirmed them.',
+    sections: {
+      executiveSummary: true,
+      warnings: true,
+      fieldReports: true,
+      riskBySector: false,
+      cropLossEstimate: false,
+      engagement: false,
+    },
+  },
+  'Field data summary': {
+    description: 'Field data summary — executive summary, risk by sector, field reports (no farmer names).',
+    sections: {
+      executiveSummary: true,
+      riskBySector: true,
+      fieldReports: true,
+      warnings: false,
+      cropLossEstimate: false,
+      engagement: false,
+    },
+  },
   'Situation report': {
     description: 'Situation report — executive summary, warnings, risk by sector, crop loss estimate.',
     sections: {
@@ -112,6 +146,8 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   reportsList: propsReportsList,
   onReportsListChange,
   onShowToast,
+  reportTypes = DISTRICT_REPORT_TYPES,
+  authorName = 'Claudine M.',
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'library' | 'scheduled'>('overview');
   const [internalReportsList, setInternalReportsList] = useState<GeneratedReport[]>(INITIAL_GENERATED_REPORTS);
@@ -129,7 +165,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   // -------------------------------------------------------------------------
   // NEW REPORT BUILDER STATE
   // -------------------------------------------------------------------------
-  const [newType, setNewType] = useState<GeneratedReportType>('District risk summary');
+  const [newType, setNewType] = useState<GeneratedReportType>(reportTypes[0]);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [newPeriodType, setNewPeriodType] = useState<'season' | 'month' | 'week' | 'custom'>('season');
   const [customStartDate, setCustomStartDate] = useState('21/09/2026');
@@ -481,7 +517,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
       title: reportName.trim() || `${newType} · ${computedPeriod}`,
       type: newType,
       period: computedPeriod,
-      createdBy: 'Claudine M.',
+      createdBy: authorName,
       date: '28/09',
       status: 'Draft',
       sectors: newSectorsMode === 'all' ? ['All'] : selectedSectors,
@@ -1569,15 +1605,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
                   {/* Dropdown Menu */}
                   {isTypeDropdownOpen && (
                     <div className="absolute left-0 right-0 top-full mt-1.5 z-20 bg-white rounded-2xl border border-[rgba(31,74,52,0.15)] shadow-xl overflow-hidden py-1 divide-y divide-[rgba(31,74,52,0.06)] animate-in fade-in slide-in-from-top-1">
-                      {(
-                        [
-                          'District risk summary',
-                          'Seasonal forecast',
-                          'Warning effectiveness',
-                          'Farmer engagement',
-                          'Situation report',
-                        ] as const
-                      ).map((t) => (
+                      {reportTypes.map((t) => (
                         <button
                           key={t}
                           type="button"

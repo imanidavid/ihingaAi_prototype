@@ -207,6 +207,50 @@ const ADMIN_APP_VIEWS: {
   },
 ];
 
+const RESEARCHER_APP_VIEWS: {
+  id: ViewType;
+  title: string;
+  subtitle: string;
+  keywords: string[];
+  icon: React.ReactNode;
+}[] = [
+  {
+    id: 'dashboard',
+    title: 'Research dashboard',
+    subtitle: 'Forecast hits, warning hit rate and field checks',
+    keywords: ['dashboard', 'overview', 'research', 'summary'],
+    icon: <Layers className="w-3.5 h-3.5 text-[#1F4A34]" />,
+  },
+  {
+    id: 'forecast',
+    title: 'Risk forecast',
+    subtitle: 'Sector risk and rainfall for Musanze',
+    keywords: ['forecast', 'risk', 'rain', 'sectors'],
+    icon: <CloudRain className="w-3.5 h-3.5 text-[#1F4A34]" />,
+  },
+  {
+    id: 'model_performance',
+    title: 'Model performance',
+    subtitle: 'Forecast vs observed, accuracy by horizon, validation',
+    keywords: ['model', 'performance', 'accuracy', 'validation', 'observed', 'hit rate'],
+    icon: <Layers className="w-3.5 h-3.5 text-[#1F4A34]" />,
+  },
+  {
+    id: 'field_data',
+    title: 'Field data',
+    subtitle: 'Anonymised field reports and CSV export',
+    keywords: ['field', 'data', 'reports', 'export', 'csv', 'anonymised'],
+    icon: <FileText className="w-3.5 h-3.5 text-[#1F4A34]" />,
+  },
+  {
+    id: 'reports',
+    title: 'Reports',
+    subtitle: 'Build and export reports',
+    keywords: ['reports', 'export', 'pdf'],
+    icon: <FileText className="w-3.5 h-3.5 text-[#1F4A34]" />,
+  },
+];
+
 const COOP_APP_VIEWS: {
   id: ViewType;
   title: string;
@@ -303,7 +347,7 @@ export const Topbar: React.FC<TopbarProps> = ({
     : role === 'admin'
     ? ADMIN_APP_VIEWS
     : role === 'researcher'
-    ? OFFICER_APP_VIEWS.filter((v) => v.id === 'forecast' || v.id === 'reports' || v.id === 'settings')
+    ? RESEARCHER_APP_VIEWS
     : FARMER_APP_VIEWS;
 
   const userInitials = fromAccount

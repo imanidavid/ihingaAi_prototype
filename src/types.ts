@@ -522,7 +522,10 @@ export type GeneratedReportType =
   | 'Seasonal forecast'
   | 'Warning effectiveness'
   | 'Farmer engagement'
-  | 'Situation report';
+  | 'Situation report'
+  // Research report types (researcher role)
+  | 'Model validation'
+  | 'Field data summary';
 
 export type GeneratedReportStatus = 'Draft' | 'Final' | 'Sent';
 

@@ -11,4 +11,7 @@
 6. Sign out. Sign in as esther.n@ihinga.demo → "Waiting for approval". Sign in as Admin
    (grace.i@ihinga.demo, code 246810) → Users & access → approve Esther. Sign out, sign in as
    Esther (code 246810) → officer dashboard. Reject Celestin with a reason → his sign-in shows it.
-7. [Reset demo] restores everything in every role.
+7. As Researcher (diane.u@ihinga.demo): dashboard and Model performance reflect step 3's warning
+   and step 2's report; Field data shows no farmer names. As Admin, untick "View research data"
+   for Researcher → Field data is locked.
+8. [Reset demo] restores everything in every role.
