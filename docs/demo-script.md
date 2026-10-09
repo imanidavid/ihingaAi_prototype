@@ -14,4 +14,9 @@
 7. As Researcher (diane.u@ihinga.demo): dashboard and Model performance reflect step 3's warning
    and step 2's report; Field data shows no farmer names. As Admin, untick "View research data"
    for Researcher → Field data is locked.
-8. [Reset demo] restores everything in every role.
+8. As Officer: Warnings → Thresholds & rules → set Watch to 45 mm and save → the farmer's
+   "Affected sectors" drops Muhoza (3 of 15). Add crop advice to Late Blight Threat → it appears
+   on Jean-Baptiste's dashboard; end Heavy Rain Influx → the bean and maize advice disappear.
+   As Admin: Data sources → upload the sample station file → farmer weather 21°C / 84%; upload
+   the sample forecast → Kinigi High, month total 323 mm.
+9. [Reset demo] restores everything in every role.

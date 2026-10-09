@@ -13,13 +13,14 @@ import {
   AlertTriangle,
   ArrowRight,
 } from 'lucide-react';
-import { CropAdvisory, AppRole, OfficerCropRiskDetail, RiskLevel, OfficerActiveWarning } from '../types';
+import { WeatherForecastDay, CropAdvisory, AppRole, OfficerCropRiskDetail, RiskLevel, OfficerActiveWarning } from '../types';
 import {
   CROP_ADVISORIES_DATA as CROP_ADVISORIES,
   FORECAST_HORIZONS,
   CROP_RISK_MATRIX,
-  SECTORS_WATCH_LIST,
-  SECTORS_LOW_LIST,
+  SECTOR_RISK_NOTES,
+  RISK_LEVEL_COLORS,
+  RISK_LEVEL_WEIGHT,
   MUSANZE_RECORD,
   OFFICER_CROP_RISK_MAP,
   computeSectorClimateRisk,
@@ -35,6 +36,12 @@ interface RiskForecastViewProps {
   hideUserSectorChip?: boolean;
   onOpenWarning?: (warningId?: string) => void;
   activeWarnings?: OfficerActiveWarning[];
+  /** Each sector's forecast risk (forecast series + the officer's threshold rules). */
+  forecastRisk: Record<string, RiskLevel>;
+  /** The signed-in farmer's sector ("Your sector" chip). */
+  userSector?: string;
+  /** The farmer's sector forecast from the store (10-day and month charts). */
+  forecastSeries?: WeatherForecastDay[];
 }
 
 export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
@@ -43,6 +50,9 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
   hideUserSectorChip = false,
   onOpenWarning,
   activeWarnings,
+  forecastRisk,
+  userSector,
+  forecastSeries,
 }) => {
   const [horizon, setHorizon] = useState<HorizonType>('10d');
   const [isLowRiskExpanded, setIsLowRiskExpanded] = useState<boolean>(false);
@@ -56,7 +66,12 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
   };
 
   // Horizon Package from shared data module
-  const currentHorizonPkg = FORECAST_HORIZONS[horizon];
+  // 10-day and month charts read the forecast series in the store; the season chart stays monthly totals
+  const basePkg = FORECAST_HORIZONS[horizon];
+  const currentHorizonPkg =
+    forecastSeries && forecastSeries.length > 0 && horizon !== 'season'
+      ? { ...basePkg, chartData: horizon === '10d' ? forecastSeries.slice(0, 10) : forecastSeries }
+      : basePkg;
   const maxScaleMm = horizon === 'season' ? 250 : 50;
   const yGridValues = horizon === 'season' ? [0, 50, 100, 150, 200, 250] : [0, 10, 20, 30, 40, 50];
 
@@ -129,8 +144,14 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
 
   const peakPoint = chartPoints.find((p) => p.isPeak);
 
-  const watchSectors = SECTORS_WATCH_LIST;
-  const lowSectors = SECTORS_LOW_LIST;
+  // Sector lists computed from the forecast risk (highest level first)
+  const watchSectors = MUSANZE_RECORD.allSectors
+    .filter((name) => (forecastRisk[name] || 'Low') !== 'Low')
+    .sort((a, b) => RISK_LEVEL_WEIGHT[forecastRisk[b]] - RISK_LEVEL_WEIGHT[forecastRisk[a]])
+    .map((name) => ({ name, level: forecastRisk[name], isUserSector: name === userSector, reason: SECTOR_RISK_NOTES[name] || '' }));
+  const lowSectors = MUSANZE_RECORD.allSectors
+    .filter((name) => (forecastRisk[name] || 'Low') === 'Low')
+    .map((name) => ({ name, reason: SECTOR_RISK_NOTES[name] || '' }));
 
   const getLevelChip = (lvl: RiskLevel) => {
     switch (lvl) {
@@ -601,7 +622,7 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
         {/* Dynamic High risk sectors if active weather warning issued */}
         {activeWarnings && activeWarnings.length > 0 && (() => {
           const highSectors = MUSANZE_RECORD.allSectors
-            .filter((sec) => computeSectorClimateRisk(sec, activeWarnings) === 'High')
+            .filter((sec) => computeSectorClimateRisk(sec, activeWarnings, forecastRisk) === 'High')
             .map((name) => ({
               name,
               reason: `High risk: active weather broadcast issued for ${name} sector.`,
@@ -637,7 +658,7 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
           );
         })()}
 
-        {/* 2x2 grid of compact cards for the 4 Watch sectors */}
+        {/* Compact cards for the sectors whose forecast reaches Watch or above */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {watchSectors.map((sec) => (
             <div
@@ -655,8 +676,11 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
                     </span>
                   )}
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#D9A032]/20 text-[#9E6905]">
-                  Watch
+                <span
+                  className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold text-[#17271D] border"
+                  style={{ backgroundColor: `${RISK_LEVEL_COLORS[sec.level]}33`, borderColor: `${RISK_LEVEL_COLORS[sec.level]}66` }}
+                >
+                  {sec.level}
                 </span>
               </div>
               <p className="text-[12px] text-[#5B665E] mt-1 leading-snug">
@@ -666,16 +690,16 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
           ))}
         </div>
 
-        {/* Collapsed row for 11 Low risk sectors */}
+        {/* Collapsed row for the Low risk sectors */}
         <div className="mt-4 pt-3 border-t border-[rgba(31,74,52,0.06)]">
           <div className="flex items-center justify-between p-3 rounded-xl bg-[#F4F6EF]/60 border border-[rgba(31,74,52,0.06)]">
             <div className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#3E8E55]" />
               <span className="text-[13px] font-medium text-[#17271D]">
-                11 sectors at Low risk
+                {lowSectors.length} sectors at Low risk
               </span>
               <span className="hidden sm:inline text-[11.5px] text-[#5B665E]">
-                (Cyuve, Gacaca, Gashaki, Gataraga, Kimonyi, Muko, Musanze, Nkotsi, Nyange, Rwaza, Shingiro)
+                ({lowSectors.map((sec) => sec.name).join(', ')})
               </span>
             </div>
 

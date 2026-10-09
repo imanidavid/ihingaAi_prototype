@@ -125,7 +125,34 @@ export interface ThresholdRuleItem {
   thresholdsList: {
     label: string;
     level: RiskLevel;
+    /** Numeric trigger (e.g. 40 mm in 24 h). Rules with numbers drive the sector forecast risk. */
+    value?: number;
+    unit?: string;
   }[];
+}
+
+/** Daily rain forecast for one sector (store field `rainForecasts`; an admin upload replaces it). */
+export interface SectorRainForecast {
+  sector: string;
+  /** DD/MM/YYYY of dailyMm[0] */
+  startDate: string;
+  dailyMm: number[];
+  source: string;
+}
+
+/** One weather station reading (store field `stationReadings`). */
+export interface StationReading {
+  id: string;
+  station: string;
+  sector: string;
+  /** DD/MM/YYYY */
+  date: string;
+  /** HH:MM */
+  time: string;
+  tempC: number;
+  humidityPct: number;
+  rainMm?: number;
+  source: 'Station network' | 'Manual upload';
 }
 
 export interface OfficerCropRiskDetail {
@@ -234,6 +261,13 @@ export interface CropAdvisory {
   timing: string;
   riskSummary: string;
   mitigationSteps: string[];
+  /** The warning this advice belongs to; farmers see it only while that warning is active. */
+  linkedWarningId: string;
+  /** Sectors the advice is for. */
+  sectors: string[];
+  /** Officer who wrote it. */
+  authorName?: string;
+  isDemo?: boolean;
 }
 
 export interface PlanAheadItem {

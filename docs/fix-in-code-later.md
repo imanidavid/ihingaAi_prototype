@@ -41,3 +41,14 @@ Found during Task 6 (08/10/2026):
 - [ ] Month and season accuracy (72%, 64%) are labelled "Illustrative" — the prototype holds no past seasons. Forecast vs observed covers Kinigi only (simulated gauge).
 - [ ] A warning issued during the demo counts as "Not confirmed" in the hit rate until reports confirm it (no flow sets `confirmedByReports` yet).
 
+Farmer dashboard — sources still missing (08/10/2026):
+- [ ] Map: soil saturation (78%) and the other 29 districts are seeded values (by design for now; only Musanze is live).
+- [ ] Risk forecast page: the four horizon cards (excess rain, dry spell, temperature, season onset) and the season chart's monthly totals still come from `FORECAST_HORIZONS`; only the 10-day and month charts read `rainForecasts`.
+- [ ] Only the rain rule has numbers; dry spell, temperature and late blight rules don't feed the sector forecast risk yet.
+- [ ] Forecast temperature/humidity per day reuse the seeded template series; an uploaded forecast only changes rain.
+- [ ] Crop risk matrix (`CROP_RISK_MATRIX`) and plan-ahead items (`PLAN_AHEAD_DATA`) are static and can open advice whose warning has ended.
+- [ ] Officer dashboard sector table: farmers and reports columns still come from `OFFICER_DATA`.
+- [ ] Greeting is always "Good afternoon" (NOW is 14:00).
+- [ ] Rainfall chart peak dot and the "require action" KPI text use orange regardless of level (rule 4) — Task 9.
+- [ ] Seasonal calendar card unchanged (Task 7).
+

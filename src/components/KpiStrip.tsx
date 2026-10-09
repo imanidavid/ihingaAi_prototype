@@ -5,12 +5,19 @@ import {
   ShieldAlert,
   MapPin,
 } from 'lucide-react';
-import { MUSANZE_RECORD } from '../data/musanzeData';
-import { RiskLevel } from '../types';
+import { RiskLevel, StationReading } from '../types';
+import { RISK_LEVEL_COLORS } from '../data/musanzeData';
 
 interface KpiStripProps {
-  activeWarningsCount?: number;
-  riskLevel?: RiskLevel;
+  activeWarningsCount: number;
+  riskLevel: RiskLevel;
+  sector: string;
+  /** Latest station reading for the farmer's sector. */
+  reading?: StationReading;
+  weatherSummary: string;
+  /** Sectors at Watch or above (computed) and the district's sector count. */
+  affectedSectors: string[];
+  totalSectors: number;
   onSelectWarningKpi?: () => void;
   onSelectRiskKpi?: () => void;
 }
@@ -18,12 +25,16 @@ interface KpiStripProps {
 export const KpiStrip: React.FC<KpiStripProps> = ({
   activeWarningsCount,
   riskLevel,
+  sector,
+  reading,
+  weatherSummary,
+  affectedSectors,
+  totalSectors,
   onSelectWarningKpi,
   onSelectRiskKpi,
 }) => {
-  const displayActiveWarnings =
-    activeWarningsCount !== undefined ? activeWarningsCount : MUSANZE_RECORD.activeWarningsCount;
-  const displayRiskLevel = riskLevel || MUSANZE_RECORD.riskLevel;
+  const displayActiveWarnings = activeWarningsCount;
+  const displayRiskLevel = riskLevel;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -32,8 +43,11 @@ export const KpiStrip: React.FC<KpiStripProps> = ({
         onClick={onSelectRiskKpi}
         className="bg-[#FBFCF8] rounded-[16px] p-4 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex items-center gap-3.5 hover:border-[rgba(31,74,52,0.25)] transition-all cursor-pointer"
       >
-        <div className="w-10 h-10 rounded-full bg-[#D9A032]/15 border border-[#D9A032]/30 flex items-center justify-center flex-shrink-0">
-          <AlertTriangle className="w-5 h-5 text-[#D9A032]" strokeWidth={1.5} />
+        <div
+          className="w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: `${RISK_LEVEL_COLORS[displayRiskLevel]}26`, borderColor: `${RISK_LEVEL_COLORS[displayRiskLevel]}4D` }}
+        >
+          <AlertTriangle className="w-5 h-5" style={{ color: RISK_LEVEL_COLORS[displayRiskLevel] }} strokeWidth={1.5} />
         </div>
         <div className="flex flex-col min-w-0">
           <span className="text-[12px] font-normal text-[#5B665E]">Current Risk Level</span>
@@ -55,7 +69,7 @@ export const KpiStrip: React.FC<KpiStripProps> = ({
           </div>
           {/* Caption: Kinigi sector per FIX 1 */}
           <span className="text-[12px] text-[#5B665E] font-medium mt-0.5">
-            Kinigi sector
+            {sector} sector
           </span>
         </div>
       </div>
@@ -68,11 +82,16 @@ export const KpiStrip: React.FC<KpiStripProps> = ({
         <div className="flex flex-col min-w-0">
           <span className="text-[12px] font-normal text-[#5B665E]">Upcoming Weather</span>
           <span className="text-[22px] font-semibold text-[#17271D] leading-tight mt-0.5">
-            {MUSANZE_RECORD.temp} / {MUSANZE_RECORD.humidity}
+            {reading ? `${reading.tempC}°C / ${reading.humidityPct}%` : '—'}
           </span>
           <span className="text-[12px] text-[#5B665E] mt-0.5 font-medium">
-            {MUSANZE_RECORD.weatherSummary}
+            {weatherSummary}
           </span>
+          {reading && (
+            <span className="text-[11px] text-[#5B665E] tabular-nums">
+              {reading.station} · {reading.date.slice(0, 5)} {reading.time}
+            </span>
+          )}
         </div>
       </div>
 
@@ -105,12 +124,12 @@ export const KpiStrip: React.FC<KpiStripProps> = ({
           <span className="text-[12px] font-normal text-[#5B665E]">Affected Sectors</span>
           <div className="flex items-baseline gap-1 mt-0.5">
             <span className="text-[22px] font-semibold text-[#17271D] leading-tight">
-              {MUSANZE_RECORD.affectedSectorsCount}
+              {affectedSectors.length}
             </span>
-            <span className="text-[14px] text-[#5B665E]">/ {MUSANZE_RECORD.totalSectorsCount}</span>
+            <span className="text-[14px] text-[#5B665E]">/ {totalSectors}</span>
           </div>
           <span className="text-[11.5px] text-[#5B665E] leading-tight mt-0.5">
-            {MUSANZE_RECORD.affectedSectorsList.join(', ')}
+            {affectedSectors.length === 0 ? 'No sector at Watch or above' : affectedSectors.join(', ')}
           </span>
         </div>
       </div>

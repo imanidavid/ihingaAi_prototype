@@ -1,23 +1,28 @@
 import React, { useState } from 'react';
+import { WeatherForecastDay } from '../types';
 import {
-  RAINFALL_10D,
-  RAINFALL_MONTH_30D,
   MUSANZE_RECORD,
   RAINFALL_NORMAL_MM_PER_DAY,
 } from '../data/musanzeData';
 
 type TimeRange = '7D' | '10D' | '30D';
 
-export const RainfallChartCard: React.FC = () => {
+interface RainfallChartCardProps {
+  /** The farmer's sector forecast from the store (30 days from today). */
+  days: WeatherForecastDay[];
+}
+
+export const RainfallChartCard: React.FC<RainfallChartCardProps> = ({ days }) => {
   const [range, setRange] = useState<TimeRange>('10D');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const rawData =
     range === '7D'
-      ? RAINFALL_10D.slice(0, 7)
+      ? days.slice(0, 7)
       : range === '10D'
-      ? RAINFALL_10D
-      : RAINFALL_MONTH_30D;
+      ? days.slice(0, 10)
+      : days;
+  const monthTotal = days.reduce((sum, d) => sum + d.rainfallMm, 0);
 
   // Chart coordinates calculation with 12px minimum axis labels
   const width = 680;
@@ -26,7 +31,8 @@ export const RainfallChartCard: React.FC = () => {
   const paddingTop = 26;
   const paddingBottom = 36;
 
-  const maxRain = 50; // max scale 50mm
+  // Even 10 mm steps, at least 50 mm, growing if an uploaded forecast is wetter
+  const maxRain = Math.max(50, Math.ceil(Math.max(0, ...rawData.map((d) => d.rainfallMm)) / 10) * 10);
   const chartHeight = height - paddingTop - paddingBottom;
   const chartWidth = width - paddingX * 2;
 
@@ -111,7 +117,7 @@ export const RainfallChartCard: React.FC = () => {
           </defs>
 
           {/* Dotted horizontal gridlines (0, 10, 20, 30, 40, 50 mm) */}
-          {[0, 10, 20, 30, 40, 50].map((val) => {
+          {Array.from({ length: maxRain / 10 + 1 }, (_, i) => i * 10).map((val) => {
             const y = paddingTop + chartHeight - (val / maxRain) * chartHeight;
             return (
               <g key={val}>
@@ -254,7 +260,7 @@ export const RainfallChartCard: React.FC = () => {
                 textAnchor="middle"
                 className="text-[10px] font-semibold fill-white"
               >
-                {range === '30D' ? '300 mm total' : `Peak ${peakPoint.data.rainfallMm} mm`}
+                {range === '30D' ? `${monthTotal} mm total` : `Peak ${peakPoint.data.rainfallMm} mm`}
               </text>
             </g>
           )}
@@ -288,7 +294,9 @@ export const RainfallChartCard: React.FC = () => {
         <span>Precipitation depth (mm)</span>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-[#D9772F]" />
-          <span>Tuesday downpour peak (48 mm)</span>
+          <span>
+            Peak {peakPoint.data.day} {peakPoint.data.fullDate} ({peakPoint.data.rainfallMm} mm)
+          </span>
         </span>
       </div>
     </div>

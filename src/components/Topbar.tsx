@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import {
   MUSANZE_RECORD,
-  CROP_ADVISORIES_DATA,
   MUSANZE_SECTORS_CELLS,
   OFFICER_DATA,
   COOPERATIVE_DATA,
@@ -48,6 +47,10 @@ interface TopbarProps {
   warnings?: AlertItem[];
   /** Signed-in account (used for the administrator and researcher profile). */
   account?: UserAccount;
+  /** Crop advice the search can find (farmers: only advice for their active warnings). */
+  advisories?: CropAdvisory[];
+  /** Sectors at Watch or above (computed), for the sector search results. */
+  atRiskSectors?: string[];
 }
 
 interface SearchItem {
@@ -78,7 +81,7 @@ const FARMER_APP_VIEWS: {
   {
     id: 'forecast',
     title: 'Risk forecast & rainfall',
-    subtitle: '30-day rain series (300 mm total) and sector risk rankings',
+    subtitle: '30-day rain series and sector risk rankings',
     keywords: ['forecast', 'rainfall', 'precipitation', 'rain', '30d', '10d', 'season', 'sectors', 'weather'],
     icon: <CloudRain className="w-3.5 h-3.5 text-[#1F4A34]" />,
   },
@@ -331,6 +334,8 @@ export const Topbar: React.FC<TopbarProps> = ({
   onNotificationClick,
   warnings = [],
   account,
+  advisories = [],
+  atRiskSectors = [],
 }) => {
   const isOfficer = role === 'officer';
   const isCoop = role === 'cooperative';
@@ -467,7 +472,7 @@ export const Topbar: React.FC<TopbarProps> = ({
 
     // 2. Match Crop Advisories (Farmer only)
     if (!isOfficer) {
-      CROP_ADVISORIES_DATA.forEach((adv) => {
+      advisories.forEach((adv) => {
         const matchInCrop = adv.crop.toLowerCase().includes(trimmedQuery);
         const matchInTitle = adv.title.toLowerCase().includes(trimmedQuery);
         const matchInCategory = adv.category.toLowerCase().includes(trimmedQuery);
@@ -499,7 +504,7 @@ export const Topbar: React.FC<TopbarProps> = ({
     Object.entries(MUSANZE_SECTORS_CELLS).forEach(([sectorName, cells]) => {
       const matchSector = sectorName.toLowerCase().includes(trimmedQuery);
       const matchCells = cells.some((c) => c.toLowerCase().includes(trimmedQuery));
-      const isWatch = MUSANZE_RECORD.affectedSectorsList.includes(sectorName);
+      const isWatch = atRiskSectors.includes(sectorName);
 
       if (matchSector || matchCells) {
         items.push({
@@ -543,7 +548,7 @@ export const Topbar: React.FC<TopbarProps> = ({
     });
 
     return items;
-  }, [trimmedQuery, onSelectAlert, onSelectAdvisory, onNavigateView, onSearchChange, isOfficer, appViews]);
+  }, [trimmedQuery, onSelectAlert, onSelectAdvisory, onNavigateView, onSearchChange, isOfficer, appViews, advisories, atRiskSectors]);
 
   // Reset selected index when query changes
   useEffect(() => {

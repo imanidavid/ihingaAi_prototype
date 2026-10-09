@@ -16,7 +16,7 @@ import {
   ArrowRight,
   Send,
 } from 'lucide-react';
-import { NavView, SectorOverviewItem, OfficerActiveWarning, ReportItem } from '../types';
+import { NavView, SectorOverviewItem, OfficerActiveWarning, ReportItem, RiskLevel } from '../types';
 import {
   OFFICER_DATA,
   computeSectorClimateRisk,
@@ -30,6 +30,8 @@ interface OfficerDashboardViewProps {
   reports?: ReportItem[];
   onNavigateView: (view: NavView) => void;
   onShowToast: (message: string) => void;
+  /** Each sector's forecast risk (forecast series + threshold rules). */
+  forecastRisk: Record<string, RiskLevel>;
 }
 
 export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
@@ -39,6 +41,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
   reports,
   onNavigateView,
   onShowToast,
+  forecastRisk,
 }) => {
   const [selectedSector, setSelectedSector] = useState<SectorOverviewItem | null>(null);
 
@@ -51,7 +54,8 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
   const computedDistrictRisk = activeWarnings
     ? computeDistrictClimateRisk(
         OFFICER_DATA.sectorOverviews.map((s) => s.name),
-        activeWarnings
+        activeWarnings,
+        forecastRisk
       )
     : OFFICER_DATA.districtRiskLevel;
 
@@ -281,7 +285,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
                 {OFFICER_DATA.sectorOverviews.map((sec) => {
                   // FIX 1: Sector climate risk = highest level among active WEATHER warnings covering that sector (Low if none)
                   const secClimateRisk = activeWarnings
-                    ? computeSectorClimateRisk(sec.name, activeWarnings)
+                    ? computeSectorClimateRisk(sec.name, activeWarnings, forecastRisk)
                     : sec.risk;
 
                   return (

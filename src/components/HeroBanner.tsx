@@ -1,6 +1,6 @@
 import React from 'react';
 import { Leaf, Eye } from 'lucide-react';
-import { heroImg, MUSANZE_RECORD, NOW } from '../data/musanzeData';
+import { heroImg, MUSANZE_RECORD } from '../data/musanzeData';
 import { RiskLevel } from '../types';
 
 interface HeroBannerProps {
@@ -8,6 +8,10 @@ interface HeroBannerProps {
   onGetRecommendations: () => void;
   onReportObservation: () => void;
   riskLevel?: RiskLevel;
+  /** Farmer's first name and sector, and the weather line computed from the forecast. */
+  firstName: string;
+  sector: string;
+  weatherSummary: string;
 }
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({
@@ -15,6 +19,9 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   onGetRecommendations,
   onReportObservation,
   riskLevel,
+  firstName,
+  sector,
+  weatherSummary,
 }) => {
   return (
     <div className="relative w-full rounded-[16px] overflow-hidden shadow-[0_2px_12px_rgba(31,74,52,0.08)] bg-gradient-to-r from-[#1F4A34] via-[#24543B] to-[#2C6343] min-h-[190px] flex items-center">
@@ -43,7 +50,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
 
           {/* Heading */}
           <h1 className="text-[26px] md:text-[28px] font-normal text-white leading-tight tracking-tight line-clamp-2 max-w-xl">
-            {NOW.greeting}
+            Good afternoon, {firstName}. {weatherSummary}
           </h1>
 
           {/* Subtitle (FIX 1: Current risk level, caption Kinigi sector) */}
@@ -63,7 +70,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${chipClass}`}>
                   {lvl}
                 </span>
-                <span className="text-[12px] text-white/70">Kinigi sector</span>
+                <span className="text-[12px] text-white/70">{sector} sector</span>
               </div>
             );
           })()}
