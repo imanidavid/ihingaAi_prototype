@@ -26,6 +26,9 @@ export interface SignInTranslationStrings {
   coopLeaderName: string;
   researcherRole: string;
   adminRole: string;
+  adminName: string;
+  errorSuspended: string;
+  errorRejected: string;
   designedInNextIteration: string;
 
   // Two-Step & Verification Codes
@@ -165,6 +168,9 @@ export const SIGN_IN_TRANSLATIONS: Record<SignInLanguage, SignInTranslationStrin
     coopLeaderName: 'Aline Uwimana',
     researcherRole: 'Researcher',
     adminRole: 'Administrator',
+    adminName: 'Grace Ingabire',
+    errorSuspended: 'This account is suspended. Contact your administrator.',
+    errorRejected: 'Your access request was not approved.',
     designedInNextIteration: 'Designed in next iteration',
 
     // Two-Step & Verification Codes
@@ -324,6 +330,9 @@ export const SIGN_IN_TRANSLATIONS: Record<SignInLanguage, SignInTranslationStrin
     researcherRole: 'Umushakashatsi',
     // to be reviewed by a native speaker
     adminRole: 'Umuyobozi wa sisitemu',
+    adminName: 'Grace Ingabire',
+    errorSuspended: "Iyi konti yarahagaritswe. Vugana n'umuyobozi wa sisitemu.",
+    errorRejected: 'Icyifuzo cyawe cyo kwinjira nticyemewe.',
     // to be reviewed by a native speaker
     designedInNextIteration: 'Bizakorwa mu kindi cyiciro',
 

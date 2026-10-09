@@ -28,6 +28,8 @@ interface OfficerObservationsViewProps {
   onAskMoreInfo: (reportId: string, message: string) => void;
   onRejectReport: (reportId: string, reason: string) => void;
   onShowToast: (message: string) => void;
+  /** Called when the officer opens a farmer's report (data access tracking). */
+  onOpenReport?: (report: DistrictFieldReportItem) => void;
 }
 
 const QUICK_FEEDBACK_TEMPLATES = [
@@ -42,6 +44,7 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
   onAskMoreInfo,
   onRejectReport,
   onShowToast,
+  onOpenReport,
 }) => {
   const [activeTab, setActiveTab] = useState<'review' | 'all' | 'insights'>('review');
 
@@ -284,6 +287,7 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
                         onClick={() => {
                           setSelectedReportId(rep.id);
                           setFeedbackText('');
+                          onOpenReport?.(rep);
                         }}
                         className={`p-4 md:p-5 rounded-[16px] border transition-all cursor-pointer ${
                           isSelected

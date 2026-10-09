@@ -26,6 +26,16 @@ import {
   EquipmentBooking,
   RegisteredFarmer,
   TrainingMaterial,
+  AccountStatus,
+  AuditEvent,
+  RolePermissions,
+  DataSourceStatus,
+  LoginAttempt,
+  MessageTemplate,
+  ProcessingRun,
+  ProcessingSettings,
+  SecuritySettings,
+  VoiceSettings,
 } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -59,7 +69,14 @@ import { ScheduleMeetingModal } from './components/coop/ScheduleMeetingModal';
 import { MessageComposerModal } from './components/MessageComposerModal';
 import { SignInView } from './components/SignInView';
 import { INITIAL_GENERATED_REPORTS } from './data/reportsModuleData';
-import { INITIAL_USER_ACCOUNTS } from './data/rwandaAdminData';
+import {
+  INITIAL_USER_ACCOUNTS,
+  INITIAL_ACCESS_REQUESTS,
+  DEMO_ACCOUNT_ID_BY_ROLE,
+} from './data/rwandaAdminData';
+import { AdminDashboardView } from './components/AdminDashboardView';
+import { AdminUsersView } from './components/AdminUsersView';
+import { PlaceholderView } from './components/PlaceholderView';
 import {
   INITIAL_USER_SETTINGS,
   userSettingsFromAccount,
@@ -86,7 +103,22 @@ import {
   parseDMY,
   reportNameOf,
   sortMeetings,
+  INITIAL_ROLE_PERMISSIONS,
+  INITIAL_AUDIT_EVENTS,
+  NOW_STAMP,
+  ROLE_LABELS,
+  INITIAL_LOGIN_ATTEMPTS,
+  INITIAL_SECURITY_SETTINGS,
+  INITIAL_DATA_SOURCES,
+  INITIAL_PROCESSING_RUNS,
+  INITIAL_PROCESSING_SETTINGS,
+  INITIAL_MESSAGE_TEMPLATES,
+  INITIAL_VOICE_SETTINGS,
 } from './data/musanzeData';
+import { AdminSecurityView } from './components/AdminSecurityView';
+import { AdminDataSourcesView } from './components/AdminDataSourcesView';
+import { AdminProcessingView } from './components/AdminProcessingView';
+import { AdminNotificationsView } from './components/AdminNotificationsView';
 
 export default function App() {
   const [role, setRole] = useState<AppRole>('farmer');
@@ -115,7 +147,36 @@ export default function App() {
 
   // Accounts & Access Requests in Shared Store
   const [accounts, setAccounts] = useState<UserAccount[]>(INITIAL_USER_ACCOUNTS);
-  const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
+  const [accessRequests, setAccessRequests] = useState<AccessRequest[]>(INITIAL_ACCESS_REQUESTS);
+  // Administration: permissions per role and the audit trail of real store events
+  const [rolePermissions, setRolePermissions] = useState<RolePermissions>(INITIAL_ROLE_PERMISSIONS);
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>(INITIAL_AUDIT_EVENTS);
+  // Security, data sources, processing and notification settings (admin pages)
+  const [loginAttempts, setLoginAttempts] = useState<LoginAttempt[]>(INITIAL_LOGIN_ATTEMPTS);
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>(INITIAL_SECURITY_SETTINGS);
+  const [dataSources, setDataSources] = useState<DataSourceStatus[]>(INITIAL_DATA_SOURCES);
+  const [processingRuns, setProcessingRuns] = useState<ProcessingRun[]>(INITIAL_PROCESSING_RUNS);
+  const [processingSettings, setProcessingSettings] = useState<ProcessingSettings>(INITIAL_PROCESSING_SETTINGS);
+  const [messageTemplates, setMessageTemplates] = useState<MessageTemplate[]>(INITIAL_MESSAGE_TEMPLATES);
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(INITIAL_VOICE_SETTINGS);
+  // Who is signed in (UI state): the account behind `role`
+  const [currentAccountId, setCurrentAccountId] = useState<string>(DEMO_ACCOUNT_ID_BY_ROLE.farmer);
+
+  /** Append an audit event at NOW, by the signed-in account unless an actor is given. */
+  const logAudit = (action: string, target: string, actor?: { name: string; role: AuditEvent['actorRole'] }) => {
+    const account = accounts.find((a) => a.id === currentAccountId);
+    setAuditEvents((prev) => [
+      ...prev,
+      {
+        id: `aud-demo-${Date.now()}-${prev.length}`,
+        at: NOW_STAMP,
+        actor: actor?.name || account?.fullName || ROLE_LABELS[role],
+        actorRole: actor?.role || account?.role || role,
+        action,
+        target,
+      },
+    ]);
+  };
 
   const handleAddNewAccount = (newAcc: UserAccount) => {
     setAccounts((prev) => [newAcc, ...prev.filter((a) => a.id !== newAcc.id)]);
@@ -124,6 +185,10 @@ export default function App() {
   const handleAddAccessRequest = (newAcc: UserAccount, newReq: AccessRequest) => {
     setAccounts((prev) => [newAcc, ...prev.filter((a) => a.id !== newAcc.id)]);
     setAccessRequests((prev) => [newReq, ...prev]);
+    logAudit('Requested access', `${ROLE_LABELS[newReq.role]} · ${newReq.organizationOrArea}`, {
+      name: newReq.fullName,
+      role: newReq.role,
+    });
   };
 
   // Inactivity timeout state (Officer 15 min, Farmer 60 min)
@@ -144,10 +209,30 @@ export default function App() {
 
   const handleSignInSuccess = (signedInRole: AppRole, userAccount?: UserAccount) => {
     setRole(signedInRole);
-    setCurrentView('dashboard');
+    setCurrentView(signedInRole === 'researcher' ? 'forecast' : 'dashboard');
     setIsAuthenticated(true);
-    if (signedInRole === 'officer' || signedInRole === 'cooperative') {
+    if (signedInRole !== 'farmer') {
       setPreviewMode('desktop');
+    }
+    const accountId = userAccount?.id || DEMO_ACCOUNT_ID_BY_ROLE[signedInRole];
+    const account = userAccount || accounts.find((a) => a.id === accountId);
+    setCurrentAccountId(accountId);
+    setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, lastSignIn: NOW_STAMP } : a)));
+    if (account) {
+      logAudit('Signed in', ROLE_LABELS[signedInRole], { name: account.fullName, role: signedInRole });
+      setLoginAttempts((prev) => [
+        ...prev,
+        {
+          id: `la-demo-${Date.now()}`,
+          at: NOW_STAMP,
+          identifier: account.email || account.phone,
+          accountName: account.fullName,
+          role: signedInRole,
+          success: true,
+          device: 'This browser',
+          location: account.scope?.sectors[0] || account.district,
+        },
+      ]);
     }
     // If a farmer signed in:
     if (signedInRole === 'farmer' && userAccount) {
@@ -158,6 +243,24 @@ export default function App() {
       }
     }
     resetInactivityTimer();
+  };
+
+  // Failed sign-ins reported by the sign-in form (wrong password, suspended, rejected, unknown)
+  const handleSignInFailed = (identifier: string, reason: string, account?: UserAccount) => {
+    setLoginAttempts((prev) => [
+      ...prev,
+      {
+        id: `la-demo-${Date.now()}-${prev.length}`,
+        at: NOW_STAMP,
+        identifier,
+        accountName: account?.fullName,
+        role: account?.role,
+        success: false,
+        device: 'This browser',
+        location: account?.scope?.sectors[0] || account?.district || 'Unknown',
+        reason,
+      },
+    ]);
   };
 
   // Activity listeners to track idle duration
@@ -186,17 +289,15 @@ export default function App() {
     const interval = setInterval(() => {
       const idleTimeMs = Date.now() - lastActivityRef.current;
       // Inactivity timeout: officer 15 min (warn at 14 min), farmer 60 min (warn at 59 min)
-      const warningThresholdMs =
-        role === 'officer'
-          ? (15 * 60 - 60) * 1000
-          : (60 * 60 - 60) * 1000;
+      // Timeouts come from Security & audit settings (officer 15 min, farmer 60 min by default)
+      const warningThresholdMs = (securitySettings.timeoutMinutes[role] * 60 - 60) * 1000;
       if (idleTimeMs >= warningThresholdMs) {
         setIsTimeoutModalOpen(true);
         setTimeoutCountdown(60);
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [isAuthenticated, role, isTimeoutModalOpen]);
+  }, [isAuthenticated, role, isTimeoutModalOpen, securitySettings]);
 
   // Live 60s countdown timer when timeout modal is open
   useEffect(() => {
@@ -481,11 +582,33 @@ export default function App() {
     ];
   }, [officerActiveWarnings, messages, coopSummary.groupSectors, readNotificationIds]);
 
+  // Administrator: access requests waiting for a decision
+  const adminNotifications: NotificationItem[] = useMemo(
+    () =>
+      accessRequests
+        .filter((r) => r.status === 'pending')
+        .map((r) => ({
+          id: `access-${r.id}`,
+          type: 'access_request' as const,
+          title: `Access request: ${r.fullName}`,
+          subtitle: `${ROLE_LABELS[r.role]} · ${r.organizationOrArea}`,
+          time: r.submittedAt,
+          isRead: readNotificationIds.includes(`access-${r.id}`),
+          targetId: r.id,
+          targetData: r,
+        })),
+    [accessRequests, readNotificationIds]
+  );
+
   const currentRoleNotifications =
     role === 'officer'
       ? officerNotifications
       : role === 'cooperative'
       ? coopNotifications
+      : role === 'admin'
+      ? adminNotifications
+      : role === 'researcher'
+      ? officerNotifications.filter((n) => n.type === 'warning')
       : farmerNotifications;
 
   // Unread badge count
@@ -495,8 +618,10 @@ export default function App() {
     // Mark as read
     setReadNotificationIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
 
-    if (item.type === 'warning') {
-      if (role === 'officer') {
+    if (item.type === 'access_request') {
+      setCurrentView('users');
+    } else if (item.type === 'warning') {
+      if (role === 'officer' || role === 'researcher') {
         setCurrentView('warnings');
       } else {
         setDrawerContent({ type: 'alert', data: item.targetData });
@@ -515,10 +640,11 @@ export default function App() {
   // Role switcher handler (demo shortcut: signs in as that demo account)
   const handleRoleChange = (newRole: AppRole) => {
     setRole(newRole);
-    setCurrentView('dashboard');
+    setCurrentView(newRole === 'researcher' ? 'forecast' : 'dashboard');
     setDrawerContent(null);
     setIsAuthenticated(true);
-    if (newRole === 'officer' || newRole === 'cooperative') {
+    setCurrentAccountId(DEMO_ACCOUNT_ID_BY_ROLE[newRole]);
+    if (newRole !== 'farmer') {
       setPreviewMode('desktop');
     }
     resetInactivityTimer();
@@ -679,6 +805,7 @@ export default function App() {
       return prev;
     });
 
+    logAudit('Verified report', reports.find((r) => r.id === reportId)?.title || reportId);
     setToastMessage('Report verified · Farmer notified');
     setTimeout(() => setToastMessage(null), 3000);
   };
@@ -785,6 +912,7 @@ export default function App() {
       return prev;
     });
 
+    logAudit('Rejected report', reports.find((r) => r.id === reportId)?.title || reportId);
     setToastMessage('Report rejected');
     setTimeout(() => setToastMessage(null), 3000);
   };
@@ -822,9 +950,11 @@ export default function App() {
       category: categoryLabel,
     };
     setWarnings((prev) => [warningToStore, ...prev]);
+    logAudit('Issued warning', `${warningToStore.title} · ${warningToStore.severity}`);
   };
 
   const handleEndWarning = (warningId: string) => {
+    logAudit('Ended warning', warnings.find((w) => w.id === warningId)?.title || warningId);
     setWarnings((prev) =>
       prev.map((w) =>
         w.id === warningId
@@ -924,6 +1054,7 @@ export default function App() {
 
   const handleScheduleMeeting = (meeting: CoopMeeting) => {
     setMeetings((prev) => [...prev, meeting]);
+    logAudit('Scheduled meeting', `${meeting.title} · ${meeting.date}`);
     setIsScheduleMeetingOpen(false);
     const invited = meetingInviteeCount(meeting, coopMembers);
     showToast(
@@ -935,6 +1066,7 @@ export default function App() {
 
   const handleBookEquipment = (booking: EquipmentBooking) => {
     setEquipmentBookings((prev) => [...prev, booking]);
+    logAudit('Booked sprayer', `${booking.date} ${booking.slot}`);
     const eq = COOP_EQUIPMENT.find((e) => e.id === booking.equipmentId);
     showToast(`${eq?.name} booked · ${formatDayShort(booking.date)} ${booking.slot}`);
   };
@@ -944,13 +1076,156 @@ export default function App() {
     setIsMessageComposerOpen(true);
   };
 
+  // =========================================================================
+  // ADMINISTRATION HANDLERS (users & access) — every change is one store update + one audit event
+  // =========================================================================
+  const accountName = (id: string) => accounts.find((a) => a.id === id)?.fullName || id;
+
+  const handleApproveRequest = (requestId: string) => {
+    const request = accessRequests.find((r) => r.id === requestId);
+    if (!request) return;
+    setAccessRequests((prev) =>
+      prev.map((r) => (r.id === requestId ? { ...r, status: 'approved' as const, decidedAt: NOW_STAMP } : r))
+    );
+    setAccounts((prev) => prev.map((a) => (a.id === request.accountId ? { ...a, status: 'active' as const } : a)));
+    logAudit('Approved access', `${request.fullName} · ${ROLE_LABELS[request.role]}`);
+    showToast(`${request.fullName} approved · can sign in now`);
+  };
+
+  const handleRejectRequest = (requestId: string, reason: string) => {
+    const request = accessRequests.find((r) => r.id === requestId);
+    if (!request) return;
+    setAccessRequests((prev) =>
+      prev.map((r) =>
+        r.id === requestId ? { ...r, status: 'rejected' as const, decisionReason: reason, decidedAt: NOW_STAMP } : r
+      )
+    );
+    setAccounts((prev) => prev.map((a) => (a.id === request.accountId ? { ...a, status: 'rejected' as const } : a)));
+    logAudit('Rejected access', `${request.fullName} · ${reason}`);
+    showToast(`${request.fullName} rejected`);
+  };
+
+  const handleSetAccountStatus = (accountId: string, status: AccountStatus) => {
+    setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, status } : a)));
+    logAudit(status === 'suspended' ? 'Suspended user' : 'Reactivated user', accountName(accountId));
+    showToast(`${accountName(accountId)} ${status === 'suspended' ? 'suspended' : 'reactivated'}`);
+  };
+
+  const handleChangeAccountRole = (accountId: string, newRole: AppRole) => {
+    setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, role: newRole } : a)));
+    logAudit('Changed role', `${accountName(accountId)} → ${ROLE_LABELS[newRole]}`);
+    showToast(`${accountName(accountId)} is now ${ROLE_LABELS[newRole].toLowerCase()}`);
+  };
+
+  const handleUpdateAccountScope = (accountId: string, scope: NonNullable<UserAccount['scope']>) => {
+    setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, scope } : a)));
+    const area = scope.sectors.length === 0 ? `${scope.district} district` : scope.sectors.join(', ');
+    logAudit('Changed access area', `${accountName(accountId)} → ${area}`);
+    showToast(`Access area saved for ${accountName(accountId)}`);
+  };
+
+  const handleSavePermissions = (next: RolePermissions, changes: number) => {
+    setRolePermissions(next);
+    logAudit('Saved permissions', `${changes} ${changes === 1 ? 'change' : 'changes'}`);
+    showToast(`Permissions saved · ${changes} ${changes === 1 ? 'change' : 'changes'}`);
+  };
+
+  const handleImportAccounts = (imported: UserAccount[], cooperative: string) => {
+    setAccounts((prev) => [...prev, ...imported]);
+    logAudit('Imported users', `${imported.length} farmers · ${cooperative}`);
+    showToast(`${imported.length} farmers imported`);
+  };
+
+  // Data sources, processing and notifications
+  const handleRefreshSource = (sourceId: string) => {
+    const source = dataSources.find((d) => d.id === sourceId);
+    setDataSources((prev) =>
+      prev.map((d) =>
+        d.id === sourceId
+          ? { ...d, status: 'Healthy' as const, lastSync: NOW_STAMP.slice(0, 5) + NOW_STAMP.slice(10), recordsToday: d.expectedToday, note: 'Synced just now' }
+          : d
+      )
+    );
+    logAudit('Refreshed data source', source?.name || sourceId);
+    showToast(`${source?.name} synced`);
+  };
+
+  const handleAddSource = (source: DataSourceStatus) => {
+    setDataSources((prev) => [...prev, source]);
+    logAudit('Connected data source', source.name);
+    showToast(`${source.name} connected`);
+  };
+
+  const handleManualUpload = (rows: number) => {
+    setDataSources((prev) =>
+      prev.map((d) =>
+        d.kind === 'File upload'
+          ? (() => {
+              const recordsToday = Math.min(d.expectedToday, d.recordsToday + rows);
+              const missing = d.expectedToday - recordsToday;
+              return {
+                ...d,
+                // Healthy only once the week's readings are complete
+                status: missing > 0 ? ('Delayed' as const) : ('Healthy' as const),
+                lastSync: NOW_STAMP.slice(0, 5) + NOW_STAMP.slice(10),
+                recordsToday,
+                note: missing > 0 ? `${rows} readings uploaded · ${missing} still missing` : 'All readings uploaded',
+              };
+            })()
+          : d
+      )
+    );
+    logAudit('Uploaded data', `${rows} rain gauge readings`);
+    showToast(`${rows} readings uploaded`);
+  };
+
+  const handleProcessingRun = (run: ProcessingRun) => {
+    setProcessingRuns((prev) => [...prev, run]);
+    logAudit(run.trigger === 'Reprocess' ? 'Reprocessed data' : 'Ran processing', `${run.recordsIn} records`);
+    showToast(`Processing finished · ${run.recordsIn} records ready for the forecast`);
+  };
+
+  const handleSaveProcessingSettings = (next: ProcessingSettings) => {
+    setProcessingSettings(next);
+    logAudit('Saved processing settings', `${next.gapMethod} · ${next.outlierThresholdSd} SD`);
+    showToast('Processing settings saved');
+  };
+
+  const handleSaveSecuritySettings = (next: SecuritySettings) => {
+    setSecuritySettings(next);
+    logAudit('Saved security settings', `Two-step: ${next.twoStepRoles.map((r) => ROLE_LABELS[r]).join(', ')}`);
+    showToast('Security settings saved');
+  };
+
+  const handleSaveTemplate = (template: MessageTemplate) => {
+    setMessageTemplates((prev) => prev.map((t) => (t.id === template.id ? template : t)));
+    logAudit('Edited template', template.name);
+    showToast(`${template.name} template saved`);
+  };
+
+  const handleSaveVoiceSettings = (next: VoiceSettings) => {
+    setVoiceSettings(next);
+    logAudit('Saved voice settings', next.enabled ? `${next.voice} · ${next.callWindow}` : 'Voice calls off');
+    showToast('Voice settings saved');
+  };
+
   const handleResetDemo = () => {
     setWarnings(INITIAL_WARNINGS);
     setReports(INITIAL_52_REPORTS);
     setThresholdRules(INITIAL_THRESHOLD_RULES);
     setUserSettings(INITIAL_USER_SETTINGS);
     setAccounts(INITIAL_USER_ACCOUNTS);
-    setAccessRequests([]);
+    setAccessRequests(INITIAL_ACCESS_REQUESTS);
+    setRolePermissions(INITIAL_ROLE_PERMISSIONS);
+    setAuditEvents(INITIAL_AUDIT_EVENTS);
+    setLoginAttempts(INITIAL_LOGIN_ATTEMPTS);
+    setSecuritySettings(INITIAL_SECURITY_SETTINGS);
+    setDataSources(INITIAL_DATA_SOURCES);
+    setProcessingRuns(INITIAL_PROCESSING_RUNS);
+    setProcessingSettings(INITIAL_PROCESSING_SETTINGS);
+    setMessageTemplates(INITIAL_MESSAGE_TEMPLATES);
+    setVoiceSettings(INITIAL_VOICE_SETTINGS);
+    setCurrentAccountId(DEMO_ACCOUNT_ID_BY_ROLE[role]);
     setGeneratedReports(INITIAL_GENERATED_REPORTS);
     setMessages(INITIAL_COOP_MESSAGES);
     setSavedItemIds(['plan-4']);
@@ -977,6 +1252,9 @@ export default function App() {
           accessRequests={accessRequests}
           onAddNewAccount={handleAddNewAccount}
           onAddAccessRequest={handleAddAccessRequest}
+          onSignInFailed={handleSignInFailed}
+          twoStepRoles={securitySettings.twoStepRoles}
+          lockAfterFailed={securitySettings.lockAfterFailed}
         />
 
         {/* Floating Device Switcher stays as demo shortcut: it signs in as that demo account */}
@@ -1016,6 +1294,7 @@ export default function App() {
           reportsToReviewCount={reportsToReviewCount}
           coopMembersUnderWarning={coopSummary.membersUnderWarning}
           coopTotalMembers={coopSummary.totalMembers}
+          pendingAccessRequests={accessRequests.filter((r) => r.status === 'pending').length}
         />
       )}
 
@@ -1024,7 +1303,11 @@ export default function App() {
         {/* Topbar */}
         <Topbar
           onOpenAlertsList={() => {
-            if (role === 'officer') {
+            if (role === 'admin') {
+              setCurrentView('users');
+            } else if (role === 'researcher') {
+              setCurrentView('forecast');
+            } else if (role === 'officer') {
               setCurrentView('warnings');
             } else {
               handleSelectAlert(farmerActiveAlerts[0] || farmerWarnings[0] || warnings[0]);
@@ -1046,7 +1329,8 @@ export default function App() {
           bellCount={unreadCount}
           notifications={currentRoleNotifications}
           onNotificationClick={handleNotificationClick}
-          warnings={role === 'officer' ? warnings : farmerWarnings}
+          warnings={role === 'farmer' ? farmerWarnings : warnings}
+          account={accounts.find((a) => a.id === currentAccountId)}
         />
 
         {/* View Switcher: Mobile Frames vs Desktop Layout */}
@@ -1064,7 +1348,100 @@ export default function App() {
         ) : (
           <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-[1240px] w-full mx-auto space-y-6 pb-32">
             {/* View routing */}
-            {currentView === 'dashboard' &&
+            {currentView === 'dashboard' && role === 'admin' && (
+              <AdminDashboardView
+                dataSources={dataSources}
+                lastRun={processingRuns[processingRuns.length - 1]}
+                accounts={accounts}
+                accessRequests={accessRequests}
+                auditEvents={auditEvents}
+                onApprove={handleApproveRequest}
+                onReject={handleRejectRequest}
+                onNavigateView={setCurrentView}
+                currentAccount={accounts.find((a) => a.id === currentAccountId)}
+              />
+            )}
+
+            {currentView === 'users' && (
+              <AdminUsersView
+                accounts={accounts}
+                accessRequests={accessRequests}
+                rolePermissions={rolePermissions}
+                currentAccountId={currentAccountId}
+                onApprove={handleApproveRequest}
+                onReject={handleRejectRequest}
+                onSetStatus={handleSetAccountStatus}
+                onChangeRole={handleChangeAccountRole}
+                onUpdateScope={handleUpdateAccountScope}
+                onSavePermissions={handleSavePermissions}
+                onImportAccounts={handleImportAccounts}
+              />
+            )}
+
+            {currentView === 'security' && (
+              <AdminSecurityView
+                auditEvents={auditEvents}
+                loginAttempts={loginAttempts}
+                accounts={accounts}
+                securitySettings={securitySettings}
+                onSaveSettings={handleSaveSecuritySettings}
+                onExport={(what) => logAudit('Exported data', what)}
+              />
+            )}
+
+            {currentView === 'data_sources' && (
+              <AdminDataSourcesView
+                dataSources={dataSources}
+                onRefresh={handleRefreshSource}
+                onAddSource={handleAddSource}
+                onManualUpload={handleManualUpload}
+              />
+            )}
+
+            {currentView === 'processing' && (
+              <AdminProcessingView
+                runs={processingRuns}
+                settings={processingSettings}
+                dataSources={dataSources}
+                onRun={handleProcessingRun}
+                onSaveSettings={handleSaveProcessingSettings}
+              />
+            )}
+
+            {currentView === 'notifications' && (
+              <AdminNotificationsView
+                warnings={warnings}
+                messages={messages}
+                meetings={meetings}
+                members={coopMembers}
+                groupRecords={coopGroupRecords}
+                userSettings={userSettings}
+                templates={messageTemplates}
+                voiceSettings={voiceSettings}
+                onSaveTemplate={handleSaveTemplate}
+                onSaveVoiceSettings={handleSaveVoiceSettings}
+                onOpenComposer={() => openComposer({ group: 'All groups' })}
+              />
+            )}
+
+            {(
+              [
+                ['model_performance', 'Model performance'],
+                ['field_data', 'Field data'],
+              ] as const
+            ).map(
+              ([view, title]) =>
+                currentView === view && (
+                  <PlaceholderView
+                    key={view}
+                    viewId={view}
+                    title={title}
+                    onBackToDashboard={() => setCurrentView(role === 'researcher' ? 'forecast' : 'dashboard')}
+                  />
+                )
+            )}
+
+            {currentView === 'dashboard' && role !== 'admin' && role !== 'researcher' &&
               (role === 'officer' ? (
                 <OfficerDashboardView
                   activeWarningsCount={officerActiveCount}
@@ -1159,7 +1536,7 @@ export default function App() {
               <RiskForecastView
                 role={role}
                 onSelectAdvisory={handleSelectAdvisory}
-                hideUserSectorChip={role === 'officer' || role === 'cooperative'}
+                hideUserSectorChip={role !== 'farmer'}
                 onOpenWarning={() => setCurrentView('warnings')}
                 activeWarnings={officerActiveWarnings}
               />
@@ -1269,6 +1646,7 @@ export default function App() {
               (role === 'officer' ? (
                 <OfficerObservationsView
                   reports={reports}
+                  onOpenReport={(r) => logAudit('Opened farmer report', `${r.farmer} · ${r.title}`)}
                   onVerifyReport={handleOfficerVerifyReport}
                   onAskMoreInfo={handleOfficerAskMoreInfo}
                   onRejectReport={handleOfficerRejectReport}
@@ -1293,6 +1671,9 @@ export default function App() {
                 reportsList={generatedReports}
                 onReportsListChange={setGeneratedReports}
                 onShowToast={(msg) => {
+                  // Export tracking: downloads and PDF exports go to the audit log
+                  if (msg.startsWith('Downloaded ')) logAudit('Exported report', msg.replace('Downloaded ', ''));
+                  if (msg.includes('PDF export')) logAudit('Exported report', 'PDF');
                   setToastMessage(msg);
                   setTimeout(() => setToastMessage(null), 3000);
                 }}
@@ -1344,6 +1725,7 @@ export default function App() {
         onClose={() => setIsMessageComposerOpen(false)}
         onSendMessage={(newMsg) => {
           setMessages((prev) => [newMsg, ...prev]);
+          logAudit('Sent message', `${newMsg.groups.join(', ')} · ${newMsg.recipientCount}`);
           const split = newMsg.channelSplit || { sms: 67, voice: 6, inApp: 9 };
           setToastMessage(
             `Sent to ${newMsg.recipientCount} ${newMsg.recipientCount === 1 ? 'member' : 'members'} (SMS ${split.sms} · Voice ${split.voice} · In-app ${split.inApp})`
@@ -1396,6 +1778,8 @@ export default function App() {
               <span className="font-semibold text-[#17271D]">
                 {role === 'officer'
                   ? 'Claudine Mukamana · Agricultural Officer'
+                  : role === 'admin' || role === 'researcher'
+                  ? `${accountName(currentAccountId)} · ${ROLE_LABELS[role]}`
                   : role === 'cooperative'
                   ? 'Aline Uwimana · Cooperative Leader'
                   : 'Jean-Baptiste Ndayisaba · Farmer'}

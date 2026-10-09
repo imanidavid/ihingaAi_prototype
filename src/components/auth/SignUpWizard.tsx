@@ -178,7 +178,7 @@ export const SignUpWizard: React.FC<SignUpWizardProps> = ({
       if (cropsGrown.length === 0) {
         errors.crops = 'Select at least one crop';
       }
-    } else if (role === 'cooperative_leader') {
+    } else if (role === 'cooperative') {
       if (!coopName.trim()) errors.coopName = 'Cooperative name is required';
       if (!regNumber.trim()) errors.regNumber = 'Registration number is required';
     } else if (role === 'officer') {
@@ -258,7 +258,7 @@ export const SignUpWizard: React.FC<SignUpWizardProps> = ({
     } else {
       // Non-farmer roles create access request
       let orgOrArea = '';
-      if (role === 'cooperative_leader') {
+      if (role === 'cooperative') {
         newAccount.coopDetails = {
           cooperativeName: coopName,
           registrationNumber: regNumber,
@@ -284,7 +284,7 @@ export const SignUpWizard: React.FC<SignUpWizardProps> = ({
       const request: AccessRequest = {
         id: `req-${Date.now()}`,
         accountId: newAccount.id,
-        role: role as 'cooperative_leader' | 'officer' | 'researcher',
+        role: role as 'cooperative' | 'officer' | 'researcher',
         fullName: fullName.trim(),
         phone: phone.trim(),
         email: email.trim(),
@@ -419,16 +419,16 @@ export const SignUpWizard: React.FC<SignUpWizardProps> = ({
 
               {/* 2. Cooperative Leader Card */}
               <div
-                onClick={() => setRole('cooperative_leader')}
+                onClick={() => setRole('cooperative')}
                 className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
-                  role === 'cooperative_leader'
+                  role === 'cooperative'
                     ? 'bg-[#E4ECDB]/40 border-[#1F4A34] shadow-xs'
                     : 'bg-white border-[rgba(31,74,52,0.12)] hover:border-[rgba(31,74,52,0.25)]'
                 }`}
               >
                 <div
                   className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    role === 'cooperative_leader'
+                    role === 'cooperative'
                       ? 'bg-[#1F4A34] text-white'
                       : 'bg-[#E4ECDB] text-[#1F4A34]'
                   }`}
@@ -800,7 +800,7 @@ export const SignUpWizard: React.FC<SignUpWizardProps> = ({
             )}
 
             {/* 3B: COOPERATIVE LEADER FIELDS */}
-            {role === 'cooperative_leader' && (
+            {role === 'cooperative' && (
               <>
                 <div className="space-y-1">
                   <label className="font-semibold text-[#17271D] block">

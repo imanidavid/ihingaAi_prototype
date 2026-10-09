@@ -8,4 +8,7 @@
 4. As Cooperative leader: message Kinigi growers → Jean-Baptiste's bell shows it (Kinyarwanda first).
    Message Busogo growers only → Jean-Baptiste does not receive it.
 5. As Officer: Reports → preview a report; the executive summary reflects step 3.
-6. [Reset demo] restores everything in every role.
+6. Sign out. Sign in as esther.n@ihinga.demo → "Waiting for approval". Sign in as Admin
+   (grace.i@ihinga.demo, code 246810) → Users & access → approve Esther. Sign out, sign in as
+   Esther (code 246810) → officer dashboard. Reject Celestin with a reason → his sign-in shows it.
+7. [Reset demo] restores everything in every role.

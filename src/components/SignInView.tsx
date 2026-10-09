@@ -29,6 +29,12 @@ interface SignInViewProps {
   onAddNewAccount?: (account: UserAccount) => void;
   onAddAccessRequest?: (account: UserAccount, request: AccessRequest) => void;
   initialLanguage?: SignInLanguage;
+  /** Failed sign-ins are recorded for Security & audit. */
+  onSignInFailed?: (identifier: string, reason: string, account?: UserAccount) => void;
+  /** Roles that must enter the two-step code (Security & audit settings). */
+  twoStepRoles?: AppRole[];
+  /** Sign-in form locks after this many failed attempts (Security & audit settings). */
+  lockAfterFailed?: number;
 }
 
 export type AuthMode = 'sign_in' | 'two_step' | 'sign_up' | 'forgot_password' | 'waiting_approval';
@@ -40,6 +46,9 @@ export const SignInView: React.FC<SignInViewProps> = ({
   onAddNewAccount = () => {},
   onAddAccessRequest = () => {},
   initialLanguage = 'en',
+  onSignInFailed = () => {},
+  twoStepRoles = ['officer', 'admin'],
+  lockAfterFailed = 5,
 }) => {
   const [lang, setLang] = useState<SignInLanguage>(initialLanguage);
   const [authMode, setAuthMode] = useState<AuthMode>('sign_in');
@@ -63,14 +72,20 @@ export const SignInView: React.FC<SignInViewProps> = ({
     contact: string;
   } | null>(null);
 
+  // Role waiting for the two-step code (officers and administrators)
+  const [twoStepTarget, setTwoStepTarget] = useState<{ role: AppRole; account?: UserAccount } | null>(null);
+
   // Handle Fill from Demo Account panel
-  const handleSelectDemoAccount = (targetRole: 'farmer' | 'officer' | 'cooperative') => {
+  const handleSelectDemoAccount = (targetRole: 'farmer' | 'officer' | 'cooperative' | 'admin') => {
     setErrorMessage(null);
     if (targetRole === 'farmer') {
       setIdentifier('+250 788 000 012');
       setPassword('demo1234');
     } else if (targetRole === 'officer') {
       setIdentifier('claudine.m@ihinga.demo');
+      setPassword('demo1234');
+    } else if (targetRole === 'admin') {
+      setIdentifier('grace.i@ihinga.demo');
       setPassword('demo1234');
     } else {
       setIdentifier('+250 788 000 034');
@@ -81,7 +96,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
   // Resolve role and account match from input
   const resolveAccount = (
     inputIdentifier: string
-  ): { role: AppRole | 'pending_role'; account?: UserAccount } | null => {
+  ): { role: AppRole | 'pending_role' | 'blocked_role'; account?: UserAccount } | null => {
     const clean = inputIdentifier.trim().toLowerCase();
     const cleanDigits = clean.replace(/\D/g, '');
 
@@ -97,10 +112,10 @@ export const SignInView: React.FC<SignInViewProps> = ({
       if (matched.status === 'pending') {
         return { role: 'pending_role', account: matched };
       }
-      if (matched.role === 'cooperative_leader') {
-        return { role: 'cooperative', account: matched };
+      if (matched.status === 'suspended' || matched.status === 'rejected') {
+        return { role: 'blocked_role', account: matched };
       }
-      return { role: matched.role === 'officer' ? 'officer' : 'farmer', account: matched };
+      return { role: matched.role, account: matched };
     }
 
     // 2. Check initial demo accounts fallback
@@ -141,7 +156,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
   // Handle Submit Sign-in Form
   const handleSubmitSignIn = (e: React.FormEvent) => {
     e.preventDefault();
-    if (failedAttempts >= 5) {
+    if (failedAttempts >= lockAfterFailed) {
       setErrorMessage(t.errorTooManyAttempts);
       return;
     }
@@ -164,12 +179,29 @@ export const SignInView: React.FC<SignInViewProps> = ({
         return;
       }
 
+      // Suspended or rejected accounts cannot sign in
+      if (resolution && resolution.role === 'blocked_role') {
+        onSignInFailed(
+          identifier,
+          resolution.account?.status === 'rejected' ? 'Access request rejected' : 'Account suspended',
+          resolution.account
+        );
+        if (resolution.account?.status === 'rejected') {
+          const reason = accessRequests.find((r) => r.accountId === resolution.account?.id)?.decisionReason;
+          setErrorMessage(reason ? `${t.errorRejected} ${reason}` : t.errorRejected);
+        } else {
+          setErrorMessage(t.errorSuspended);
+        }
+        return;
+      }
+
       const isValidPassword = password.trim() === 'demo1234' || password.trim().length >= 4;
 
       if (!resolution || !isValidPassword) {
+        onSignInFailed(identifier, resolution ? 'Wrong password' : 'Unknown account', resolution?.account);
         const nextAttempts = failedAttempts + 1;
         setFailedAttempts(nextAttempts);
-        if (nextAttempts >= 5) {
+        if (nextAttempts >= lockAfterFailed) {
           setErrorMessage(t.errorTooManyAttempts);
         } else {
           setErrorMessage(t.errorIncorrect);
@@ -178,15 +210,15 @@ export const SignInView: React.FC<SignInViewProps> = ({
       }
 
       // Valid credentials
-      if (resolution.role === 'officer') {
-        // Agricultural officers require two-step verification
+      if (resolution.role !== 'pending_role' && resolution.role !== 'blocked_role' && twoStepRoles.includes(resolution.role)) {
+        // Roles chosen in Security & audit (officers and administrators by default) need the code
+        setTwoStepTarget({ role: resolution.role, account: resolution.account });
         setAuthMode('two_step');
-      } else if (resolution.role === 'cooperative') {
-        // Cooperative leaders sign in to cooperative dashboard
-        onSignInSuccess('cooperative', resolution.account);
+      } else if (resolution.role === 'pending_role' || resolution.role === 'blocked_role') {
+        return;
       } else {
-        // Farmers sign directly in
-        onSignInSuccess('farmer', resolution.account);
+        // Farmers, cooperative leaders and researchers sign directly in
+        onSignInSuccess(resolution.role, resolution.account);
       }
     }, 350);
   };
@@ -308,7 +340,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder={t.phoneOrEmailPlaceholder}
-                    disabled={failedAttempts >= 5}
+                    disabled={failedAttempts >= lockAfterFailed}
                     className="w-full py-2.5 px-3.5 rounded-xl bg-white border border-[rgba(31,74,52,0.20)] text-[#17271D] text-[13px] placeholder:text-[#5B665E]/60 focus:outline-hidden focus:border-[#1F4A34] transition-colors"
                     required
                   />
@@ -334,7 +366,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder={t.passwordPlaceholder}
-                      disabled={failedAttempts >= 5}
+                      disabled={failedAttempts >= lockAfterFailed}
                       className="w-full py-2.5 pl-3.5 pr-10 rounded-xl bg-white border border-[rgba(31,74,52,0.20)] text-[#17271D] text-[13px] placeholder:text-[#5B665E]/60 focus:outline-hidden focus:border-[#1F4A34] transition-colors"
                       required
                     />
@@ -356,7 +388,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 {/* Submit Sign In Button */}
                 <button
                   type="submit"
-                  disabled={isLoading || failedAttempts >= 5}
+                  disabled={isLoading || failedAttempts >= lockAfterFailed}
                   className="w-full py-3 px-4 rounded-full bg-[#1F4A34] text-white text-[13px] font-semibold hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-98"
                 >
                   {isLoading ? <span>{t.signingIn}</span> : <span>{t.signInButton}</span>}
@@ -465,10 +497,33 @@ export const SignInView: React.FC<SignInViewProps> = ({
                     </span>
                   </div>
 
+                  {/* Administrator row */}
+                  <div
+                    onClick={() => handleSelectDemoAccount('admin')}
+                    className="p-2.5 rounded-xl bg-white hover:bg-[#E4ECDB]/40 border border-[rgba(31,74,52,0.08)] cursor-pointer transition-colors flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-full bg-[#1F4A34] flex items-center justify-center flex-shrink-0 text-white">
+                        <KeyRound className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-[#17271D] group-hover:text-[#1F4A34]">
+                          {t.adminRole} — {t.adminName}
+                        </div>
+                        <div className="text-[10.5px] text-[#5B665E]">
+                          grace.i@ihinga.demo · demo1234
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10.5px] text-[#1F4A34] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                      Fill
+                    </span>
+                  </div>
+
                   {/* Disabled future roles */}
                   <div className="p-2.5 rounded-xl bg-[#F4F6EF]/50 border border-[rgba(31,74,52,0.06)] opacity-60 flex items-center justify-between">
                     <div className="text-[11px] text-[#5B665E]">
-                      <span>{t.researcherRole} · {t.adminRole}</span>
+                      <span>{t.researcherRole}</span>
                     </div>
                     <span className="text-[10px] text-[#5B665E] font-medium italic">
                       {t.designedInNextIteration}
@@ -505,7 +560,9 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 destinationType="authenticator"
                 lang={lang}
                 buttonLabel={t.twoStepVerifyButton}
-                onSuccess={() => onSignInSuccess('officer')}
+                onSuccess={() =>
+                  onSignInSuccess(twoStepTarget?.role || 'officer', twoStepTarget?.account)
+                }
               />
 
               <div className="text-center pt-1 border-t border-[rgba(31,74,52,0.06)]">

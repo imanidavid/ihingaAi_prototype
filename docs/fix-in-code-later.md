@@ -22,3 +22,16 @@ Found during Task 1 (08/10/2026):
 - [ ] Kinyarwanda strings added in Task 1 (training share messages in `TRAINING_MATERIALS`) need the owner's review.
 - [x] `farmerMyReports` matched reports on the full name, so officer feedback never reached the farmer bell — fixed (matches `reportNameOf()` + sector).
 - [ ] The Sep/Oct calendar shows sprayer bookings from Tue 29/09; booking slots before the spray window opens (Tue 14:00) only show a note, they are not blocked.
+
+Found during Task 2 (08/10/2026):
+- [ ] An approved second officer (e.g. Esther) lands on the officer dashboard that greets "Claudine" (`OFFICER_DATA.profile`); the topbar already uses the signed-in account. Same for a second cooperative leader, who sees Aline's cooperative.
+- [ ] Settings shows Jean-Baptiste's farmer profile for every role (officer, cooperative, admin, researcher). Give non-farmer roles their own profile section.
+- [ ] Saved permissions (`rolePermissions`) are recorded and audited but not enforced in the UI yet (e.g. hiding "Issue warning" when an officer loses it). Decide in Task 3.
+- [ ] The floating role switcher signs in as the demo account without updating "Last sign-in", the audit log or login activity (only the real sign-in form does). Intentional so demo shortcuts don't flood the log.
+- [ ] Imported farmers get `farmSizeHa: 0` (the CSV has no farm size column).
+
+Found during Tasks 3–5 (08/10/2026):
+- [ ] SMS inbox replies are seeded and read-only; a "1" reply does not yet set `acknowledged` on the member record (same gap as the farmer drawer's Acknowledge button).
+- [ ] Data processing runs are simulated: "Run now" walks the stages and records a run, but does not change forecast numbers. The climate normal shown (13 mm/day) is still the undecided value.
+- [ ] Message templates are stored and editable but the composers don't use them yet.
+- [ ] Data retention and password policy settings are recorded only (no data is deleted, passwords are not re-checked).

@@ -30,12 +30,15 @@ module, no context and no reducer; state is passed down as props. Fields:
 
 `warnings` · `reports` · `thresholdRules` · `userSettings` · `messages` · `accounts` ·
 `accessRequests` · `generatedReports` · `savedItemIds` · `readNotificationIds` ·
-`coopMembers` · `coopGroupRecords` · `meetings` · `equipmentBookings`
+`coopMembers` · `coopGroupRecords` · `meetings` · `equipmentBookings` · `rolePermissions` ·
+`auditEvents` · `loginAttempts` · `securitySettings` · `dataSources` · `processingRuns` ·
+`processingSettings` · `messageTemplates` · `voiceSettings`
 
 Derived once in `App.tsx` and passed down: `coopGroups` (`computeCoopGroups`), `coopSummary`
 (`computeCoopSummary`), and for the farmer `farmerMember`, `farmerMeetings`, `farmerBookings`.
 
-UI-only state alongside them: `role`, `currentView`, `previewMode`, `drawerContent`,
+UI-only state alongside them: `role`, `currentAccountId` (who is signed in), `currentView`,
+`previewMode`, `drawerContent`,
 `searchQuery`, `toastMessage`, `isAuthenticated`, `hasUnsavedSettings`, plus the
 message-composer, schedule-meeting, report-modal and session-timeout flags.
 
@@ -55,8 +58,15 @@ Seed data lives in four files, not one:
 - `src/data/districtReportsData.ts` — the 52 field reports
   (`INITIAL_52_DISTRICT_REPORTS`, re-exported as `INITIAL_52_REPORTS` from `musanzeData.ts`).
 - `src/data/reportsModuleData.ts` — `INITIAL_GENERATED_REPORTS`.
-- `src/data/rwandaAdminData.ts` — `INITIAL_USER_ACCOUNTS`, sector/cell lists,
-  `validateRwandaPhone`, `maskPhone`, `maskEmail`.
+- `src/data/rwandaAdminData.ts` — `INITIAL_USER_ACCOUNTS` (11, incl. two waiting for
+  approval), `INITIAL_ACCESS_REQUESTS` (2), `DEMO_ACCOUNT_ID_BY_ROLE`, sector/cell lists,
+  `validateRwandaPhone`, `maskPhone`, `maskEmail`, `SAMPLE_MEMBER_IMPORT_CSV`, `parseMemberCsv`.
+  Admin data in `musanzeData.ts`: `ROLE_LABELS`, `ROLE_ORDER`, `PERMISSIONS`,
+  `INITIAL_ROLE_PERMISSIONS`, `INITIAL_AUDIT_EVENTS`, `INITIAL_LOGIN_ATTEMPTS`,
+  `INITIAL_SECURITY_SETTINGS`, `INITIAL_DATA_SOURCES`, `INITIAL_PROCESSING_RUNS`,
+  `INITIAL_PROCESSING_SETTINGS`, `PROCESSING_STAGES`, `INITIAL_MESSAGE_TEMPLATES`,
+  `INITIAL_VOICE_SETTINGS`, `SEEDED_SMS_OPT_OUTS`, `SMS_REPLIES`, `SCHEDULED_MESSAGES`,
+  `SAMPLE_RAIN_GAUGE_CSV` / `parseRainGaugeCsv`, `computeSignInAnomalies`.
 
 Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a component.
 
@@ -97,21 +107,27 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
     keep it at ≥ 96px.
 14. **Reset demo** (`handleResetDemo`, `App.tsx`) must restore every store field to its
     initial value, including anything created during the demo. It currently resets all
-    fourteen fields; add every new field you introduce.
+    twenty-three fields; add every new field you introduce.
 
 ## Roles (one shared store, desktop unless noted)
 
-`AppRole` in `src/types.ts` is exactly `'farmer' | 'officer' | 'cooperative'`.
-Note `UserAccount.role` in `rwandaAdminData.ts` uses a different spelling for the third role:
-`'cooperative_leader'`. Researcher and administrator have no `AppRole` value yet.
+`AppRole` in `src/types.ts` is exactly `'farmer' | 'officer' | 'cooperative' | 'researcher' | 'admin'`
+(`'cooperative'` = cooperative leader). It is the one set of role names: the app shell,
+`UserAccount.role`, sign-up (`SignUpRole`) and access requests (`ApprovalRole`) all use it.
+Display names come from `ROLE_LABELS`. Account status: `active · pending · suspended · rejected`;
+only `active` accounts can sign in. Officers and administrators need the two-step code.
 
 | Role | Sign-in identifier | Password | Lands on |
 |---|---|---|---|
 | Farmer — Jean-Baptiste Ndayisaba | +250 788 000 012 | demo1234 | Farmer dashboard (desktop + mobile M1/M2) |
 | Cooperative leader — Aline Uwimana | +250 788 000 034 | demo1234 | Cooperative dashboard |
 | Agricultural officer — Claudine Mukamana | claudine.m@ihinga.demo | demo1234 | Officer dashboard |
-| Researcher | not built yet | — | see `docs/remaining-work.md` Task 6 |
-| Administrator | not built yet | — | see `docs/remaining-work.md` Task 2–5 |
+| Administrator — Grace Ingabire | grace.i@ihinga.demo | demo1234 | Admin dashboard (two-step 246810) |
+| Researcher — Diane Uwase | diane.u@ihinga.demo | demo1234 | Risk forecast (shell only; Task 6 builds the pages) |
+
+Waiting for approval at the start of the demo: Esther Nyirabagenzi (officer,
+esther.n@ihinga.demo) and Celestin Ndayambaje (cooperative leader, +250 788 000 072).
+Suspended: Theophile Nsabimana (farmer).
 
 The two-step verification code is **246810** everywhere it is asked for (officer sign-in,
 sign-up, forgot password). Other seeded account details: officer phone +250 788 000 014,
@@ -180,6 +196,16 @@ groups, hard-coded 13 mm normal, composer group list, sidebar Title Case, RAB st
 
 Task 1 (cooperative part 2) fixed: the invented 32% fungicide claim, the hard-coded "186
 members under warning" sidebar card, and the farmer bell's hard-coded `'kinigi'` message filter.
+
+Task 2 (admin) added: the administrator role and shell, Users & access (Users · Access
+requests · Permission matrix · Bulk import), and one role naming (`'cooperative_leader'` is
+gone). Tasks 3–5 followed in the same branch: `AdminSecurityView` (Audit log · Login
+activity · Data access · Security settings), `AdminDataSourcesView`, `AdminProcessingView`,
+`AdminNotificationsView` (Message history · Templates · Opt-outs · SMS inbox · Scheduled).
+`auditEvents` records sign-ins, warnings, report decisions and opens, exports, messages,
+meetings, bookings and every admin action. Security settings are live: the two-step roles,
+lock-after-N-failures and the inactivity timeouts drive sign-in and the session timer.
+Only the researcher pages Model performance and Field data are still `PlaceholderView` (Task 6).
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 
