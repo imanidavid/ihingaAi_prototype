@@ -26,7 +26,7 @@ export const FloatingDeviceSwitcher: React.FC<FloatingDeviceSwitcherProps> = ({
   return (
     <aside
       aria-label="Role and Viewport Switcher"
-      className={`fixed right-6 z-40 transition-all duration-300 ${
+      className={`fixed left-1/2 -translate-x-1/2 w-max max-w-[calc(100vw-2rem)] overflow-x-auto z-40 transition-all duration-300 ${
         hasUnsavedBar ? 'bottom-20' : 'bottom-5'
       }`}
     >
