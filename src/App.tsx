@@ -47,7 +47,7 @@ import { KpiStrip } from './components/KpiStrip';
 import { RainfallChartCard } from './components/RainfallChartCard';
 import { RecentAlertsCard } from './components/RecentAlertsCard';
 import { CropAdvisoriesSection } from './components/CropAdvisoriesSection';
-import { RwandaRiskMapCard } from './components/RwandaRiskMapCard';
+import { MusanzeRiskMapCard } from './components/MusanzeRiskMapCard';
 import { SeasonalCalendarCard } from './components/SeasonalCalendarCard';
 import { DetailDrawer, DrawerContent } from './components/DetailDrawer';
 import { ReportObservationModal } from './components/ReportObservationModal';
@@ -113,6 +113,7 @@ import {
   INITIAL_RAIN_FORECASTS,
   MUSANZE_RECORD,
   STATION_SECTOR,
+  parseRainGaugeCsv,
   SECTOR_RISK_NOTES,
   INITIAL_STATION_READINGS,
   INITIAL_CROP_ADVISORIES,
@@ -135,6 +136,7 @@ import { ResearcherDashboardView } from './components/ResearcherDashboardView';
 import { ResearcherModelView } from './components/ResearcherModelView';
 import { ResearcherFieldDataView } from './components/ResearcherFieldDataView';
 import { AdminDataSourcesView } from './components/AdminDataSourcesView';
+import { OfficerWeatherDataView } from './components/OfficerWeatherDataView';
 import { AdminProcessingView } from './components/AdminProcessingView';
 import { AdminNotificationsView } from './components/AdminNotificationsView';
 
@@ -447,13 +449,10 @@ export default function App() {
   const farmerForecast = useMemo(() => forecastDays(rainForecasts, farmerSector), [rainForecasts, farmerSector]);
   const farmerWeatherSummary = weatherSummaryFrom(farmerForecast, thresholdRules);
   const farmerReading = latestReading(stationReadings, farmerSector);
-  const districtReading = latestReading(stationReadings, '');
   const farmerAdvisories = useMemo(
     () => visibleAdvisories(cropAdvisories, warnings, farmerSector, userSettings.cropsGrown),
     [cropAdvisories, warnings, farmerSector, userSettings.cropsGrown]
   );
-  // Map: Musanze's "expected 24 h rain" = wettest sector tomorrow
-  const districtRainTomorrow = Math.max(0, ...rainForecasts.map((f) => f.dailyMm[1] ?? 0));
 
   // =========================================================================
   // BELL & NOTIFICATIONS COMPUTATION
@@ -1208,29 +1207,6 @@ export default function App() {
     showToast(`${source.name} connected`);
   };
 
-  const handleManualUpload = (rows: number) => {
-    setDataSources((prev) =>
-      prev.map((d) =>
-        d.kind === 'File upload'
-          ? (() => {
-              const recordsToday = Math.min(d.expectedToday, d.recordsToday + rows);
-              const missing = d.expectedToday - recordsToday;
-              return {
-                ...d,
-                // Healthy only once the week's readings are complete
-                status: missing > 0 ? ('Delayed' as const) : ('Healthy' as const),
-                lastSync: NOW_STAMP.slice(0, 5) + NOW_STAMP.slice(10),
-                recordsToday,
-                note: missing > 0 ? `${rows} readings uploaded · ${missing} still missing` : 'All readings uploaded',
-              };
-            })()
-          : d
-      )
-    );
-    logAudit('Uploaded data', `${rows} rain gauge readings`);
-    showToast(`${rows} readings uploaded`);
-  };
-
   const handleProcessingRun = (run: ProcessingRun) => {
     setProcessingRuns((prev) => [...prev, run]);
     logAudit(run.trigger === 'Reprocess' ? 'Reprocessed data' : 'Ran processing', `${run.recordsIn} records`);
@@ -1261,7 +1237,7 @@ export default function App() {
     showToast('Voice settings saved');
   };
 
-  // Crop advice (officer) and weather data uploads (admin)
+  // Crop advice and weather data uploads (officer)
   const handleSaveAdvice = (advice: CropAdvisory) => {
     setCropAdvisories((prev) => [...prev, advice]);
     logAudit('Published crop advice', `${advice.crop} · ${advice.title}`);
@@ -1275,11 +1251,45 @@ export default function App() {
     showToast('Advice removed');
   };
 
-  const handleUploadReadings = (readings: StationReading[]) => {
-    setStationReadings((prev) => [...prev, ...readings]);
+  /** Officer manual upload: adds the readings and updates the "Manual upload" feed the admin watches. */
+  const handleUploadReadings = (rows: ReturnType<typeof parseRainGaugeCsv>['rows']) => {
+    const count = rows.length;
+    setStationReadings((prev) => [
+      ...prev,
+      ...rows.map((r, i) => ({
+        id: `st-demo-${Date.now()}-${i}`,
+        station: r.station,
+        sector: STATION_SECTOR[r.station],
+        date: r.date,
+        time: r.time,
+        tempC: r.tempC,
+        humidityPct: r.humidityPct,
+        rainMm: r.rainMm,
+        source: 'Manual upload' as const,
+      })),
+    ]);
+    setDataSources((prev) =>
+      prev.map((d) => {
+        if (d.kind !== 'File upload') return d;
+        const recordsToday = Math.min(d.expectedToday, d.recordsToday + count);
+        const missing = d.expectedToday - recordsToday;
+        return {
+          ...d,
+          // Healthy only once the week's readings are complete
+          status: missing > 0 ? ('Delayed' as const) : ('Healthy' as const),
+          lastSync: NOW_STAMP.slice(0, 5) + NOW_STAMP.slice(10),
+          recordsToday,
+          note: missing > 0 ? `${count} readings uploaded · ${missing} still missing` : 'All readings uploaded',
+        };
+      })
+    );
+    const stations = Array.from(new Set(rows.map((r) => r.station)));
+    logAudit('Uploaded station readings', `${count} readings · ${stations.join(', ')}`);
+    showToast(`${count} readings uploaded`);
   };
 
   const handleUploadForecast = (updates: { sector: string; dayIndex: number; rainMm: number }[]) => {
+    const uploader = accounts.find((a) => a.id === currentAccountId)?.fullName || ROLE_LABELS[role];
     setRainForecasts((prev) =>
       prev.map((f) => {
         const mine = updates.filter((u) => u.sector === f.sector);
@@ -1288,11 +1298,11 @@ export default function App() {
         mine.forEach((u) => {
           dailyMm[u.dayIndex] = u.rainMm;
         });
-        return { ...f, dailyMm, source: `Admin upload ${NOW_STAMP}` };
+        return { ...f, dailyMm, source: `Uploaded by ${uploader} ${NOW_STAMP}` };
       })
     );
     const sectors = Array.from(new Set(updates.map((u) => u.sector)));
-    logAudit('Uploaded forecast', `${updates.length} days · ${sectors.join(', ')}`);
+    logAudit('Uploaded rain forecast', `${updates.length} days · ${sectors.join(', ')}`);
     showToast(`Forecast updated for ${sectors.join(', ')}`);
   };
 
@@ -1497,25 +1507,19 @@ export default function App() {
             {currentView === 'data_sources' && (
               <AdminDataSourcesView
                 dataSources={dataSources}
+                permissions={rolePermissions[role]}
                 onRefresh={handleRefreshSource}
                 onAddSource={handleAddSource}
-                onManualUpload={(rows) => {
-                  handleManualUpload(rows.length);
-                  handleUploadReadings(
-                    rows.map((r, i) => ({
-                      id: `st-demo-${Date.now()}-${i}`,
-                      station: r.station,
-                      sector: STATION_SECTOR[r.station],
-                      date: r.date,
-                      time: r.time,
-                      tempC: r.tempC,
-                      humidityPct: r.humidityPct,
-                      rainMm: r.rainMm,
-                      source: 'Manual upload' as const,
-                    }))
-                  );
-                }}
+              />
+            )}
+
+            {currentView === 'weather_data' && (
+              <OfficerWeatherDataView
+                permissions={rolePermissions[role]}
+                dataSources={dataSources}
+                stationReadings={stationReadings}
                 rainForecasts={rainForecasts}
+                onUploadReadings={handleUploadReadings}
                 onUploadForecast={handleUploadForecast}
               />
             )}
@@ -1647,19 +1651,16 @@ export default function App() {
                     onViewAll={() => setCurrentView('recommendations')}
                   />
 
-                  {/* Band 5 — 2/3 Rwanda Risk Map (All 30 Districts) + 1/3 Seasonal Calendar Preview */}
+                  {/* Band 5 — 2/3 Musanze sector risk map + 1/3 Seasonal Calendar Preview */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                     <div className="lg:col-span-8">
-                      <RwandaRiskMapCard
+                      <MusanzeRiskMapCard
+                        warnings={warnings}
+                        forecastRisk={sectorForecastRisk}
+                        rainForecasts={rainForecasts}
+                        stationReadings={stationReadings}
+                        homeSector={farmerSector}
                         onViewFullMap={() => setCurrentView('forecast')}
-                        musanzeRiskLevel={districtClimateRisk}
-                        musanzeLive={{
-                          temp: districtReading ? `${districtReading.tempC}°C` : undefined,
-                          humidity: districtReading ? `${districtReading.humidityPct}%` : undefined,
-                          rainfall24h: districtRainTomorrow,
-                          affectedSectorsCount: affectedSectors.length,
-                          affectedSectorsList: affectedSectors.map((a) => a.sector),
-                        }}
                       />
                     </div>
                     <div className="lg:col-span-4">

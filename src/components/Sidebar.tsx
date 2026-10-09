@@ -21,6 +21,7 @@ import {
   BellRing,
   LineChart,
   Table2,
+  CloudUpload,
 } from 'lucide-react';
 import { NavView, AppRole } from '../types';
 
@@ -67,6 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'forecast', label: 'Risk forecast', icon: CloudRain },
     { id: 'warnings', label: 'Warnings', icon: AlertTriangle },
     { id: 'observations', label: 'Observations', icon: Eye },
+    { id: 'weather_data', label: 'Weather data', icon: CloudUpload },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];

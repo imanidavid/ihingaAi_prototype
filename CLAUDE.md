@@ -50,7 +50,9 @@ Seed data lives in four files, not one:
 - `src/data/musanzeData.ts` — `NOW`, `MUSANZE_RECORD`, `INITIAL_WARNINGS`,
   `INITIAL_THRESHOLD_RULES`, `INITIAL_USER_SETTINGS`, `COOPERATIVE_DATA`,
   `INITIAL_COOP_MESSAGES`, the 15 sectors, the rainfall series,
-  `SECTOR_BASE_FORECAST_RISK`, `computeSectorClimateRisk`, `computeDistrictClimateRisk`,
+  Uploads belong to the officer (sidebar "Weather data", permission `upload_weather_data`); the
+administrator keeps the feed connections, sync and schedules (`manage_data_sources`). Audit
+actions: "Uploaded station readings", "Uploaded rain forecast". `SECTOR_BASE_FORECAST_RISK`, `computeSectorClimateRisk`, `computeDistrictClimateRisk`,
   `isWarningRelevantToFarmer`. Cooperative: `INITIAL_COOP_MEMBERS` (186, built by
   `buildInitialMembers()`), `INITIAL_COOP_GROUPS`, `INITIAL_COOP_MEETINGS`,
   `INITIAL_EQUIPMENT_BOOKINGS`, `COOP_EQUIPMENT`, `BOOKING_SLOTS`, `COOP_CROP_WINDOWS`,
@@ -221,13 +223,16 @@ permission matrix (`view_research_data`, `export_data`). Reports offers research
 `PlaceholderView` any more.
 
 Farmer dashboard data sources (after Task 6): weather = latest `stationReadings` entry for the
-farmer's sector (admin Data sources → Manual upload adds readings with temperature and
-humidity); rainfall outlook = the sector's series in `rainForecasts` (admin "Rain forecast
+farmer's sector (officer Weather data → Manual upload adds readings with temperature and
+humidity); rainfall outlook = the sector's series in `rainForecasts` (officer "Rain forecast
 upload" replaces days); "N mm total" = sum of the 30-day series; affected sectors = sectors at
 Watch or above (`computeAffectedSectors`); crop advice = `cropAdvisories`, written by the
 officer on an active warning (Warnings → "Add crop advice"), shown to a farmer only while
 that warning is active and only for their sector and crops (`visibleAdvisories`); the map
-colours Musanze with `computeDistrictClimateRisk`. `SECTOR_BASE_FORECAST_RISK`,
+(`MusanzeRiskMapCard`, Leaflet + OpenStreetMap tiles, no API key) colours Musanze's 15 sectors
+with `computeSectorClimateRisk`; the sector shapes are bundled in
+`src/data/musanzeSectorBoundaries.json` (geoBoundaries gbOpen RWA ADM3, CC BY 4.0, credited on
+the card), so they show even when the tiles cannot load. `SECTOR_BASE_FORECAST_RISK`,
 `SECTORS_WATCH_LIST` and `SECTORS_LOW_LIST` are gone. Sources still missing are listed in
 `docs/fix-in-code-later.md`.
 

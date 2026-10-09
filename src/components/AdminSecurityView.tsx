@@ -41,7 +41,7 @@ import {
 type SecurityTab = 'audit' | 'logins' | 'access' | 'settings';
 const PAGE_SIZE = 10;
 const ACCESS_ACTIONS = ['Opened farmer report'];
-const EXPORT_ACTIONS = ['Exported report', 'Exported data', 'Imported users', 'Uploaded data'];
+const EXPORT_ACTIONS = ['Exported report', 'Exported data', 'Imported users', 'Uploaded station readings', 'Uploaded rain forecast'];
 
 const roleLabel = (r: AuditEvent['actorRole'] | undefined) => (!r ? '—' : r === 'system' ? 'System' : ROLE_LABELS[r]);
 

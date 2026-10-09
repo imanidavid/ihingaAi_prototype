@@ -3,6 +3,7 @@ export type NavView =
   | 'users'
   | 'security'
   | 'data_sources'
+  | 'weather_data'
   | 'processing'
   | 'notifications'
   | 'model_performance'
@@ -671,6 +672,8 @@ export type PermissionId =
   | 'message_members'
   | 'manage_members'
   | 'view_research_data'
+  | 'upload_weather_data'
+  | 'manage_data_sources'
   | 'manage_users'
   | 'export_data';
 

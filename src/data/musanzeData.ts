@@ -2199,18 +2199,9 @@ export function computeSectorForecastRisk(
   return result;
 }
 
-export function computeSectorClimateRisk(
-  sectorName: string,
-  activeWarnings: OfficerActiveWarning[],
-  forecastRisk: Record<string, RiskLevel>
-): RiskLevel {
-  // Sector climate risk = the higher of (a) the sector's forecast risk (forecast series + threshold rules)
-  // and (b) active WEATHER warnings covering it.
-  const baseForecastRisk: RiskLevel = forecastRisk[sectorName] || 'Low';
-
-  // Only WEATHER warnings: Excess rain, Dry spell, Temperature
-  // Pest / disease warnings do NOT change climate risk
-  const weatherWarnings = activeWarnings.filter((w) => {
+/** Active WEATHER warnings (excess rain, dry spell, temperature) covering a sector. Pest / disease warnings are excluded. */
+export function weatherWarningsForSector<W extends OfficerActiveWarning>(sectorName: string, activeWarnings: W[]): W[] {
+  return activeWarnings.filter((w) => {
     if (w.status !== 'Active') return false;
     const isWeather =
       (w.category && w.category.toLowerCase().includes('weather')) ||
@@ -2228,9 +2219,17 @@ export function computeSectorClimateRisk(
       (w.affectedArea && w.affectedArea.toLowerCase().includes('all sectors'))
     );
   });
+}
 
-  let highest: RiskLevel = baseForecastRisk;
-  for (const w of weatherWarnings) {
+export function computeSectorClimateRisk(
+  sectorName: string,
+  activeWarnings: OfficerActiveWarning[],
+  forecastRisk: Record<string, RiskLevel>
+): RiskLevel {
+  // Sector climate risk = the higher of (a) the sector's forecast risk (forecast series + threshold rules)
+  // and (b) active WEATHER warnings covering it.
+  let highest: RiskLevel = forecastRisk[sectorName] || 'Low';
+  for (const w of weatherWarningsForSector(sectorName, activeWarnings)) {
     if (RISK_LEVEL_WEIGHT[w.severity] > RISK_LEVEL_WEIGHT[highest]) {
       highest = w.severity;
     }
@@ -2350,7 +2349,7 @@ export function weatherSummaryFrom(days: WeatherForecastDay[], rules: ThresholdR
 }
 
 // =========================================================================
-// WEATHER STATION READINGS (store field `stationReadings`; admin manual upload adds more)
+// WEATHER STATION READINGS (store field `stationReadings`; the officer's manual upload adds more)
 // =========================================================================
 export const STATION_SECTOR: Record<string, string> = {
   'Kinigi gauge': 'Kinigi',
@@ -3186,15 +3185,18 @@ export const PERMISSIONS: { id: PermissionId; label: string; hint: string }[] = 
   { id: 'manage_members', label: 'Manage members', hint: 'Cooperative members and groups' },
   { id: 'view_research_data', label: 'View research data', hint: 'Anonymised field data' },
   { id: 'export_data', label: 'Export data', hint: 'Download reports and CSV files' },
+  { id: 'upload_weather_data', label: 'Upload weather data', hint: 'Station readings and rain forecasts' },
+  { id: 'manage_data_sources', label: 'Manage data sources', hint: 'Connect feeds, sync and schedules' },
   { id: 'manage_users', label: 'Manage users', hint: 'Accounts, roles and access' },
 ];
 
 export const INITIAL_ROLE_PERMISSIONS: RolePermissions = {
   farmer: ['view_forecasts'],
   cooperative: ['view_forecasts', 'message_members', 'manage_members'],
-  officer: ['view_forecasts', 'issue_warnings', 'verify_reports', 'export_data'],
+  officer: ['view_forecasts', 'issue_warnings', 'verify_reports', 'export_data', 'upload_weather_data'],
   researcher: ['view_forecasts', 'view_research_data', 'export_data'],
-  admin: PERMISSIONS.map((p) => p.id),
+  // The administrator keeps the feed connections; the officer uploads the readings and forecasts
+  admin: PERMISSIONS.map((p) => p.id).filter((id) => id !== 'upload_weather_data'),
 };
 
 /** Seeded events before NOW; the store appends real events as the demo runs. */
@@ -3222,7 +3224,7 @@ export const INITIAL_DATA_SOURCES: DataSourceStatus[] = [
   { id: 'ds-satellite', name: 'Satellite rainfall', kind: 'Satellite', status: 'Healthy', lastSync: '28/09 12:00', note: 'Daily estimate received', endpoint: 'satellite.ihinga.demo/rain-daily', schedule: 'Daily at 12:00', recordsToday: 15, expectedToday: 15 },
   { id: 'ds-vegetation', name: 'Vegetation index', kind: 'Satellite', status: 'Healthy', lastSync: '27/09 06:00', note: 'Weekly composite', endpoint: 'satellite.ihinga.demo/ndvi-weekly', schedule: 'Weekly on Sunday', recordsToday: 15, expectedToday: 15 },
   { id: 'ds-seasonal', name: 'Seasonal forecast', kind: 'Forecast model', status: 'Healthy', lastSync: '01/09 08:00', note: 'Season 2026/27 A outlook', endpoint: 'forecast.ihinga.demo/seasonal', schedule: 'Monthly on day 1', recordsToday: 15, expectedToday: 15 },
-  { id: 'ds-manual', name: 'Manual upload', kind: 'File upload', status: 'Delayed', lastSync: '21/09 16:30', note: 'Weekly rain gauge upload is overdue', endpoint: 'Upload in the console', schedule: 'Weekly (manual)', recordsToday: 0, expectedToday: 42 },
+  { id: 'ds-manual', name: 'Manual upload', kind: 'File upload', status: 'Delayed', lastSync: '21/09 16:30', note: 'Weekly rain gauge upload is overdue', endpoint: 'Officer upload (Weather data page)', schedule: 'Weekly (manual)', recordsToday: 0, expectedToday: 42 },
 ];
 
 /** Kept for the admin dashboard; reads the seeded list. */
