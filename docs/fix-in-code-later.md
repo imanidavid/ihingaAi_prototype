@@ -47,8 +47,17 @@ Farmer dashboard — sources still missing (08/10/2026):
 - [ ] Only the rain rule has numbers; dry spell, temperature and late blight rules don't feed the sector forecast risk yet.
 - [ ] Forecast temperature/humidity per day reuse the seeded template series; an uploaded forecast only changes rain.
 - [ ] Crop risk matrix (`CROP_RISK_MATRIX`) and plan-ahead items (`PLAN_AHEAD_DATA`) are static and can open advice whose warning has ended.
-- [ ] Officer dashboard sector table: farmers and reports columns still come from `OFFICER_DATA`.
+- [x] Officer dashboard sector table: farmers and reports columns still came from `OFFICER_DATA` — fixed (sector register + reports store).
 - [ ] Greeting is always "Good afternoon" (NOW is 14:00).
 - [ ] Rainfall chart peak dot and the "require action" KPI text use orange regardless of level (rule 4) — Task 9.
 - [ ] Seasonal calendar card unchanged (Task 7).
 
+
+Officer dashboard computed (09/10/2026):
+- [ ] Officer bell count is still `OFFICER_DATA.profile.bellCount` (3); compute it from reports under review and attention items.
+- [ ] Risk forecast page, officer cell drawer: the fallback `growersCount` (690 / 1,640) and acknowledgement (58 / 65) are hard-coded; read them from the warning's delivery totals.
+- [ ] Reports page engagement figures (active farmers 2,890, weekly 1,980 · 2,310 · 2,640 · 2,890, 70%) and "196 reports this season" have no source in the store.
+- [ ] Nothing moves `acknowledged` on a delivery record yet (farmer Acknowledge button, SMS "1" reply). Wire both to `warningDeliveries` with the member-record fix above.
+- [ ] The issue-warning form keeps the last sectors and risk type between opens; reset it on open.
+- [ ] Sector register changes only affect warnings issued afterwards (delivery records keep what was sent). Intentional.
+- [ ] One field report was dated 20/09 although every report is meant to be within the last 7 days (21–28/09); moved to 21/09 so the computed count stays 52.

@@ -16,6 +16,7 @@ Review target date: ~28/10/2026. Each task: follow the `ihinga-new-page` skill, 
 - [x] Task 5 — Admin: Notifications, SMS & voice (Module 10): message history + delivery by channel, templates (EN/RW, 160-char counters), voice settings, opt-outs (Jean-Baptiste joins when he stops SMS), SMS inbox, scheduled messages, broadcast composer — 08/10/2026
 - [x] Task 6 — Researcher role (Module 5 model performance, Module 12 research reports): research dashboard, model performance, anonymised field data + CSV (permission-gated), research report types, demo account in sign-in and switcher — 08/10/2026
 - [x] Farmer dashboard data sources: rain thresholds as numbers drive sector forecast risk, station readings (weather), forecast series (rainfall outlook, month total), computed affected sectors, officer-written crop advice linked to warnings, admin uploads for readings and forecast, map colour from district risk — 08/10/2026
+- [x] Officer dashboard computed: warning delivery per sector (`warningDeliveries`), admin sector register, officer-added risk types (weather or pest and disease), duplicate reason and "Update that warning instead" next to Send, sector counts and "Needs your attention" computed; cooperative and reports pages read the same delivery records — 09/10/2026
 - [ ] Task 7 — Crop calendar gaps (Module 8)
 - [ ] Task 8 — Fix-in-code-later list (`docs/fix-in-code-later.md`)
 - [ ] Task 9 — Consistency pass across all roles + mobile (design self-check on every page)

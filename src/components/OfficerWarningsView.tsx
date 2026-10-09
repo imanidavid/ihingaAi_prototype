@@ -488,6 +488,9 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                   <h3 className="text-[13px] font-semibold text-[#17271D]">
                     Recommended actions sent to farmers
                   </h3>
+                  {warning.recommendedActions.length === 0 && (
+                    <p className="text-[12.5px] text-[#5B665E]">No actions were added to this warning.</p>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
                     {warning.recommendedActions.map((action, idx) => (
                       <div
@@ -1245,7 +1248,7 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsIssueModalOpen(false)}
-                  className="px-4 py-2 rounded-full bg-[#F4F6EF] text-[#5B665E] hover:text-[#17271D] text-[12.5px] font-medium transition-colors cursor-pointer"
+                  className="px-4 py-2 whitespace-nowrap rounded-full bg-[#F4F6EF] text-[#5B665E] hover:text-[#17271D] text-[12.5px] font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1253,7 +1256,7 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                   type="submit"
                   disabled={selectedSectors.length === 0 || !warningTitle.trim() || !!duplicateWarning}
                   title={duplicateWarning ? `${duplicateSector} already has an active ${riskType} warning` : undefined}
-                  className="px-6 py-2 rounded-full bg-[#1F4A34] text-white text-[12.5px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 whitespace-nowrap rounded-full bg-[#1F4A34] text-white text-[12.5px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Send to {farmersReachedCount.toLocaleString()} farmers
                 </button>

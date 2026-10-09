@@ -33,7 +33,7 @@ module, no context and no reducer; state is passed down as props. Fields:
 `coopMembers` · `coopGroupRecords` · `meetings` · `equipmentBookings` · `rolePermissions` ·
 `auditEvents` · `loginAttempts` · `securitySettings` · `dataSources` · `processingRuns` ·
 `processingSettings` · `messageTemplates` · `voiceSettings` · `rainForecasts` ·
-`stationReadings` · `cropAdvisories`
+`stationReadings` · `cropAdvisories` · `warningDeliveries` · `riskTypes` · `sectorRegister`
 
 Derived once in `App.tsx` and passed down: `coopGroups` (`computeCoopGroups`), `coopSummary`
 (`computeCoopSummary`), `sectorForecastRisk` (`computeSectorForecastRisk`), `affectedSectors`,
@@ -113,7 +113,7 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
     keep it at ≥ 96px.
 14. **Reset demo** (`handleResetDemo`, `App.tsx`) must restore every store field to its
     initial value, including anything created during the demo. It currently resets all
-    twenty-six fields; add every new field you introduce.
+    twenty-nine fields; add every new field you introduce.
 
 ## Roles (one shared store, desktop unless noted)
 
@@ -230,6 +230,17 @@ that warning is active and only for their sector and crops (`visibleAdvisories`)
 colours Musanze with `computeDistrictClimateRisk`. `SECTOR_BASE_FORECAST_RISK`,
 `SECTORS_WATCH_LIST` and `SECTORS_LOW_LIST` are gone. Sources still missing are listed in
 `docs/fix-in-code-later.md`.
+
+Officer dashboard (09/10/2026): warning delivery is stored per warning and sector in
+`warningDeliveries` (sent and delivered by channel, acknowledged). App reads `warnings` through
+`withDeliveryTotals`, so `channels`, `sectorBreakdown`, `totalSent`, `acknowledgedPct`,
+`farmersReached` etc. are always computed — never seed them on a warning. Farmer counts come
+from `sectorRegister` (admin: Users & access → Sector register); a new warning's delivery
+records are built from it (`buildWarningDeliveries`). Risk types live in `riskTypes`; each
+warning carries `riskGroup` (`weather` | `pest_disease`) and only `weather` raises climate risk
+(`isWeatherWarning`). The officer dashboard rows and "Needs your attention" come from
+`computeSectorOverview` and `computeOfficerAttention`; `OFFICER_DATA` now only holds the
+profile, hero badge and photo.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 
