@@ -25,15 +25,19 @@ installed at the repo root in `.claude/skills/`.
 
 ## The store
 
-The "shared store" is React `useState` in `src/App.tsx` (lines ~65–233). There is no store
+The "shared store" is React `useState` in `src/App.tsx` (lines ~65–260). There is no store
 module, no context and no reducer; state is passed down as props. Fields:
 
 `warnings` · `reports` · `thresholdRules` · `userSettings` · `messages` · `accounts` ·
-`accessRequests` · `generatedReports` · `savedItemIds` · `readNotificationIds`
+`accessRequests` · `generatedReports` · `savedItemIds` · `readNotificationIds` ·
+`coopMembers` · `coopGroupRecords` · `meetings` · `equipmentBookings`
+
+Derived once in `App.tsx` and passed down: `coopGroups` (`computeCoopGroups`), `coopSummary`
+(`computeCoopSummary`), and for the farmer `farmerMember`, `farmerMeetings`, `farmerBookings`.
 
 UI-only state alongside them: `role`, `currentView`, `previewMode`, `drawerContent`,
 `searchQuery`, `toastMessage`, `isAuthenticated`, `hasUnsavedSettings`, plus the
-message-composer, report-modal and session-timeout flags.
+message-composer, schedule-meeting, report-modal and session-timeout flags.
 
 Seed data lives in four files, not one:
 
@@ -41,7 +45,13 @@ Seed data lives in four files, not one:
   `INITIAL_THRESHOLD_RULES`, `INITIAL_USER_SETTINGS`, `COOPERATIVE_DATA`,
   `INITIAL_COOP_MESSAGES`, the 15 sectors, the rainfall series,
   `SECTOR_BASE_FORECAST_RISK`, `computeSectorClimateRisk`, `computeDistrictClimateRisk`,
-  `isWarningRelevantToFarmer`.
+  `isWarningRelevantToFarmer`. Cooperative: `INITIAL_COOP_MEMBERS` (186, built by
+  `buildInitialMembers()`), `INITIAL_COOP_GROUPS`, `INITIAL_COOP_MEETINGS`,
+  `INITIAL_EQUIPMENT_BOOKINGS`, `COOP_EQUIPMENT`, `BOOKING_SLOTS`, `COOP_CROP_WINDOWS`,
+  `TRAINING_MATERIALS`, `COOP_DIRECTORY`, `REGISTERED_MUSANZE_FARMERS`, and the helpers
+  `computeCoopGroups`, `computeCoopSummary`, `computeCoopPerformance`, `memberReportsFor`,
+  `messageReachesMember`, `meetingReachesGroup`, `findBookingConflict`. Date helpers computed
+  from NOW: `NOW_DATE`, `parseDMY`, `formatDMY`, `formatDayShort`, `formatDaysAgo`.
 - `src/data/districtReportsData.ts` — the 52 field reports
   (`INITIAL_52_DISTRICT_REPORTS`, re-exported as `INITIAL_52_REPORTS` from `musanzeData.ts`).
 - `src/data/reportsModuleData.ts` — `INITIAL_GENERATED_REPORTS`.
@@ -80,14 +90,14 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
 11. **No implied official affiliation.** Never present the prototype as endorsed by the
     Government of Rwanda, RAB, Meteo Rwanda or MINAGRI. External feeds are labelled "simulated".
 12. **Dates DD/MM/YYYY.** Never use the native date input (currently true — no `type="date"`
-    anywhere). A custom date picker and a custom pill dropdown **do not exist yet**; 17 native
-    `<select>` elements remain. Build the two components before the consistency pass (Task 9)
-    and replace the native ones then.
+    anywhere). Use `DatePicker` (`src/components/DatePicker.tsx`) and `PillSelect`
+    (`src/components/PillSelect.tsx`) for every new form. 17 older native `<select>` elements
+    remain; replace them in the consistency pass (Task 9).
 13. **The floating demo control never covers content.** `<main>` carries `pb-32` (128px) —
     keep it at ≥ 96px.
 14. **Reset demo** (`handleResetDemo`, `App.tsx`) must restore every store field to its
-    initial value, including anything created during the demo. It currently resets all ten
-    fields; add every new field you introduce.
+    initial value, including anything created during the demo. It currently resets all
+    fourteen fields; add every new field you introduce.
 
 ## Roles (one shared store, desktop unless noted)
 
@@ -113,18 +123,26 @@ phone +250 788 000 012, email j.ndayisaba@musanzecoop.rw, Kinigi sector, Bisoke 
 Musanze Potato Growers Cooperative, Kinyarwanda. `INITIAL_USER_SETTINGS` is derived from it
 with `userSettingsFromAccount()` (`musanzeData.ts`), and `handleSignInSuccess` uses the same
 function, so his profile is identical before and after sign-in. Alerts by SMS is a default
-setting, not an account field. His cooperative group is "Kinigi growers", recorded only in
-`COOPERATIVE_DATA.groups`, never on his profile.
+setting, not an account field. His cooperative membership is the member record `mem-jb`
+(Member, Kinigi growers) in `coopMembers`, never a profile field; App finds it by full name
+(`findMemberByName`). Cooperative messages, meetings and sprayer bookings reach him only
+through that record.
 
-Cooperative groups (`COOPERATIVE_DATA.groups`) are seeds only: name, sector, members,
-acknowledged count per warning id, reports 7 d. Their active warnings and levels are
-**computed** from the `warnings` state by `computeCoopGroups()`, and the dashboard totals by
-`computeCoopSummary()`. Risk colours come from `RISK_LEVEL_COLORS` (`musanzeData.ts`).
+Cooperative members (`coopMembers`) are the one record of who is in which group, their role,
+and which warnings they acknowledged. Group records (`coopGroupRecords`) hold only name,
+sector and earlier-season report counts. Everything else is **computed** by
+`computeCoopGroups()`: member counts, lead, active warnings and levels (from `warnings`),
+acknowledgement (from members), "not acknowledged" names, and member field reports (from
+`reports`, matched on "First L." name + sector, the same records the officer sees). A warning
+issued in the demo starts at 0 acknowledged. Risk colours come from `RISK_LEVEL_COLORS`.
 `COOPERATIVE_OPTIONS` (`rwandaAdminData.ts`) is the one list of Musanze cooperatives, used by
 sign-up and Settings.
 
-Views per role come from `src/components/Sidebar.tsx`. The cooperative views `members`,
-`meetings` and `training` are still `PlaceholderView` (remaining-work Task 1).
+Views per role come from `src/components/Sidebar.tsx`. Cooperative pages:
+`CooperativeMembersView` (Members · Groups · Performance · Directory, sub-parts in
+`src/components/coop/`), `CooperativeMeetingsView` (shared calendar + upcoming list) and
+`CooperativeTrainingView` (Materials · Shared equipment). Meetings show on the farmer's
+`CropCalendarView` under "Cooperative events" and in the farmer bell (type `meeting`).
 
 ## Key data (must stay consistent everywhere)
 
@@ -136,8 +154,14 @@ Views per role come from `src/components/Sidebar.tsx`. The cooperative views `me
   (`RAINFALL_NORMAL_MM_PER_DAY`; the season chart uses `RAINFALL_NORMAL_MM_PER_MONTH_SEASON_CHART` = 65).
 - Field reports: 52 in last 7 days (Kinigi 14).
 - Cooperative: Musanze Potato Growers Cooperative, 186 members —
-  Kinigi growers 82 · Busogo growers 54 · Muhoza growers 50; member reports 7 d = 11;
-  rain-warning acknowledgement 63%.
+  Kinigi growers 82 · Busogo growers 54 · Muhoza growers 50; member reports 7 d = 11
+  (6 · 3 · 2), this season 42; rain-warning acknowledgement 63% (86 of 136).
+  Active 30 days 141 of 186 (76%); weekly active 102 · 118 · 133 · 141; average
+  acknowledgement 164 of 268 deliveries (61%). Not acknowledged latest warning:
+  Kinigi 18 · Busogo 32 · Muhoza 22.
+- Meetings: Thu 01/10 14:00 Blight plan for Season A (Kinigi growers) · Mon 05/10 09:00 Seed
+  orders for Season B (all) · Sat 10/10 08:30 Field day (all). Sprayers 1–3; bookings start
+  Tue 29/09 14:00 (spray window opens).
 - Potato advisory: "Don't spray until Tuesday 14:00" / "Heavy rain will wash the spray off your plants."
 
 ## Known code drift (fix deliberately, in its own task — don't "tidy" it mid-task)
@@ -147,14 +171,15 @@ Views per role come from `src/components/Sidebar.tsx`. The cooperative views `me
 - **Rainfall normal contradicts the month total.** 13 mm/day × 30 = 390 mm, but the month
   card says 300 mm is "above normal", and the season chart's normal is 65 mm/month. The values
   now live in one place (`musanzeData.ts`), but the numbers themselves need a decision.
-- **Coop dashboard still has an invented claim** that Task 1 replaces: the "reduces fungicide
-  cost by 32%" coordination note (rule 10).
 - **Heavy Rain issue time:** `INITIAL_WARNINGS` says `issuedAt: '28/09 13:40'`; the UI and key
   data say 13:35.
 
 Task A (data integrity) fixed: Jean-Baptiste's double seed, Late Blight level in cooperative
 groups, hard-coded 13 mm normal, composer group list, sidebar Title Case, RAB staff id, stale
 210 mm comment, media manifest paths.
+
+Task 1 (cooperative part 2) fixed: the invented 32% fungicide claim, the hard-coded "186
+members under warning" sidebar card, and the farmer bell's hard-coded `'kinigi'` message filter.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 

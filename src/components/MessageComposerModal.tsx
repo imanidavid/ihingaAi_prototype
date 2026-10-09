@@ -10,8 +10,8 @@ import {
   Users,
   Info,
 } from 'lucide-react';
-import { CoopMessage } from '../types';
-import { computeChannelSplit, COOPERATIVE_DATA } from '../data/musanzeData';
+import { CoopGroup, CoopMember, CoopMessage } from '../types';
+import { computeChannelSplit } from '../data/musanzeData';
 
 interface MessageComposerModalProps {
   isOpen: boolean;
@@ -20,15 +20,11 @@ interface MessageComposerModalProps {
   prefillTargetGroup?: string;
   prefillEn?: string;
   prefillRw?: string;
+  /** Cooperative groups computed from the store (names and member counts). */
+  groups: CoopGroup[];
+  /** Direct message to one member instead of groups. */
+  prefillMember?: CoopMember | null;
 }
-
-const COOP_GROUPS = COOPERATIVE_DATA.groups.map((g) => ({
-  id: g.id,
-  name: g.name,
-  count: g.membersCount,
-}));
-const TOTAL_MEMBERS = COOP_GROUPS.reduce((sum, g) => sum + g.count, 0);
-const GROUPS_LIST = [{ id: 'all', name: 'All groups', count: TOTAL_MEMBERS }, ...COOP_GROUPS];
 
 export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
   isOpen,
@@ -37,7 +33,13 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
   prefillTargetGroup = 'All groups',
   prefillEn = '',
   prefillRw = '',
+  groups,
+  prefillMember = null,
 }) => {
+  const COOP_GROUPS = groups.map((g) => ({ id: g.id, name: g.name, count: g.membersCount }));
+  const TOTAL_MEMBERS = COOP_GROUPS.reduce((sum, g) => sum + g.count, 0);
+  const GROUPS_LIST = [{ id: 'all', name: 'All groups', count: TOTAL_MEMBERS }, ...COOP_GROUPS];
+
   const [selectedGroups, setSelectedGroups] = useState<string[]>(['All groups']);
   const [messageEn, setMessageEn] = useState('');
   const [messageRw, setMessageRw] = useState('');
@@ -68,6 +70,7 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
 
   // Compute total reached members
   const reachedCount = useMemo(() => {
+    if (prefillMember) return 1;
     if (selectedGroups.includes('All groups')) {
       return TOTAL_MEMBERS;
     }
@@ -75,7 +78,7 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
       (sum, g) => sum + g.count,
       0
     );
-  }, [selectedGroups]);
+  }, [selectedGroups, prefillMember, TOTAL_MEMBERS, COOP_GROUPS]);
 
   const sharePct = (n: number) => (reachedCount > 0 ? Math.round((n / reachedCount) * 100) : 0);
 
@@ -125,7 +128,8 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
       id: `msg-coop-demo-${Date.now()}`,
       senderName: 'Aline Uwimana',
       senderCoop: 'Musanze Potato Growers Cooperative',
-      groups: selectedGroups,
+      groups: prefillMember ? [prefillMember.fullName] : selectedGroups,
+      ...(prefillMember ? { recipientMemberIds: [prefillMember.id] } : {}),
       recipientCount: reachedCount,
       deliveredCount: reachedCount,
       channelSplit,
@@ -153,7 +157,7 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
             </div>
             <div>
               <h2 className="text-[17px] font-bold text-[#17271D] leading-tight">
-                Send member broadcast
+                {prefillMember ? 'Message a member' : 'Send member broadcast'}
               </h2>
               <p className="text-[11.5px] text-[#5B665E]">
                 Musanze Potato Growers Cooperative · Aline Uwimana
@@ -179,10 +183,17 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
                 <span>To</span>
               </label>
               <span className="text-[11.5px] font-semibold text-[#1F4A34] bg-[#E4ECDB]/70 px-2.5 py-0.5 rounded-full">
-                Will reach {reachedCount} members
+                Will reach {reachedCount} {reachedCount === 1 ? 'member' : 'members'}
               </span>
             </div>
 
+            {prefillMember ? (
+              <div className="flex flex-wrap gap-2">
+                <span className="px-3 py-1.5 rounded-full text-[12px] font-medium border bg-[#1F4A34] text-white border-[#1F4A34] flex items-center gap-1.5">
+                  {prefillMember.fullName}
+                </span>
+              </div>
+            ) : (
             <div className="flex flex-wrap gap-2">
               {GROUPS_LIST.map((g) => {
                 const isSelected = selectedGroups.includes(g.name);
@@ -209,6 +220,7 @@ export const MessageComposerModal: React.FC<MessageComposerModalProps> = ({
                 );
               })}
             </div>
+            )}
           </div>
 
           {/* 2. Message: English & Kinyarwanda fields */}

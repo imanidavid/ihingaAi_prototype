@@ -11,6 +11,14 @@ Found during Task A (07/10/2026):
 - [ ] Heavy Rain Influx `issuedAt` is `28/09 13:40` in `INITIAL_WARNINGS`; the UI and key data say 13:35.
 - [ ] Officer dashboard "Active warnings" KPI subtitle is fixed text ("Rain influx & Late blight"); it does not change when a warning is issued or ended.
 - [ ] Farmer dashboard: "2 active" chip and "2 require action" text use risk colours for counts (rule 4). Title Case KPI/section labels ("Current Risk Level", "Crop Advisories", "Rwanda Risk Map") — Task 9 sweep.
-- [ ] Farmer bell filters cooperative messages with a hard-coded `'kinigi'` (`App.tsx`) instead of Jean-Baptiste's group from `COOPERATIVE_DATA.groups`.
+- [x] Farmer bell filters cooperative messages with a hard-coded `'kinigi'` (`App.tsx`) — fixed in Task 1 (`messageReachesMember` with his member record).
 - [ ] Two sector→cell lists disagree: `MUSANZE_SECTORS_CELLS` (`musanzeData.ts`, used by Settings) and the list in `rwandaAdminData.ts` (used by sign-up). Merge when verifying cell names.
-- [ ] Cooperative group drawer: when a warning issued in the demo becomes a group's latest, the named "not acknowledged" members are still the seeded names (count is correct). Task 1 member table replaces this.
+- [x] Cooperative group drawer: named "not acknowledged" members were seeded names — fixed in Task 1 (names come from the member records).
+
+Found during Task 1 (08/10/2026):
+- [ ] Farmer warning drawer [Acknowledge warning] is local state only; it does not set `acknowledged` on Jean-Baptiste's member record, so cooperative acknowledgement counts do not move. Wire it when fixing the acknowledgement item above.
+- [ ] Meeting SMS invitations are a flag on the meeting (`smsInvite`); they are not added to the message history. Task 5 (Notifications) should list them with the other messages.
+- [ ] Farmer bell shows a cooperative message's English text as the subtitle; the drawer shows Kinyarwanda first. Decide one order for both.
+- [ ] Kinyarwanda strings added in Task 1 (training share messages in `TRAINING_MATERIALS`) need the owner's review.
+- [x] `farmerMyReports` matched reports on the full name, so officer feedback never reached the farmer bell — fixed (matches `reportNameOf()` + sector).
+- [ ] The Sep/Oct calendar shows sprayer bookings from Tue 29/09; booking slots before the spray window opens (Tue 14:00) only show a note, they are not blocked.

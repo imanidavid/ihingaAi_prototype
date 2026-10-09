@@ -23,6 +23,9 @@ interface SidebarProps {
   onOpenReportModal: () => void;
   role?: AppRole;
   reportsToReviewCount?: number;
+  /** Cooperative members under an active warning (computed in App from the store). */
+  coopMembersUnderWarning?: number;
+  coopTotalMembers?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -31,6 +34,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenReportModal,
   role = 'farmer',
   reportsToReviewCount = 3,
+  coopMembersUnderWarning = 0,
+  coopTotalMembers = 0,
 }) => {
   const isOfficer = role === 'officer';
   const isCoop = role === 'cooperative';
@@ -136,11 +141,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         ) : isCoop ? (
           <div className="bg-[#FBFCF8] rounded-[16px] p-3 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] relative overflow-hidden">
-            <div className="w-6 h-6 rounded-full bg-[#D9A032]/20 border border-[#D9A032]/30 flex items-center justify-center mb-1.5">
-              <AlertTriangle className="w-3 h-3 text-[#9E6905]" strokeWidth={1.5} />
+            <div className="w-6 h-6 rounded-full bg-[#E4ECDB] border border-[rgba(31,74,52,0.12)] flex items-center justify-center mb-1.5">
+              <AlertTriangle className="w-3 h-3 text-[#1F4A34]" strokeWidth={1.5} />
             </div>
             <h4 className="text-[12px] font-semibold text-[#17271D] leading-tight">
-              186 members under warning
+              {coopMembersUnderWarning === 0
+                ? 'No members under warning'
+                : `${coopMembersUnderWarning} of ${coopTotalMembers} members under warning`}
             </h4>
             <p className="text-[10.5px] text-[#5B665E] mt-0.5 leading-tight">
               Review group risk and broadcast advisories.

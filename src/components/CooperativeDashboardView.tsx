@@ -18,11 +18,11 @@ import {
   Bell,
 } from 'lucide-react';
 import potatoImg from '../assets/images/irish_potato_crop_1790594286456.jpg';
-import { CoopGroup, CoopMessage, WarningItem } from '../types';
+import { CoopGroup, CoopMessage } from '../types';
 import {
   COOPERATIVE_DATA,
+  NOW,
   RISK_LEVEL_COLORS,
-  computeCoopGroups,
   computeCoopSummary,
 } from '../data/musanzeData';
 
@@ -35,20 +35,21 @@ interface CooperativeDashboardViewProps {
   onSelectGroup: (group: CoopGroup) => void;
   onSelectMessage: (message: CoopMessage) => void;
   onShowToast: (msg: string) => void;
+  onScheduleMeeting: () => void;
   messages: CoopMessage[];
-  warnings: WarningItem[];
+  /** Groups computed from the store (members, warnings, acknowledgement, reports). */
+  groups: CoopGroup[];
 }
 
 export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> = ({
   onOpenMessageComposer,
   onSelectGroup,
   onSelectMessage,
-  onShowToast,
+  onScheduleMeeting,
   messages,
-  warnings,
+  groups,
 }) => {
   const coop = COOPERATIVE_DATA;
-  const groups = useMemo(() => computeCoopGroups(warnings), [warnings]);
   const summary = useMemo(() => computeCoopSummary(groups), [groups]);
   const joinNames = (names: string[]) =>
     names.length <= 1
@@ -111,7 +112,7 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
                   className="w-2 h-2 rounded-full"
                   style={{ backgroundColor: RISK_LEVEL_COLORS[summary.highestLevel] }}
                 />
-                <span>Active warnings for {joinNames(summary.groupsUnderWarning)} groups</span>
+                <span>Active warnings for {joinNames(summary.groupsUnderWarning)}</span>
               </div>
             )}
           </div>
@@ -132,9 +133,7 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
               <span>Member risk</span>
             </button>
             <button
-              onClick={() =>
-                onShowToast('Meeting scheduler opened for upcoming general assembly')
-              }
+              onClick={onScheduleMeeting}
               className="px-4 py-1.5 rounded-full bg-transparent text-white border border-white/40 text-[12px] font-medium hover:bg-white/10 hover:border-white transition-all cursor-pointer flex items-center gap-1.5 active:scale-98"
             >
               <Calendar className="w-3 h-3 text-[#E4ECDB]" strokeWidth={1.5} />
@@ -244,7 +243,7 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
                 </p>
               </div>
               <span className="text-[11px] text-[#5B665E] hidden sm:inline-block">
-                Season 2026/27 A
+                {NOW.season}
               </span>
             </div>
 
@@ -351,7 +350,7 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
           <div className="pt-2 border-t border-[rgba(31,74,52,0.06)] flex items-center justify-between text-[11px] text-[#5B665E]">
             <span>Click any row to open group actions and unacknowledged list</span>
             <span>
-              Total {summary.totalMembers} members in {summary.groupCount} sectors
+              Total {summary.totalMembers} members in {summary.groupCount} groups
             </span>
           </div>
         </div>
@@ -406,7 +405,8 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
           <div className="p-3 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.08)] text-[11px] text-[#5B665E] space-y-1">
             <span className="font-semibold text-[#17271D] block">Coordination note:</span>
             <span>
-              Shared spraying reduces fungicide cost by 32% and protects bordering Kinigi plots.
+              A shared spraying schedule means members don't spray before rain and the
+              cooperative's sprayers are used in turn.
             </span>
           </div>
         </div>

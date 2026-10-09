@@ -10,6 +10,17 @@ import {
   UserAccount,
   CoopData,
   CoopGroup,
+  CoopGroupRecord,
+  CoopMember,
+  CoopMemberRole,
+  CoopMeeting,
+  CoopMessage,
+  CoopEquipment,
+  CoopDirectoryEntry,
+  CropWindow,
+  EquipmentBooking,
+  RegisteredFarmer,
+  TrainingMaterial,
   OfficerData,
   SectorOverviewItem,
   OfficerWarningDelivery,
@@ -25,6 +36,7 @@ import {
   SectorWarningItem,
 } from '../types';
 import { INITIAL_USER_ACCOUNTS } from './rwandaAdminData';
+import { INITIAL_52_DISTRICT_REPORTS } from './districtReportsData';
 import heroImg from '../assets/images/musanze_terraced_hero_1790594273190.jpg';
 import officerHeroImg from '../assets/images/musanze_aerial_hero_1790767815128.jpg';
 import potatoImg from '../assets/images/irish_potato_crop_1790594286456.jpg';
@@ -2198,48 +2210,382 @@ function issuedAtSortKey(issuedAt?: string): number {
   return Number(`${m[2]}${m[1]}${m[3]}${m[4]}`);
 }
 
+// =========================================================================
+// DATES — every date on the cooperative pages is computed from NOW (Mon 28/09/2026 14:00)
+// =========================================================================
+export const NOW_DATE = new Date(2026, 8, 28, 14, 0);
+
+/** 'DD/MM/YYYY' (+ optional 'HH:MM') -> Date */
+export function parseDMY(dmy: string, hhmm: string = '00:00'): Date {
+  const [d, m, y] = dmy.split('/').map(Number);
+  const [hh, mm] = (hhmm || '00:00').split(':').map(Number);
+  return new Date(y, m - 1, d, hh || 0, mm || 0);
+}
+
+/** Date -> 'DD/MM/YYYY' */
+export function formatDMY(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${date.getFullYear()}`;
+}
+
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/** 'DD/MM/YYYY' -> 'Thu 01/10' */
+export function formatDayShort(dmy: string): string {
+  const date = parseDMY(dmy);
+  return `${WEEKDAY_SHORT[date.getDay()]} ${dmy.slice(0, 5)}`;
+}
+
+/** Whole days from `dmy` to NOW (positive = in the past). */
+export function daysBeforeNow(dmy: string): number {
+  const startOfToday = new Date(NOW_DATE.getFullYear(), NOW_DATE.getMonth(), NOW_DATE.getDate());
+  return Math.round((startOfToday.getTime() - parseDMY(dmy).getTime()) / 86400000);
+}
+
+/** "Today", "Yesterday", "5 days ago" — computed from NOW. */
+export function formatDaysAgo(dmy: string): string {
+  const days = daysBeforeNow(dmy);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return `${days} days ago`;
+}
+
+// =========================================================================
+// COOPERATIVE MEMBERS (186) — the one record of who is in which group
+// =========================================================================
+/** Name as it appears on a field report: "Jean-Baptiste Ndayisaba" -> "Jean-Baptiste N." */
+export function reportNameOf(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return fullName;
+  const last = parts[parts.length - 1];
+  return `${parts.slice(0, -1).join(' ')} ${last[0]}.`;
+}
+
+const UNSENT_REPORT_STATUSES = ['Not sent', 'Waiting to send'];
+
+/** Field reports in the store sent by these members (the same records the officer sees). */
+export function memberReportsFor(members: CoopMember[], reports: ObservationItem[]): ObservationItem[] {
+  const keys = new Set(members.map((m) => `${reportNameOf(m.fullName)}|${m.sector}`));
+  return reports
+    .filter((r) => !UNSENT_REPORT_STATUSES.includes(r.status) && keys.has(`${r.farmer}|${r.sector}`))
+    .sort((a, b) => issuedAtSortKey(b.date) - issuedAtSortKey(a.date));
+}
+
+export const INITIAL_COOP_GROUPS: CoopGroupRecord[] = [
+  // Member reports earlier this season: 17 + 8 + 6 = 31 (+ 11 in the 7-day store = 42 this season)
+  { id: 'grp-kinigi', name: 'Kinigi growers', sector: 'Kinigi', reportsEarlierThisSeason: 17 },
+  { id: 'grp-busogo', name: 'Busogo growers', sector: 'Busogo', reportsEarlierThisSeason: 8 },
+  { id: 'grp-muhoza', name: 'Muhoza growers', sector: 'Muhoza', reportsEarlierThisSeason: 6 },
+];
+
+interface MemberSeed {
+  id?: string;
+  fullName: string;
+  cell: string;
+  role?: CoopMemberRole;
+  phone?: string;
+  crops?: string[];
+  /** Has not acknowledged any warning yet (listed by name in the group drawer). */
+  pending?: boolean;
+}
+
+interface GroupSeedPlan {
+  groupId: string;
+  sector: string;
+  size: number;
+  cells: string[];
+  crops: string[][];
+  /** Members who acknowledged each warning, by warning id. */
+  acknowledgedByWarning: Record<string, number>;
+  named: MemberSeed[];
+}
+
+// Kinigi 82 + Busogo 54 + Muhoza 50 = 186. Jean-Baptiste is a Member of Kinigi growers.
+const MEMBER_PLAN: GroupSeedPlan[] = [
+  {
+    groupId: 'grp-kinigi',
+    sector: 'Kinigi',
+    size: 82,
+    cells: ['Kaguhu', 'Nyange', 'Bisoke', 'Susa', 'Kampanga'],
+    crops: [['Irish Potato', 'Climbing Beans'], ['Irish Potato'], ['Irish Potato', 'Climbing Beans', 'Maize']],
+    acknowledgedByWarning: { 'alert-rain': 64, 'alert-blight': 50 },
+    named: [
+      { id: 'mem-aline', fullName: 'Aline Uwimana', cell: 'Kampanga', role: 'Leader', phone: '+250 788 000 034' },
+      {
+        id: 'mem-jb',
+        fullName: 'Jean-Baptiste Ndayisaba',
+        cell: 'Bisoke',
+        phone: '+250 788 000 012',
+        crops: ['Irish Potato', 'Climbing Beans', 'Maize'],
+      },
+      { id: 'mem-odette', fullName: 'Odette Mukeshimana', cell: 'Susa', role: 'Group lead' },
+      { id: 'mem-jean-claude', fullName: 'Jean Claude Niyonsaba', cell: 'Nyange', role: 'Secretary' },
+      { id: 'mem-faustin', fullName: 'Faustin Nzeyimana', cell: 'Bisoke', pending: true },
+      { id: 'mem-emmanuel', fullName: 'Emmanuel Habimana', cell: 'Bisoke', pending: true },
+      { fullName: 'Daphrose Mukamana', cell: 'Kaguhu', pending: true },
+      { fullName: 'Callixte Karemera', cell: 'Nyange', pending: true },
+      { fullName: 'Agnes Uwera', cell: 'Bisoke', pending: true },
+      { fullName: 'Venuste Bizimana', cell: 'Kaguhu', pending: true },
+      { fullName: 'Speciose Nyiraharerimana', cell: 'Susa', pending: true },
+      { fullName: 'Donat Hakizimana', cell: 'Kaguhu', pending: true },
+    ],
+  },
+  {
+    groupId: 'grp-busogo',
+    sector: 'Busogo',
+    size: 54,
+    cells: ['Sahara', 'Gisesero', 'Nyagisozi'],
+    crops: [['Irish Potato', 'Maize'], ['Irish Potato']],
+    acknowledgedByWarning: { 'alert-rain': 22 },
+    named: [
+      { id: 'mem-theoneste', fullName: 'Theoneste Ndagijimana', cell: 'Gisesero', role: 'Group lead' },
+      { id: 'mem-immaculee', fullName: 'Immaculee Ingabire', cell: 'Sahara', role: 'Treasurer' },
+      { id: 'mem-marie', fullName: 'Marie Uwase', cell: 'Sahara' },
+      { id: 'mem-patrick', fullName: 'Patrick Tuyisenge', cell: 'Sahara' },
+      { fullName: 'Innocent Nshimiyimana', cell: 'Gisesero', pending: true },
+      { fullName: 'Valens Munyaneza', cell: 'Sahara', pending: true },
+      { fullName: 'Esperance Nyirahabineza', cell: 'Gisesero', pending: true },
+      { fullName: 'Jean Damascene Manirakiza', cell: 'Sahara', pending: true },
+      { fullName: 'Beatrice Mukakarangwa', cell: 'Gisesero', pending: true },
+    ],
+  },
+  {
+    groupId: 'grp-muhoza',
+    sector: 'Muhoza',
+    size: 50,
+    cells: ['Cyivugiza', 'Ruhengeri', 'Kigombe', 'Mpenge'],
+    crops: [['Irish Potato', 'Vegetables'], ['Irish Potato']],
+    acknowledgedByWarning: { 'alert-blight': 28 },
+    named: [
+      { id: 'mem-josiane', fullName: 'Josiane Uwamariya', cell: 'Kigombe', role: 'Group lead' },
+      { id: 'mem-eric', fullName: 'Eric Habyarimana', cell: 'Kigombe' },
+      { fullName: 'Therese Mukamugema', cell: 'Kigombe', pending: true },
+      { fullName: 'Theogene Bagirishya', cell: 'Cyivugiza', pending: true },
+      { fullName: 'Claudine Uwamahoro', cell: 'Mpenge', pending: true },
+      { fullName: 'Aloys Nkurunziza', cell: 'Kigombe', pending: true },
+    ],
+  },
+];
+
+const MEMBER_FIRST_NAMES = [
+  'Alphonsine', 'Ange', 'Anitha', 'Assumpta', 'Athanase', 'Bosco', 'Celestine', 'Claudette',
+  'Clementine', 'Damien', 'Delphine', 'Didier', 'Egide', 'Eugenie', 'Evariste', 'Fabrice',
+  'Felicien', 'Francine', 'Gilbert', 'Grace', 'Hyacinthe', 'Jacqueline', 'Janvier', 'Jeanne',
+  'Josephine', 'Leonard', 'Liliane', 'Marcel', 'Martine', 'Modeste', 'Olive', 'Oscar',
+  'Pacifique', 'Prosper', 'Regine', 'Samuel', 'Sylvie', 'Vestine', 'Yves', 'Zacharie',
+];
+const MEMBER_LAST_NAMES = [
+  'Niyonzima', 'Nsengiyumva', 'Mukandayisenga', 'Hategekimana', 'Ntawukuriryayo', 'Nyirahabimana',
+  'Ndayisenga', 'Mukarugwiza', 'Twagirumukiza', 'Munyakazi', 'Iradukunda', 'Harerimana',
+  'Uwizeye', 'Niyitegeka', 'Kayitesi', 'Dusabimana', 'Ntakirutimana', 'Mukashema', 'Tuyishime',
+  'Gatete', 'Nyiransengimana', 'Rukundo', 'Ishimwe', 'Mutoni', 'Ndikumana', 'Kamanzi',
+  'Habiyaremye', 'Mugabo', 'Umutesi', 'Nkundabagenzi', 'Sibomana', 'Ufitimana', 'Bigirimana',
+  'Mukamurenzi', 'Nzabonimpa', 'Uwera',
+];
+
+/** Small deterministic hash so the seeded members are identical on every load. */
+function seedHash(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function seedPhone(id: string): string {
+  const h = seedHash(id);
+  const a = 100 + (h % 900);
+  const b = 100 + (Math.floor(h / 900) % 900);
+  return `+250 78${(h % 8) + 1} ${a} ${b}`;
+}
+
 /**
- * Cooperative groups with their active warnings computed from the CURRENT warnings state.
- * Warning levels are never copied into cooperative data: a group shows every active warning
- * that covers its sector, at the level the warning has in the store.
- * Acknowledgement counts per warning are the only seeded part (members who replied);
- * a warning issued during the demo starts at 0 acknowledged.
+ * Build the 186 seeded members. Acknowledgements are exact per group and warning;
+ * activity is spread so 141 members were active in the last 30 days
+ * (weekly active: 102 · 118 · 133 · 141).
+ */
+function buildInitialMembers(): CoopMember[] {
+  const reportKeys = new Set(INITIAL_52_DISTRICT_REPORTS.map((r) => `${r.farmer}|${r.sector}`));
+  const usedNames = new Set<string>([
+    ...MEMBER_PLAN.flatMap((p) => p.named.map((n) => n.fullName)),
+    ...REGISTERED_MUSANZE_FARMERS.map((f) => f.fullName),
+  ]);
+
+  type Draft = Omit<CoopMember, 'activeFromWeek' | 'lastActive'> & { pending: boolean };
+  const drafts: Draft[] = [];
+  let nameCursor = 0;
+
+  for (const plan of MEMBER_PLAN) {
+    const groupDrafts: Draft[] = [];
+    const named = plan.named.filter((n) => !n.pending);
+    const pending = plan.named.filter((n) => n.pending);
+
+    const toDraft = (seed: MemberSeed, idx: number): Draft => {
+      const id = seed.id || `mem-${plan.sector.toLowerCase()}-${String(idx + 1).padStart(3, '0')}`;
+      return {
+        id,
+        fullName: seed.fullName,
+        groupId: plan.groupId,
+        sector: plan.sector,
+        cell: seed.cell,
+        phone: seed.phone || seedPhone(id),
+        role: seed.role || 'Member',
+        crops: seed.crops || plan.crops[idx % plan.crops.length],
+        acknowledged: {},
+        pending: !!seed.pending,
+      };
+    };
+
+    named.forEach((seed) => groupDrafts.push(toDraft(seed, groupDrafts.length)));
+    const generatedCount = plan.size - named.length - pending.length;
+    for (let i = 0; i < generatedCount; i++) {
+      let fullName = '';
+      // Skip names already used, or that would match another farmer's field report in this sector
+      do {
+        const first = MEMBER_FIRST_NAMES[nameCursor % MEMBER_FIRST_NAMES.length];
+        const last =
+          MEMBER_LAST_NAMES[(nameCursor * 7 + Math.floor(nameCursor / MEMBER_FIRST_NAMES.length)) % MEMBER_LAST_NAMES.length];
+        fullName = `${first} ${last}`;
+        nameCursor++;
+      } while (usedNames.has(fullName) || reportKeys.has(`${reportNameOf(fullName)}|${plan.sector}`));
+      usedNames.add(fullName);
+      const idx = groupDrafts.length;
+      groupDrafts.push(
+        toDraft({ fullName, cell: plan.cells[seedHash(fullName) % plan.cells.length] }, idx)
+      );
+    }
+    pending.forEach((seed) => groupDrafts.push(toDraft(seed, groupDrafts.length)));
+
+    // Acknowledgements: the first N members (pending members are last, so never included)
+    for (const [warningId, count] of Object.entries(plan.acknowledgedByWarning)) {
+      groupDrafts.slice(0, count).forEach((d) => {
+        d.acknowledged[warningId] = true;
+      });
+    }
+    drafts.push(...groupDrafts);
+  }
+
+  // Activity: members who acknowledged or reported are active first, then the rest.
+  const sentReports = INITIAL_52_DISTRICT_REPORTS.filter((r) => !UNSENT_REPORT_STATUSES.includes(r.status));
+  const latestReportDate = (d: Draft): string | null => {
+    const mine = sentReports
+      .filter((r) => r.farmer === reportNameOf(d.fullName) && r.sector === d.sector)
+      .sort((a, b) => issuedAtSortKey(b.date) - issuedAtSortKey(a.date));
+    return mine.length > 0 ? `${mine[0].date.slice(0, 5)}/2026` : null;
+  };
+  const tier = (d: Draft) =>
+    d.role !== 'Member' || d.id === 'mem-jb'
+      ? 0
+      : Object.keys(d.acknowledged).length > 0
+      ? 1
+      : latestReportDate(d)
+      ? 2
+      : 3;
+  const ranked = [...drafts].sort(
+    (a, b) => tier(a) - tier(b) || seedHash(a.id) - seedHash(b.id)
+  );
+  const weekByRank = (rank: number): CoopMember['activeFromWeek'] =>
+    rank < 102 ? 1 : rank < 118 ? 2 : rank < 133 ? 3 : rank < 141 ? 4 : null;
+  const activity = new Map<string, CoopMember['activeFromWeek']>();
+  ranked.forEach((d, rank) => activity.set(d.id, weekByRank(rank)));
+
+  return drafts.map(({ pending: _pending, ...d }) => {
+    const activeFromWeek = activity.get(d.id) ?? null;
+    const reportDate = latestReportDate({ ...d, pending: false });
+    const h = seedHash(d.id);
+    const lastActive =
+      d.id === 'mem-jb' || d.id === 'mem-aline'
+        ? NOW.dateFormatted
+        : reportDate && activeFromWeek !== null
+        ? reportDate
+        : activeFromWeek !== null
+        ? `${String(21 + (h % 8)).padStart(2, '0')}/09/2026`
+        : `${String(1 + (h % 25)).padStart(2, '0')}/08/2026`;
+    return { ...d, activeFromWeek, lastActive };
+  });
+}
+
+/** Registered Musanze farmers who are not cooperative members — the "Add member" search pool. */
+export const REGISTERED_MUSANZE_FARMERS: RegisteredFarmer[] = [
+  { id: 'reg-claude', fullName: 'Claude Mugisha', sector: 'Kinigi', cell: 'Nyabigoma', phone: '+250 783 214 560', crops: ['Irish Potato', 'Climbing Beans'] },
+  { id: 'reg-donatha', fullName: 'Donatha Kampire', sector: 'Kinigi', cell: 'Kaguhu', phone: '+250 784 330 118', crops: ['Irish Potato'] },
+  { id: 'reg-augustin', fullName: 'Augustin Bizimungu', sector: 'Kinigi', cell: 'Kampanga', phone: '+250 785 902 447', crops: ['Irish Potato', 'Maize'] },
+  { id: 'reg-gaspard', fullName: 'Gaspard Twizeyimana', sector: 'Kinigi', cell: 'Kampanga', phone: '+250 786 451 203', crops: ['Irish Potato'] },
+  { id: 'reg-solange', fullName: 'Solange Nyirarukundo', sector: 'Busogo', cell: 'Gisesero', phone: '+250 787 118 905', crops: ['Irish Potato', 'Maize'] },
+  { id: 'reg-valerie', fullName: 'Valerie Umutoni', sector: 'Busogo', cell: 'Gisesero', phone: '+250 782 664 310', crops: ['Maize'] },
+  { id: 'reg-alice', fullName: 'Alice Nyiransabimana', sector: 'Muhoza', cell: 'Mpenge', phone: '+250 783 775 021', crops: ['Irish Potato', 'Vegetables'] },
+  { id: 'reg-seraphine', fullName: 'Seraphine Mukamazimpaka', sector: 'Muhoza', cell: 'Mpenge', phone: '+250 788 309 642', crops: ['Vegetables'] },
+];
+
+export const INITIAL_COOP_MEMBERS: CoopMember[] = buildInitialMembers();
+
+export const COOP_MEMBER_ROLES: CoopMemberRole[] = ['Leader', 'Secretary', 'Treasurer', 'Group lead', 'Member'];
+
+/** The cooperative member record for a signed-in farmer (matched on full name), if any. */
+export function findMemberByName(members: CoopMember[], fullName: string): CoopMember | undefined {
+  const target = fullName.trim().toLowerCase();
+  return members.find((m) => m.fullName.toLowerCase() === target);
+}
+
+/**
+ * Cooperative groups with members, warnings, acknowledgement and reports computed from the store.
+ * A group shows every active warning covering its sector, at the level the warning has in the store.
  * "Not acknowledged" = members who have not acknowledged the group's latest active warning.
  */
-export function computeCoopGroups(warnings: WarningItem[]): CoopGroup[] {
-  return COOPERATIVE_DATA.groups.map((g) => {
+export function computeCoopGroups(
+  warnings: WarningItem[],
+  members: CoopMember[],
+  groupRecords: CoopGroupRecord[],
+  reports: ObservationItem[]
+): CoopGroup[] {
+  return groupRecords.map((g) => {
+    const groupMembers = members.filter((m) => m.groupId === g.id);
+    const lead = groupMembers.find((m) => m.role === 'Group lead');
     const active = warnings
       .filter((w) => w.status === 'Active' && isWarningRelevantToFarmer(w, g.sector))
       .sort((x, y) => issuedAtSortKey(y.issuedAt) - issuedAtSortKey(x.issuedAt));
 
     const acknowledgement = active.map((w) => {
       const level = w.level ?? w.severity;
-      const acknowledgedCount = g.acknowledgedByWarning[w.id] ?? 0;
+      const acknowledgedCount = groupMembers.filter((m) => m.acknowledged[w.id]).length;
       return {
         warningId: w.id,
         warningTitle: w.title,
         level,
         dotColor: RISK_LEVEL_COLORS[level],
         acknowledgedCount,
-        totalCount: g.membersCount,
-        pct: Math.round((acknowledgedCount / g.membersCount) * 100),
+        totalCount: groupMembers.length,
+        pct: groupMembers.length > 0 ? Math.round((acknowledgedCount / groupMembers.length) * 100) : 0,
       };
     });
 
     const latest = acknowledgement[0];
-    const unacknowledgedCount = latest ? latest.totalCount - latest.acknowledgedCount : 0;
+    const notAcknowledged = latest ? groupMembers.filter((m) => !m.acknowledged[latest.warningId]) : [];
+    const memberReports = memberReportsFor(groupMembers, reports);
 
     return {
       id: g.id,
       name: g.name,
       sector: g.sector,
-      membersCount: g.membersCount,
+      membersCount: groupMembers.length,
+      leadName: lead ? lead.fullName : null,
+      memberNames: [...groupMembers]
+        .sort((x, y) => COOP_MEMBER_ROLES.indexOf(x.role) - COOP_MEMBER_ROLES.indexOf(y.role))
+        .map((m) => (m.role === 'Member' ? `${m.fullName} (${m.cell})` : `${m.fullName} (${m.cell}) · ${m.role}`)),
       warnings: active.map((w) => ({ id: w.id, title: w.title, level: w.level ?? w.severity })),
       acknowledgement,
-      reports7Days: g.reports7Days,
+      memberReports,
+      reports7Days: memberReports.length,
+      reportsThisSeason: memberReports.length + g.reportsEarlierThisSeason,
       unacknowledgedWarningTitle: latest ? latest.warningTitle : null,
-      unacknowledgedCount,
-      unacknowledgedMembers: latest ? g.pendingMemberNames.slice(0, unacknowledgedCount) : [],
+      unacknowledgedCount: notAcknowledged.length,
+      unacknowledgedMembers: notAcknowledged.map((m) => `${m.fullName} (${m.cell})`),
     };
   });
 }
@@ -2271,9 +2617,9 @@ export function computeCoopSummary(groups: CoopGroup[]) {
   return {
     totalMembers,
     groupCount: groups.length,
-    groupSectors: groups.map((g) => g.sector),
+    groupSectors: Array.from(new Set(groups.map((g) => g.sector))),
     membersUnderWarning,
-    groupsUnderWarning: groupsUnderWarning.map((g) => g.sector),
+    groupsUnderWarning: groupsUnderWarning.map((g) => g.name),
     activeWarningTitles,
     highestLevel,
     rainAcknowledged,
@@ -2284,6 +2630,269 @@ export function computeCoopSummary(groups: CoopGroup[]) {
   };
 }
 
+/** The four weeks shown on the Performance tab (W4 ends at NOW). */
+export const COOP_ACTIVITY_WEEKS = [
+  { id: 1, label: 'W1', startsOn: '31/08/2026' },
+  { id: 2, label: 'W2', startsOn: '07/09/2026' },
+  { id: 3, label: 'W3', startsOn: '14/09/2026' },
+  { id: 4, label: 'W4', startsOn: '21/09/2026' },
+] as const;
+
+/** Below this acknowledgement rate a group gets a neutral "Low response" chip. */
+export const LOW_RESPONSE_PCT = 50;
+
+/** Cooperative performance metrics, computed from the store. */
+export function computeCoopPerformance(
+  members: CoopMember[],
+  groups: CoopGroup[],
+  messages: CoopMessage[]
+) {
+  const active30 = members.filter((m) => daysBeforeNow(m.lastActive) <= 30).length;
+  const weeklyActive = COOP_ACTIVITY_WEEKS.map((w) => ({
+    label: w.label,
+    startsOn: w.startsOn,
+    count: members.filter((m) => m.activeFromWeek !== null && m.activeFromWeek <= w.id).length,
+  }));
+  const acknowledged = groups.reduce(
+    (sum, g) => sum + g.acknowledgement.reduce((s, a) => s + a.acknowledgedCount, 0),
+    0
+  );
+  const deliveries = groups.reduce(
+    (sum, g) => sum + g.acknowledgement.reduce((s, a) => s + a.totalCount, 0),
+    0
+  );
+  const byGroup = groups.map((g) => {
+    const acked = g.acknowledgement.reduce((s, a) => s + a.acknowledgedCount, 0);
+    const total = g.acknowledgement.reduce((s, a) => s + a.totalCount, 0);
+    return {
+      id: g.id,
+      name: g.name,
+      acknowledged: acked,
+      deliveries: total,
+      pct: total > 0 ? Math.round((acked / total) * 100) : null,
+    };
+  });
+  return {
+    totalMembers: members.length,
+    active30,
+    active30Pct: members.length > 0 ? Math.round((active30 / members.length) * 100) : 0,
+    weeklyActive,
+    acknowledged,
+    deliveries,
+    ackPct: deliveries > 0 ? Math.round((acknowledged / deliveries) * 100) : null,
+    reportsThisSeason: groups.reduce((sum, g) => sum + g.reportsThisSeason, 0),
+    messagesSent: messages.length,
+    byGroup,
+  };
+}
+
+/** Cooperatives registered in Musanze (simulated directory for the prototype). */
+export const COOP_DIRECTORY: CoopDirectoryEntry[] = [
+  { id: 'coop-mpgc', name: 'Musanze Potato Growers Cooperative', sectors: 'Kinigi, Busogo, Muhoza', mainCrops: 'Irish potato', members: null },
+  { id: 'coop-kbfu', name: 'Kinigi Bean Farmers Union', sectors: 'Kinigi', mainCrops: 'Climbing beans', members: 124 },
+  { id: 'coop-bmc', name: 'Busogo Maize Cooperative', sectors: 'Busogo', mainCrops: 'Maize', members: 97 },
+  { id: 'coop-mvg', name: 'Muhoza Vegetable Growers', sectors: 'Muhoza', mainCrops: 'Vegetables', members: 76 },
+  { id: 'coop-rwpc', name: 'Remera Wheat & Potato Cooperative', sectors: 'Remera', mainCrops: 'Wheat, Irish potato', members: 88 },
+  { id: 'coop-npg', name: 'Nyange Pyrethrum Growers', sectors: 'Nyange', mainCrops: 'Pyrethrum', members: 64 },
+];
+
+// =========================================================================
+// MEETINGS, SHARED EQUIPMENT AND CROP WINDOWS (cooperative calendar)
+// =========================================================================
+export const INITIAL_COOP_MEETINGS: CoopMeeting[] = [
+  {
+    id: 'mtg-blight-plan',
+    title: 'Blight plan for Season A',
+    date: '01/10/2026',
+    time: '14:00',
+    place: 'Kinigi sector office',
+    audience: ['grp-kinigi'],
+    smsInvite: true,
+  },
+  {
+    id: 'mtg-seed-orders',
+    title: 'Seed orders for Season B',
+    date: '05/10/2026',
+    time: '09:00',
+    place: 'Cooperative store',
+    audience: 'all',
+    smsInvite: true,
+  },
+  {
+    id: 'mtg-field-day',
+    title: 'Field day: recognising late blight',
+    date: '10/10/2026',
+    time: '08:30',
+    place: 'Member plot, Bisoke',
+    audience: 'all',
+    smsInvite: true,
+  },
+];
+
+/** Does this meeting reach a member of `groupId`? */
+export function meetingReachesGroup(meeting: CoopMeeting, groupId: string): boolean {
+  return meeting.audience === 'all' || meeting.audience.includes(groupId);
+}
+
+export function meetingAudienceLabel(meeting: CoopMeeting, groupRecords: CoopGroupRecord[]): string {
+  if (meeting.audience === 'all') return 'All members';
+  return meeting.audience
+    .map((id) => groupRecords.find((g) => g.id === id)?.name)
+    .filter(Boolean)
+    .join(', ');
+}
+
+export function meetingInviteeCount(meeting: CoopMeeting, members: CoopMember[]): number {
+  return members.filter((m) => meetingReachesGroup(meeting, m.groupId)).length;
+}
+
+/** Meetings sorted by date and time. */
+export function sortMeetings(meetings: CoopMeeting[]): CoopMeeting[] {
+  return [...meetings].sort(
+    (a, b) => parseDMY(a.date, a.time).getTime() - parseDMY(b.date, b.time).getTime()
+  );
+}
+
+export const COOP_EQUIPMENT: CoopEquipment[] = [
+  { id: 'eq-sprayer-1', name: 'Sprayer 1', kind: 'Knapsack sprayer' },
+  { id: 'eq-sprayer-2', name: 'Sprayer 2', kind: 'Knapsack sprayer' },
+  { id: 'eq-sprayer-3', name: 'Sprayer 3', kind: 'Knapsack sprayer' },
+];
+
+export const BOOKING_SLOTS = ['08:00–11:00', '11:00–14:00', '14:00–17:00'];
+
+/** Bookings start when the spray window opens (Tue 29/09 14:00). */
+export const INITIAL_EQUIPMENT_BOOKINGS: EquipmentBooking[] = [
+  { id: 'bk-1', equipmentId: 'eq-sprayer-1', date: '29/09/2026', slot: '14:00–17:00', bookedFor: { type: 'group', id: 'grp-kinigi' } },
+  { id: 'bk-2', equipmentId: 'eq-sprayer-2', date: '29/09/2026', slot: '14:00–17:00', bookedFor: { type: 'member', id: 'mem-odette' } },
+  { id: 'bk-3', equipmentId: 'eq-sprayer-1', date: '30/09/2026', slot: '08:00–11:00', bookedFor: { type: 'group', id: 'grp-muhoza' } },
+  { id: 'bk-4', equipmentId: 'eq-sprayer-3', date: '30/09/2026', slot: '11:00–14:00', bookedFor: { type: 'group', id: 'grp-busogo' } },
+  { id: 'bk-5', equipmentId: 'eq-sprayer-2', date: '01/10/2026', slot: '08:00–11:00', bookedFor: { type: 'member', id: 'mem-jb' } },
+];
+
+export function slotStart(slot: string): string {
+  return slot.split('–')[0];
+}
+
+/** An existing booking for the same sprayer, day and slot (double booking). */
+export function findBookingConflict(
+  bookings: EquipmentBooking[],
+  equipmentId: string,
+  date: string,
+  slot: string
+): EquipmentBooking | undefined {
+  return bookings.find((b) => b.equipmentId === equipmentId && b.date === date && b.slot === slot);
+}
+
+export function isSlotInPast(date: string, slot: string): boolean {
+  return parseDMY(date, slotStart(slot)).getTime() < NOW_DATE.getTime();
+}
+
+export function bookedForLabel(
+  booking: EquipmentBooking,
+  members: CoopMember[],
+  groupRecords: CoopGroupRecord[]
+): string {
+  if (booking.bookedFor.type === 'group') {
+    return groupRecords.find((g) => g.id === booking.bookedFor.id)?.name || 'Removed group';
+  }
+  return members.find((m) => m.id === booking.bookedFor.id)?.fullName || 'Former member';
+}
+
+/** Crop-calendar dates shown on the cooperative calendar. */
+export const COOP_CROP_WINDOWS: CropWindow[] = [
+  {
+    id: 'cw-spray-window',
+    title: 'Spray window opens',
+    date: '29/09/2026',
+    time: '14:00',
+    note: "Rain ends Tuesday 14:00. Spraying after that won't wash off.",
+  },
+  {
+    id: 'cw-planting-closes',
+    title: 'Planting window closes',
+    date: '10/10/2026',
+    time: '',
+    note: 'Planting & sowing runs 15/09 to 10/10.',
+  },
+  {
+    id: 'cw-weeding-starts',
+    title: 'Weeding and fungicide start',
+    date: '15/10/2026',
+    time: '',
+    note: 'Weeding & fungicide runs 15/10 to 20/11.',
+  },
+];
+
+// =========================================================================
+// TRAINING MATERIALS (sample materials for the prototype)
+// =========================================================================
+export const TRAINING_MATERIALS: TrainingMaterial[] = [
+  {
+    id: 'tm-late-blight',
+    title: 'Recognising late blight early',
+    format: 'Audio',
+    language: 'Kinyarwanda',
+    length: '4 min',
+    summary: 'How to spot the first dark spots on potato leaves and what to do the same day.',
+    thumbnail: '/media/training-late-blight.jpg',
+    shareMessageEn: 'Training: listen to "Recognising late blight early" (4 min, Kinyarwanda) in the IHINGA AI app.',
+    shareMessageRw: 'Amahugurwa: umva "Kumenya hakiri kare indwara y\'imvura mu birayi" (iminota 4) muri IHINGA AI.',
+  },
+  {
+    id: 'tm-bean-staking',
+    title: 'Staking climbing beans',
+    format: 'Video',
+    language: 'Kinyarwanda',
+    length: '6 min',
+    summary: 'Setting strong stakes so beans stay up in heavy rain and wind.',
+    thumbnail: '/media/training-bean-staking.jpg',
+    shareMessageEn: 'Training: watch "Staking climbing beans" (6 min, Kinyarwanda) in the IHINGA AI app.',
+    shareMessageRw: 'Amahugurwa: reba "Gushingirira ibishyimbo bishingirirwa" (iminota 6) muri IHINGA AI.',
+  },
+  {
+    id: 'tm-drainage',
+    title: 'Clearing drainage channels on terraces',
+    format: 'Guide',
+    language: 'English',
+    length: '3 pages',
+    summary: 'Step-by-step guide to keep water moving off terraces before a downpour.',
+    thumbnail: '/media/training-drainage.jpg',
+    shareMessageEn: 'Training: read "Clearing drainage channels on terraces" (3 pages) in the IHINGA AI app.',
+    shareMessageRw: 'Amahugurwa: soma "Gusukura imiferege y\'amazi ku materasi" (impapuro 3) muri IHINGA AI.',
+  },
+  {
+    id: 'tm-fungicide-safety',
+    title: 'Safe use of fungicides',
+    format: 'Audio',
+    language: 'Kinyarwanda',
+    length: '5 min',
+    summary: 'Protective clothing, mixing, and cleaning the sprayer after use.',
+    thumbnail: '/media/training-fungicide-safety.jpg',
+    shareMessageEn: 'Training: listen to "Safe use of fungicides" (5 min, Kinyarwanda) in the IHINGA AI app.',
+    shareMessageRw: 'Amahugurwa: umva "Gukoresha neza imiti yica udukoko" (iminota 5) muri IHINGA AI.',
+  },
+];
+
+// =========================================================================
+// COOPERATIVE MESSAGES — who receives what
+// =========================================================================
+/** Does this cooperative message reach this member? (direct messages, their group, or all) */
+export function messageReachesMember(
+  message: CoopMessage,
+  member: CoopMember,
+  groupRecords: CoopGroupRecord[]
+): boolean {
+  if (message.recipientMemberIds && message.recipientMemberIds.length > 0) {
+    return message.recipientMemberIds.includes(member.id);
+  }
+  const groupName = groupRecords.find((g) => g.id === member.groupId)?.name.toLowerCase();
+  return message.groups.some((label) => {
+    const l = label.toLowerCase();
+    return l.startsWith('all') || (!!groupName && l.startsWith(groupName));
+  });
+}
+
 export const COOPERATIVE_DATA: CoopData = {
   cooperativeName: 'Musanze Potato Growers Cooperative',
   leader: {
@@ -2292,56 +2901,6 @@ export const COOPERATIVE_DATA: CoopData = {
     phone: '+250 788 000 034',
     initials: 'AU',
   },
-  // Member counts: Kinigi 82 + Busogo 54 + Muhoza 50 = 186. Jean-Baptiste is in Kinigi growers.
-  groups: [
-    {
-      id: 'grp-kinigi',
-      name: 'Kinigi growers',
-      sector: 'Kinigi',
-      membersCount: 82,
-      acknowledgedByWarning: { 'alert-rain': 64, 'alert-blight': 50 },
-      reports7Days: 6,
-      pendingMemberNames: [
-        'Emmanuel Habimana (Kaguhu)',
-        'Faustin Nzeyimana (Bisoke)',
-        'Daphrose Mukamana (Kaguhu)',
-        'Callixte Karemera (Nyonirima)',
-        'Agnes Uwera (Bisoke)',
-        'Venuste Bizimana (Kaguhu)',
-        'Speciose Nyiraharerimana (Nyonirima)',
-        'Donat Hakizimana (Kaguhu)',
-      ],
-    },
-    {
-      id: 'grp-busogo',
-      name: 'Busogo growers',
-      sector: 'Busogo',
-      membersCount: 54,
-      acknowledgedByWarning: { 'alert-rain': 22 },
-      reports7Days: 3,
-      pendingMemberNames: [
-        'Innocent Nshimiyimana (Gisesero)',
-        'Valens Munyaneza (Sahara)',
-        'Esperance Nyirahabineza (Gisesero)',
-        'Jean Damascene Manirakiza (Sahara)',
-        'Beatrice Mukakarangwa (Gisesero)',
-      ],
-    },
-    {
-      id: 'grp-muhoza',
-      name: 'Muhoza growers',
-      sector: 'Muhoza',
-      membersCount: 50,
-      acknowledgedByWarning: { 'alert-blight': 28 },
-      reports7Days: 2,
-      pendingMemberNames: [
-        'Therese Mukamugema (Kigombe)',
-        'Theogene Bagirishya (Cyivugiza)',
-        'Claudine Uwamahoro (Mpenge)',
-        'Aloys Nkurunziza (Kigombe)',
-      ],
-    },
-  ],
   actions: [
     {
       id: 'act-1',
@@ -2366,7 +2925,7 @@ export const COOPERATIVE_DATA: CoopData = {
   ],
 };
 
-export const INITIAL_COOP_MESSAGES = [
+export const INITIAL_COOP_MESSAGES: CoopMessage[] = [
   {
     id: 'msg-coop-1',
     senderName: 'Aline Uwimana',
