@@ -42,7 +42,8 @@ Found during Task 6 (08/10/2026):
 - [ ] A warning issued during the demo counts as "Not confirmed" in the hit rate until reports confirm it (no flow sets `confirmedByReports` yet).
 
 Farmer dashboard — sources still missing (08/10/2026):
-- [ ] Map: soil saturation (78%) and the other 29 districts are seeded values (by design for now; only Musanze is live).
+- [x] ~~Map: soil saturation (78%) and the other 29 districts are seeded values.~~ The map now shows only Musanze's 15 sectors, all computed (09/10/2026). `RWANDA_DISTRICTS` remains only for the sign-up district list.
+- [ ] Map: the sector boundaries are the 2012 geoBoundaries release (Open Data Rwanda); only the Musanze sector names are used, simplified to ~20 m.
 - [ ] Risk forecast page: the four horizon cards (excess rain, dry spell, temperature, season onset) and the season chart's monthly totals still come from `FORECAST_HORIZONS`; only the 10-day and month charts read `rainForecasts`.
 - [ ] Only the rain rule has numbers; dry spell, temperature and late blight rules don't feed the sector forecast risk yet.
 - [ ] Forecast temperature/humidity per day reuse the seeded template series; an uploaded forecast only changes rain.

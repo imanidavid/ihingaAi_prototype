@@ -17,6 +17,7 @@
 8. As Officer: Warnings → Thresholds & rules → set Watch to 45 mm and save → the farmer's
    "Affected sectors" drops Muhoza (3 of 15). Add crop advice to Late Blight Threat → it appears
    on Jean-Baptiste's dashboard; end Heavy Rain Influx → the bean and maize advice disappear.
-   As Admin: Data sources → upload the sample station file → farmer weather 21°C / 84%; upload
-   the sample forecast → Kinigi High, month total 323 mm.
+   As Officer: Weather data → upload the sample station file → farmer weather 21°C / 84%; upload
+   the sample forecast → Kinigi High on the farmer's map, month total 323 mm. As Admin: Security &
+   audit shows both uploads by Claudine; Data sources shows the manual feed at 4 of 42.
 9. [Reset demo] restores everything in every role.
