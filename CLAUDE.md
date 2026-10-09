@@ -123,7 +123,7 @@ only `active` accounts can sign in. Officers and administrators need the two-ste
 | Cooperative leader — Aline Uwimana | +250 788 000 034 | demo1234 | Cooperative dashboard |
 | Agricultural officer — Claudine Mukamana | claudine.m@ihinga.demo | demo1234 | Officer dashboard |
 | Administrator — Grace Ingabire | grace.i@ihinga.demo | demo1234 | Admin dashboard (two-step 246810) |
-| Researcher — Diane Uwase | diane.u@ihinga.demo | demo1234 | Risk forecast (shell only; Task 6 builds the pages) |
+| Researcher — Diane Uwase | diane.u@ihinga.demo | demo1234 | Research dashboard |
 
 Waiting for approval at the start of the demo: Esther Nyirabagenzi (officer,
 esther.n@ihinga.demo) and Celestin Ndayambaje (cooperative leader, +250 788 000 072).
@@ -205,7 +205,14 @@ activity · Data access · Security settings), `AdminDataSourcesView`, `AdminPro
 `auditEvents` records sign-ins, warnings, report decisions and opens, exports, messages,
 meetings, bookings and every admin action. Security settings are live: the two-step roles,
 lock-after-N-failures and the inactivity timeouts drive sign-in and the session timer.
-Only the researcher pages Model performance and Field data are still `PlaceholderView` (Task 6).
+Task 6 (researcher) added `ResearcherDashboardView`, `ResearcherModelView` (forecast vs
+observed, accuracy by horizon, warning hit rate, report-based validation) and
+`ResearcherFieldDataView` (anonymised reports + CSV). Field data and its export are gated by the
+permission matrix (`view_research_data`, `export_data`). Reports offers research types
+("Model validation", "Field data summary") to researchers. Research helpers in `musanzeData.ts`:
+`FORECAST_VS_OBSERVED`, `computeForecastSkill`, `LONG_HORIZON_ACCURACY` (illustrative),
+`computeWarningHitRate`, `computeReportValidation`, `anonymisedReportId`. No page is a
+`PlaceholderView` any more.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 

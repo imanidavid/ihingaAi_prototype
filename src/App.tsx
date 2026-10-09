@@ -116,6 +116,9 @@ import {
   INITIAL_VOICE_SETTINGS,
 } from './data/musanzeData';
 import { AdminSecurityView } from './components/AdminSecurityView';
+import { ResearcherDashboardView } from './components/ResearcherDashboardView';
+import { ResearcherModelView } from './components/ResearcherModelView';
+import { ResearcherFieldDataView } from './components/ResearcherFieldDataView';
 import { AdminDataSourcesView } from './components/AdminDataSourcesView';
 import { AdminProcessingView } from './components/AdminProcessingView';
 import { AdminNotificationsView } from './components/AdminNotificationsView';
@@ -209,7 +212,7 @@ export default function App() {
 
   const handleSignInSuccess = (signedInRole: AppRole, userAccount?: UserAccount) => {
     setRole(signedInRole);
-    setCurrentView(signedInRole === 'researcher' ? 'forecast' : 'dashboard');
+    setCurrentView('dashboard');
     setIsAuthenticated(true);
     if (signedInRole !== 'farmer') {
       setPreviewMode('desktop');
@@ -640,7 +643,7 @@ export default function App() {
   // Role switcher handler (demo shortcut: signs in as that demo account)
   const handleRoleChange = (newRole: AppRole) => {
     setRole(newRole);
-    setCurrentView(newRole === 'researcher' ? 'forecast' : 'dashboard');
+    setCurrentView('dashboard');
     setDrawerContent(null);
     setIsAuthenticated(true);
     setCurrentAccountId(DEMO_ACCOUNT_ID_BY_ROLE[newRole]);
@@ -1424,21 +1427,24 @@ export default function App() {
               />
             )}
 
-            {(
-              [
-                ['model_performance', 'Model performance'],
-                ['field_data', 'Field data'],
-              ] as const
-            ).map(
-              ([view, title]) =>
-                currentView === view && (
-                  <PlaceholderView
-                    key={view}
-                    viewId={view}
-                    title={title}
-                    onBackToDashboard={() => setCurrentView(role === 'researcher' ? 'forecast' : 'dashboard')}
-                  />
-                )
+            {currentView === 'dashboard' && role === 'researcher' && (
+              <ResearcherDashboardView
+                warnings={warnings}
+                reports={reports}
+                dataSources={dataSources}
+                currentAccount={accounts.find((a) => a.id === currentAccountId)}
+                onNavigateView={setCurrentView}
+              />
+            )}
+
+            {currentView === 'model_performance' && <ResearcherModelView warnings={warnings} reports={reports} />}
+
+            {currentView === 'field_data' && (
+              <ResearcherFieldDataView
+                reports={reports}
+                permissions={rolePermissions[role]}
+                onExport={(rows) => logAudit('Exported data', `Anonymised field data CSV · ${rows} reports`)}
+              />
             )}
 
             {currentView === 'dashboard' && role !== 'admin' && role !== 'researcher' &&
@@ -1666,6 +1672,10 @@ export default function App() {
 
             {currentView === 'reports' && (
               <OfficerReportsView
+                authorName={reportNameOf(accounts.find((a) => a.id === currentAccountId)?.fullName || 'Claudine Mukamana')}
+                reportTypes={
+                  role === 'researcher' ? ['Model validation', 'Field data summary', 'Seasonal forecast'] : undefined
+                }
                 warnings={warnings}
                 reports={reports}
                 reportsList={generatedReports}

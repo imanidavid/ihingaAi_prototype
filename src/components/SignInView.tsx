@@ -11,6 +11,7 @@ import {
   Clock,
   ArrowLeft,
   Users,
+  FlaskConical,
 } from 'lucide-react';
 import heroImg from '../assets/images/musanze_terraced_hero_1790594273190.jpg';
 import { AppRole, UserAccount, AccessRequest } from '../types';
@@ -76,8 +77,13 @@ export const SignInView: React.FC<SignInViewProps> = ({
   const [twoStepTarget, setTwoStepTarget] = useState<{ role: AppRole; account?: UserAccount } | null>(null);
 
   // Handle Fill from Demo Account panel
-  const handleSelectDemoAccount = (targetRole: 'farmer' | 'officer' | 'cooperative' | 'admin') => {
+  const handleSelectDemoAccount = (targetRole: 'farmer' | 'officer' | 'cooperative' | 'admin' | 'researcher') => {
     setErrorMessage(null);
+    if (targetRole === 'researcher') {
+      setIdentifier('diane.u@ihinga.demo');
+      setPassword('demo1234');
+      return;
+    }
     if (targetRole === 'farmer') {
       setIdentifier('+250 788 000 012');
       setPassword('demo1234');
@@ -520,13 +526,26 @@ export const SignInView: React.FC<SignInViewProps> = ({
                     </span>
                   </div>
 
-                  {/* Disabled future roles */}
-                  <div className="p-2.5 rounded-xl bg-[#F4F6EF]/50 border border-[rgba(31,74,52,0.06)] opacity-60 flex items-center justify-between">
-                    <div className="text-[11px] text-[#5B665E]">
-                      <span>{t.researcherRole}</span>
+                  {/* Researcher row */}
+                  <div
+                    onClick={() => handleSelectDemoAccount('researcher')}
+                    className="p-2.5 rounded-xl bg-white hover:bg-[#E4ECDB]/40 border border-[rgba(31,74,52,0.08)] cursor-pointer transition-colors flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-full bg-[#E4ECDB] flex items-center justify-center flex-shrink-0 text-[#1F4A34]">
+                        <FlaskConical className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-[#17271D] group-hover:text-[#1F4A34]">
+                          {t.researcherRole} — {t.researcherName}
+                        </div>
+                        <div className="text-[10.5px] text-[#5B665E]">
+                          diane.u@ihinga.demo · demo1234
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-[#5B665E] font-medium italic">
-                      {t.designedInNextIteration}
+                    <span className="text-[10.5px] text-[#1F4A34] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                      Fill
                     </span>
                   </div>
                 </div>
