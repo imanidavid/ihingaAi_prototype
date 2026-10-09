@@ -37,18 +37,21 @@ import {
   PermissionId,
   RolePermissions,
   OfficerData,
-  SectorOverviewItem,
-  OfficerWarningDelivery,
-  OfficerReviewReport,
-  OfficerAttentionItem,
   OfficerProfile,
+  RiskTypeItem,
+  SectorRegisterEntry,
+  WarningSectorDelivery,
+  ChannelDelivery,
+  SectorDeliveryBreakdown,
+  ReportItem,
+  RiskTypeGroup,
+  SectorOverviewItem,
+  OfficerAttentionItem,
   OfficerActiveWarning,
   WarningHistoryItem,
   WarningItem,
   ThresholdRuleItem,
   OfficerCropRiskDetail,
-  SectorAcknowledgedItem,
-  SectorWarningItem,
 } from '../types';
 import { INITIAL_USER_ACCOUNTS } from './rwandaAdminData';
 import { INITIAL_52_DISTRICT_REPORTS } from './districtReportsData';
@@ -1318,494 +1321,8 @@ export const OFFICER_DATA: OfficerData = {
     district: 'Musanze',
     bellCount: 3,
   },
-  districtRiskLevel: 'Watch',
-  activeWarningsCount: 2,
-  affectedSectorsCount: 4,
-  totalRegisteredFarmers: 4120,
-  affectedFarmersTotal: 2050,
-  reportsToReviewCount: 3,
-  districtFieldReports7Days: 52,
   heroBadge: 'Musanze District · Agricultural Officer',
-  heroHeading: 'Good afternoon, Claudine. 2 active warnings across 4 sectors.',
   heroPhoto: officerHeroImg,
-
-  sectorOverviews: [
-    // 4 Watch sectors first
-    {
-      id: 'kinigi',
-      name: 'Kinigi',
-      risk: 'Watch',
-      activeWarningsCount: 2,
-      farmersCount: 620,
-      reports7Days: 14,
-      acknowledgedItems: [
-        { label: '78% rain', dotColor: '#D9A032', level: 'Watch' },
-        { label: '61% blight', dotColor: '#D9772F', level: 'High' },
-      ],
-      warnings: [
-        { title: 'Heavy Rain Influx', level: 'Watch' },
-        { title: 'Late Blight Threat', level: 'High' },
-      ],
-      recentReports: [
-        {
-          id: 'rep-k1',
-          title: 'Steady overnight rain',
-          farmer: 'Jean-Baptiste N.',
-          cell: 'Bisoke cell',
-          time: '28/09 09:12',
-          type: 'Rainfall',
-        },
-        {
-          id: 'rep-k2',
-          title: 'Water ponding in potato furrows',
-          farmer: 'Jean-Baptiste N.',
-          cell: 'Bisoke cell',
-          time: '26/09 11:15',
-          type: 'Flood / damage',
-        },
-        {
-          id: 'rep-k3',
-          title: 'Patchy maize emergence',
-          farmer: 'Jean-Baptiste N.',
-          cell: 'Bisoke cell',
-          time: '24/09 14:20',
-          type: 'Crop condition',
-        },
-        {
-          id: 'rep-k4',
-          title: 'Aphids on climbing beans',
-          farmer: 'Jean-Baptiste N.',
-          cell: 'Bisoke cell',
-          time: '22/09 09:30',
-          type: 'Pest / disease',
-        },
-        {
-          id: 'rep-k5',
-          title: 'Terrace soil compaction',
-          farmer: 'Faustin K.',
-          cell: 'Kaguhu cell',
-          time: '21/09 10:15',
-          type: 'Crop condition',
-        },
-        {
-          id: 'rep-k6',
-          title: 'Silt deposition near road furrow',
-          farmer: 'Chantal M.',
-          cell: 'Susa cell',
-          time: '20/09 16:30',
-          type: 'Flood / damage',
-        },
-      ],
-    },
-    {
-      id: 'busogo',
-      name: 'Busogo',
-      risk: 'Watch',
-      activeWarningsCount: 1,
-      farmersCount: 540,
-      reports7Days: 9,
-      acknowledgedItems: [
-        { label: '41% rain', dotColor: '#D9A032', level: 'Watch' },
-      ],
-      warnings: [
-        { title: 'Heavy Rain Influx', level: 'Watch' },
-      ],
-      recentReports: [
-        {
-          id: 'rep-b1',
-          title: 'Flooded terrace path',
-          farmer: 'Marie U.',
-          cell: 'Sahara cell',
-          time: '28/09 11:40',
-          type: 'Flood / damage',
-        },
-        {
-          id: 'rep-b2',
-          title: 'Silt runoff near drainage ditch',
-          farmer: 'Emmanuel N.',
-          cell: 'Gisesero cell',
-          time: '26/09 14:10',
-          type: 'Flood / damage',
-        },
-        {
-          id: 'rep-b3',
-          title: 'Soil saturation in bean plot',
-          farmer: 'Patrick T.',
-          cell: 'Sahara cell',
-          time: '25/09 08:30',
-          type: 'Crop condition',
-        },
-      ],
-    },
-    {
-      id: 'remera',
-      name: 'Remera',
-      risk: 'Watch',
-      activeWarningsCount: 1,
-      farmersCount: 480,
-      reports7Days: 7,
-      acknowledgedItems: [
-        { label: '74% rain', dotColor: '#D9A032', level: 'Watch' },
-      ],
-      warnings: [
-        { title: 'Heavy Rain Influx', level: 'Watch' },
-      ],
-      recentReports: [
-        {
-          id: 'rep-r1',
-          title: 'Terrace contour drainage seepage',
-          farmer: 'Alphonse B.',
-          cell: 'Murama cell',
-          time: '27/09 16:20',
-          type: 'Flood / damage',
-        },
-        {
-          id: 'rep-r2',
-          title: 'High moisture on potato ridge',
-          farmer: 'Diane M.',
-          cell: 'Gasiza cell',
-          time: '25/09 10:15',
-          type: 'Crop condition',
-        },
-      ],
-    },
-    {
-      id: 'muhoza',
-      name: 'Muhoza',
-      risk: 'Watch',
-      activeWarningsCount: 1,
-      farmersCount: 410,
-      reports7Days: 8,
-      acknowledgedItems: [
-        { label: '55% blight', dotColor: '#D9772F', level: 'High' },
-      ],
-      warnings: [
-        { title: 'Late Blight Threat', level: 'High' },
-      ],
-      recentReports: [
-        {
-          id: 'rep-m1',
-          title: 'Dark spots on potato leaves',
-          farmer: 'Eric H.',
-          cell: 'Kigombe cell',
-          time: '28/09 12:15',
-          type: 'Pest / disease',
-        },
-        {
-          id: 'rep-m2',
-          title: 'Early blight lesions on lower canopy',
-          farmer: 'Valens K.',
-          cell: 'Ruhengeri cell',
-          time: '27/09 09:00',
-          type: 'Pest / disease',
-        },
-        {
-          id: 'rep-m3',
-          title: 'Drainage ponding in volcanic depression',
-          farmer: 'Alice N.',
-          cell: 'Mpenge cell',
-          time: '24/09 13:40',
-          type: 'Flood / damage',
-        },
-      ],
-    },
-
-    // 11 Low sectors (acknowledged shows "—", farmers sum = 2070, reports sum = 14)
-    {
-      id: 'cyuve',
-      name: 'Cyuve',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 210,
-      reports7Days: 2,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-cy1',
-          title: 'Normal germination in maize plot',
-          farmer: 'Jean P.',
-          cell: 'Bukinanyana cell',
-          time: '26/09 15:00',
-          type: 'Crop condition',
-        },
-      ],
-    },
-    {
-      id: 'gacaca',
-      name: 'Gacaca',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 190,
-      reports7Days: 1,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-ga1',
-          title: 'Optimal field capacity',
-          farmer: 'Bernadette K.',
-          cell: 'Gakoro cell',
-          time: '25/09 11:20',
-          type: 'Crop condition',
-        },
-      ],
-    },
-    {
-      id: 'gashaki',
-      name: 'Gashaki',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 180,
-      reports7Days: 1,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-gsh1',
-          title: 'Stable lakefront terracing',
-          farmer: 'Theogene M.',
-          cell: 'Kigabiro cell',
-          time: '27/09 14:10',
-          type: 'Flood / damage',
-        },
-      ],
-    },
-    {
-      id: 'gataraga',
-      name: 'Gataraga',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 195,
-      reports7Days: 2,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-gat1',
-          title: 'Good bean seedling stand',
-          farmer: 'Agnes M.',
-          cell: 'Rubindi cell',
-          time: '26/09 09:40',
-          type: 'Crop condition',
-        },
-      ],
-    },
-    {
-      id: 'kimonyi',
-      name: 'Kimonyi',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 175,
-      reports7Days: 1,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-kim1',
-          title: 'Soil moisture adequate',
-          farmer: 'Innocent B.',
-          cell: 'Birira cell',
-          time: '27/09 10:30',
-          type: 'Rainfall',
-        },
-      ],
-    },
-    {
-      id: 'muko',
-      name: 'Muko',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 185,
-      reports7Days: 1,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-muk1',
-          title: 'No water pooling on slopes',
-          farmer: 'Sosthene N.',
-          cell: 'Songa cell',
-          time: '25/09 16:15',
-          type: 'Flood / damage',
-        },
-      ],
-    },
-    {
-      id: 'musanze-sec',
-      name: 'Musanze',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 220,
-      reports7Days: 2,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-msz1',
-          title: 'Storm channels clear',
-          farmer: 'Claire U.',
-          cell: 'Garuka cell',
-          time: '26/09 13:25',
-          type: 'Flood / damage',
-        },
-      ],
-    },
-    {
-      id: 'nkotsi',
-      name: 'Nkotsi',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 165,
-      reports7Days: 1,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-nko1',
-          title: 'Low runoff on lower terrace',
-          farmer: 'Olivier H.',
-          cell: 'Bikara cell',
-          time: '24/09 11:00',
-          type: 'Flood / damage',
-        },
-      ],
-    },
-    {
-      id: 'nyange',
-      name: 'Nyange',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 190,
-      reports7Days: 1,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-nya1',
-          title: 'Erosion bunds holding well',
-          farmer: 'Venantie K.',
-          cell: 'Ninda cell',
-          time: '27/09 08:45',
-          type: 'Flood / damage',
-        },
-      ],
-    },
-    {
-      id: 'rwaza',
-      name: 'Rwaza',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 175,
-      reports7Days: 1,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-rwz1',
-          title: 'River drainage flowing smoothly',
-          farmer: 'Donat M.',
-          cell: 'Bumara cell',
-          time: '25/09 15:50',
-          type: 'Flood / damage',
-        },
-      ],
-    },
-    {
-      id: 'shingiro',
-      name: 'Shingiro',
-      risk: 'Low',
-      activeWarningsCount: 0,
-      farmersCount: 185,
-      reports7Days: 1,
-      acknowledgedItems: [],
-      warnings: [],
-      recentReports: [
-        {
-          id: 'rep-shi1',
-          title: 'Rapid infiltration in volcanic cinder',
-          farmer: 'Gisele N.',
-          cell: 'Mudakama cell',
-          time: '26/09 12:10',
-          type: 'Rainfall',
-        },
-      ],
-    },
-  ],
-
-  needsAttention: [
-    {
-      id: 'att-1',
-      title: 'Busogo: only 41% acknowledged the rain warning',
-      actionText: 'Resend by voice call',
-      actionType: 'voice_call',
-      toastMessage: 'Voice message queued for 318 farmers',
-    },
-    {
-      id: 'att-2',
-      title: 'Muhoza: new report of dark spots on potato leaves',
-      actionText: 'Review report',
-      actionType: 'review_report',
-    },
-  ],
-
-  warningDeliveries: [
-    {
-      id: 'warn-del-1',
-      level: 'Watch',
-      title: 'Heavy Rain Influx',
-      area: 'Kinigi, Busogo, Remera',
-      sent: 1640,
-      delivered: 1602,
-      acknowledged: 1061,
-      acknowledgedPct: 65,
-      unacknowledgedCount: 579,
-    },
-    {
-      id: 'warn-del-2',
-      level: 'High',
-      title: 'Late Blight Threat',
-      area: 'Potato growers in Muhoza & Kinigi',
-      sent: 690,
-      delivered: 671,
-      acknowledged: 402,
-      acknowledgedPct: 58,
-      unacknowledgedCount: 288,
-    },
-  ],
-
-  reportsWaitingForReview: [
-    {
-      id: 'obs-2',
-      title: 'Steady overnight rain',
-      farmer: 'Jean-Baptiste N.',
-      sector: 'Kinigi',
-      cell: 'Bisoke cell',
-      time: '28/09 09:12',
-      type: 'Rainfall',
-      description: 'Continuous gentle rain through the night. Soil moisture elevated, but no surface pooling observed.',
-    },
-    {
-      id: 'rev-2',
-      title: 'Flooded terrace path',
-      farmer: 'Marie U.',
-      sector: 'Busogo',
-      cell: 'Sahara cell',
-      time: '28/09 11:40',
-      type: 'Flood / damage',
-      description: 'Heavy runoff overflowed primary hillside footpath between terraced plots in Sahara cell.',
-    },
-    {
-      id: 'rev-3',
-      title: 'Dark spots on potato leaves',
-      farmer: 'Eric H.',
-      sector: 'Muhoza',
-      cell: 'Kigombe cell',
-      time: '28/09 12:15',
-      type: 'Pest / disease',
-      description: 'Water-soaked brown lesions with faint white mold margin observed on lower potato leaves.',
-    },
-  ],
 };
 
 /**
@@ -1822,6 +1339,7 @@ export const INITIAL_WARNINGS: WarningItem[] = [
     level: 'Watch',
     category: 'Weather · Excess rain',
     riskType: 'Excess rain',
+    riskGroup: 'weather',
     affectedArea: 'Kinigi, Busogo, Remera',
     area: 'Kinigi, Busogo, Remera',
     sectors: ['Kinigi', 'Busogo', 'Remera'],
@@ -1833,21 +1351,6 @@ export const INITIAL_WARNINGS: WarningItem[] = [
       'Strengthen bean stakes today.',
       'Wait to add fertilizer until the soil drains.',
     ],
-    channels: [
-      { channel: 'SMS', sent: 1350, delivered: 1320, failed: 30 },
-      { channel: 'Voice', sent: 120, delivered: 112, failed: 8 },
-      { channel: 'In-app', sent: 170, delivered: 170, failed: 0 },
-    ],
-    sectorBreakdown: [
-      { sector: 'Kinigi', acknowledgedCount: 484, totalCount: 620, percentage: 78 },
-      { sector: 'Busogo', acknowledgedCount: 222, totalCount: 540, percentage: 41 },
-      { sector: 'Remera', acknowledgedCount: 355, totalCount: 480, percentage: 74 },
-    ],
-    totalSent: 1640,
-    totalDelivered: 1602,
-    totalAcknowledged: 1061,
-    unacknowledgedCount: 579,
-    acknowledgedPct: 65,
     confirmedByReports: true,
     issuedAt: '28/09 13:40',
     timestamp: '13:35 (25 min ago)',
@@ -1862,6 +1365,7 @@ export const INITIAL_WARNINGS: WarningItem[] = [
     level: 'High',
     category: 'Crop disease',
     riskType: 'Pest / disease',
+    riskGroup: 'pest_disease',
     affectedArea: 'Irish Potato plots · Muhoza & Kinigi',
     area: 'Irish Potato plots · Muhoza & Kinigi',
     sectors: ['Kinigi', 'Muhoza'],
@@ -1874,20 +1378,6 @@ export const INITIAL_WARNINGS: WarningItem[] = [
       'Check leaves for dark spots on Wednesday.',
       'Clean your sprayer before use.',
     ],
-    channels: [
-      { channel: 'SMS', sent: 560, delivered: 545, failed: 15 },
-      { channel: 'Voice', sent: 60, delivered: 56, failed: 4 },
-      { channel: 'In-app', sent: 70, delivered: 70, failed: 0 },
-    ],
-    sectorBreakdown: [
-      { sector: 'Kinigi', acknowledgedCount: 231, totalCount: 380, percentage: 61 },
-      { sector: 'Muhoza', acknowledgedCount: 171, totalCount: 310, percentage: 55 },
-    ],
-    totalSent: 690,
-    totalDelivered: 671,
-    totalAcknowledged: 402,
-    unacknowledgedCount: 288,
-    acknowledgedPct: 58,
     confirmedByReports: true,
     issuedAt: '28/09 13:00',
     timestamp: '13:00 (1h ago)',
@@ -1902,6 +1392,7 @@ export const INITIAL_WARNINGS: WarningItem[] = [
     level: 'Watch',
     category: 'Weather · Excess rain',
     riskType: 'Excess rain',
+    riskGroup: 'weather',
     affectedArea: 'Remera',
     area: 'Remera',
     sectors: ['Remera'],
@@ -1909,8 +1400,6 @@ export const INITIAL_WARNINGS: WarningItem[] = [
     issuedDate: '25/09',
     endedDate: '26/09',
     timestamp: '26/09',
-    farmersReached: 480,
-    acknowledgedPct: 66,
     confirmedByReports: true,
     sourceRule: 'Wind gust sensor > 45 km/h on volcanic ridge',
     recommendedActions: ['Tie climbing bean trellises', 'Secure nursery shelters'],
@@ -1923,6 +1412,7 @@ export const INITIAL_WARNINGS: WarningItem[] = [
     level: 'Watch',
     category: 'Weather · Excess rain',
     riskType: 'Excess rain',
+    riskGroup: 'weather',
     affectedArea: 'Kinigi',
     area: 'Kinigi',
     sectors: ['Kinigi'],
@@ -1931,8 +1421,6 @@ export const INITIAL_WARNINGS: WarningItem[] = [
     issuedDate: '24/09',
     endedDate: '25/09',
     timestamp: '25/09',
-    farmersReached: 620,
-    acknowledgedPct: 71,
     confirmedByReports: true,
     sourceRule: 'Rainfall intensity > 20 mm/hr',
     recommendedActions: ['Deepen diversion ditches', 'Inspect lower slope bunds'],
@@ -1945,6 +1433,7 @@ export const INITIAL_WARNINGS: WarningItem[] = [
     level: 'Watch',
     category: 'Weather · Dry spell',
     riskType: 'Dry spell',
+    riskGroup: 'weather',
     affectedArea: 'All sectors',
     area: 'All sectors',
     sectors: ['Kinigi', 'Busogo', 'Remera', 'Muhoza', 'Musanze', 'Cyuve', 'Gataraga', 'Gacaca', 'Nyange', 'Muko', 'Shingiro', 'Gashaki', 'Kimonyi', 'Rwaza', 'Nkotsi'],
@@ -1952,14 +1441,327 @@ export const INITIAL_WARNINGS: WarningItem[] = [
     issuedDate: '01/09',
     endedDate: '08/09',
     timestamp: '08/09',
-    farmersReached: 4120,
-    acknowledgedPct: 52,
     confirmedByReports: false,
     sourceRule: '7+ consecutive dry days post planting onset',
     recommendedActions: ['Mulch exposed potato mounds', 'Hold off unshaded sowing'],
     status: 'Expired',
   },
 ];
+
+// =========================================================================
+// RISK TYPES — the officer picks one when issuing a warning and can add their own.
+// Only weather types raise sector climate risk.
+// =========================================================================
+export const RISK_TYPE_GROUP_LABELS: Record<RiskTypeGroup, string> = {
+  weather: 'Weather',
+  pest_disease: 'Pest and disease',
+};
+
+export const INITIAL_RISK_TYPES: RiskTypeItem[] = [
+  { id: 'rt-excess-rain', name: 'Excess rain', group: 'weather', isCustom: false },
+  { id: 'rt-pest-disease', name: 'Pest / disease', group: 'pest_disease', isCustom: false },
+  { id: 'rt-dry-spell', name: 'Dry spell', group: 'weather', isCustom: false },
+  { id: 'rt-temperature', name: 'Temperature', group: 'weather', isCustom: false },
+];
+
+/** Category label stored on a warning ("Weather · Excess rain", "Pest and disease · Fall armyworm"). */
+export function warningCategoryFor(type: RiskTypeItem): string {
+  if (type.id === 'rt-pest-disease') return 'Crop disease';
+  return `${RISK_TYPE_GROUP_LABELS[type.group]} · ${type.name}`;
+}
+
+/** Only weather warnings change climate risk; pest and disease warnings never do. */
+export function isWeatherWarning(w: WarningItem): boolean {
+  return w.riskGroup === 'weather';
+}
+
+export function warningCoversSector(w: WarningItem, sector: string): boolean {
+  return w.sectors.includes(sector) || w.sectors.includes('All sectors');
+}
+
+// =========================================================================
+// SECTOR REGISTER — registered farmers per sector, owned by the administrator
+// (Users & access → Sector register). Every farmer count is read from here.
+// =========================================================================
+const SECTOR_REGISTER_SEED: [string, number][] = [
+  ['Kinigi', 620],
+  ['Busogo', 540],
+  ['Remera', 480],
+  ['Muhoza', 410],
+  ['Musanze', 220],
+  ['Cyuve', 210],
+  ['Gataraga', 195],
+  ['Gacaca', 190],
+  ['Nyange', 190],
+  ['Muko', 185],
+  ['Shingiro', 185],
+  ['Gashaki', 180],
+  ['Kimonyi', 175],
+  ['Rwaza', 175],
+  ['Nkotsi', 165],
+];
+
+export const INITIAL_SECTOR_REGISTER: SectorRegisterEntry[] = SECTOR_REGISTER_SEED.map(([sector, farmers]) => ({
+  sector,
+  farmers,
+  updatedAt: '21/09/2026 09:00',
+  updatedBy: 'Grace Ingabire',
+}));
+
+export function registeredFarmers(register: SectorRegisterEntry[], sector: string): number {
+  return register.find((r) => r.sector === sector)?.farmers ?? 0;
+}
+
+export function totalRegisteredFarmers(register: SectorRegisterEntry[]): number {
+  return register.reduce((sum, r) => sum + r.farmers, 0);
+}
+
+// =========================================================================
+// WARNING DELIVERY — stored per warning and sector; every total is computed
+// =========================================================================
+export const DELIVERY_CHANNELS: ChannelDelivery['channel'][] = ['SMS', 'Voice', 'In-app'];
+/** Share of farmers reached by each channel when all three are on (as Heavy Rain Influx: 82 · 7 · 11). */
+const CHANNEL_SHARE: Record<ChannelDelivery['channel'], number> = { SMS: 0.82, Voice: 0.07, 'In-app': 0.11 };
+/** Simulated delivery rate per channel for warnings issued in the demo. */
+export const SIMULATED_DELIVERY_RATE: Record<ChannelDelivery['channel'], number> = {
+  SMS: 0.98,
+  Voice: 0.93,
+  'In-app': 1,
+};
+
+/** Split `total` across `weights` so the parts are whole numbers that add up exactly (largest remainder). */
+function splitByWeight(total: number, weights: number[]): number[] {
+  const sum = weights.reduce((a, b) => a + b, 0);
+  if (sum === 0) return weights.map(() => 0);
+  const raw = weights.map((w) => (total * w) / sum);
+  const parts = raw.map(Math.floor);
+  let left = total - parts.reduce((a, b) => a + b, 0);
+  raw
+    .map((r, i) => ({ i, rem: r - Math.floor(r) }))
+    .sort((a, b) => b.rem - a.rem)
+    .forEach(({ i }) => {
+      if (left > 0) {
+        parts[i] += 1;
+        left -= 1;
+      }
+    });
+  return parts;
+}
+
+/** Delivery records for a warning sent now: every registered farmer in each sector, split over the chosen channels. */
+export function buildWarningDeliveries(
+  warningId: string,
+  sectors: string[],
+  register: SectorRegisterEntry[],
+  enabled: ChannelDelivery['channel'][]
+): WarningSectorDelivery[] {
+  const channels = DELIVERY_CHANNELS.filter((c) => enabled.includes(c));
+  return sectors.map((sector) => {
+    const farmers = registeredFarmers(register, sector);
+    const sent = splitByWeight(farmers, channels.map((c) => CHANNEL_SHARE[c]));
+    return {
+      warningId,
+      sector,
+      channels: channels.map((channel, i) => ({
+        channel,
+        sent: sent[i],
+        delivered: Math.round(sent[i] * SIMULATED_DELIVERY_RATE[channel]),
+      })),
+      acknowledged: 0,
+    };
+  });
+}
+
+function percentOf(part: number, whole: number): number {
+  return whole > 0 ? Math.round((part / whole) * 100) : 0;
+}
+
+/** A warning with its delivery totals, channel split and per-sector acknowledgement computed from the records. */
+export function withDeliveryTotals(w: WarningItem, deliveries: WarningSectorDelivery[]): WarningItem {
+  const rows = deliveries.filter((d) => d.warningId === w.id);
+  if (rows.length === 0) return w;
+  const channels: ChannelDelivery[] = DELIVERY_CHANNELS.flatMap((channel) => {
+    const parts = rows.flatMap((r) => r.channels.filter((c) => c.channel === channel));
+    if (parts.length === 0) return [];
+    const sent = parts.reduce((s, c) => s + c.sent, 0);
+    const delivered = parts.reduce((s, c) => s + c.delivered, 0);
+    return [{ channel, sent, delivered, failed: sent - delivered }];
+  });
+  const sectorBreakdown: SectorDeliveryBreakdown[] = rows.map((r) => {
+    const sent = r.channels.reduce((s, c) => s + c.sent, 0);
+    return { sector: r.sector, acknowledgedCount: r.acknowledged, totalCount: sent, percentage: percentOf(r.acknowledged, sent) };
+  });
+  const totalSent = channels.reduce((s, c) => s + c.sent, 0);
+  const totalAcknowledged = rows.reduce((s, r) => s + r.acknowledged, 0);
+  return {
+    ...w,
+    channels,
+    sectorBreakdown,
+    totalSent,
+    totalDelivered: channels.reduce((s, c) => s + c.delivered, 0),
+    totalAcknowledged,
+    unacknowledgedCount: totalSent - totalAcknowledged,
+    acknowledgedPct: percentOf(totalAcknowledged, totalSent),
+    farmersReached: totalSent,
+  };
+}
+
+/** Seed plan: farmers reached and acknowledged per sector, plus channel totals where they were recorded. */
+function seedDeliveries(
+  warningId: string,
+  sectors: { sector: string; sent: number; acknowledged: number }[],
+  channelTotals?: { SMS: [number, number]; Voice: [number, number] }
+): WarningSectorDelivery[] {
+  const weights = sectors.map((s) => s.sent);
+  const total = weights.reduce((a, b) => a + b, 0);
+  const smsTotal = channelTotals ? channelTotals.SMS : null;
+  const voiceTotal = channelTotals ? channelTotals.Voice : null;
+  const split = computeChannelSplit(total);
+  const smsSent = splitByWeight(smsTotal ? smsTotal[0] : split.sms, weights);
+  const voiceSent = splitByWeight(voiceTotal ? voiceTotal[0] : split.voice, weights);
+  const smsDelivered = smsTotal ? splitByWeight(smsTotal[1], smsSent) : smsSent.map((n) => Math.round(n * SIMULATED_DELIVERY_RATE.SMS));
+  const voiceDelivered = voiceTotal
+    ? splitByWeight(voiceTotal[1], voiceSent)
+    : voiceSent.map((n) => Math.round(n * SIMULATED_DELIVERY_RATE.Voice));
+  return sectors.map((s, i) => {
+    const inApp = s.sent - smsSent[i] - voiceSent[i];
+    return {
+      warningId,
+      sector: s.sector,
+      channels: [
+        { channel: 'SMS', sent: smsSent[i], delivered: smsDelivered[i] },
+        { channel: 'Voice', sent: voiceSent[i], delivered: voiceDelivered[i] },
+        { channel: 'In-app', sent: inApp, delivered: inApp },
+      ],
+      acknowledged: s.acknowledged,
+    };
+  });
+}
+
+const DRY_SPELL_ACKNOWLEDGED = 2142;
+
+export const INITIAL_WARNING_DELIVERIES: WarningSectorDelivery[] = [
+  // Heavy Rain Influx: 1,640 farmers in three sectors, 1,061 acknowledged
+  ...seedDeliveries(
+    'alert-rain',
+    [
+      { sector: 'Kinigi', sent: 620, acknowledged: 484 },
+      { sector: 'Busogo', sent: 540, acknowledged: 222 },
+      { sector: 'Remera', sent: 480, acknowledged: 355 },
+    ],
+    { SMS: [1350, 1320], Voice: [120, 112] }
+  ),
+  // Late Blight Threat: Irish potato growers only (690), 402 acknowledged
+  ...seedDeliveries(
+    'alert-blight',
+    [
+      { sector: 'Kinigi', sent: 380, acknowledged: 231 },
+      { sector: 'Muhoza', sent: 310, acknowledged: 171 },
+    ],
+    { SMS: [560, 545], Voice: [60, 56] }
+  ),
+  ...seedDeliveries('alert-wind', [{ sector: 'Remera', sent: 480, acknowledged: 317 }]),
+  ...seedDeliveries('alert-runoff', [{ sector: 'Kinigi', sent: 620, acknowledged: 440 }]),
+  ...seedDeliveries(
+    'hist-3',
+    (() => {
+      const ack = splitByWeight(DRY_SPELL_ACKNOWLEDGED, SECTOR_REGISTER_SEED.map(([, n]) => n));
+      return SECTOR_REGISTER_SEED.map(([sector, sent], i) => ({ sector, sent, acknowledged: ack[i] }));
+    })()
+  ),
+];
+
+// =========================================================================
+// OFFICER DASHBOARD — sector overview and "Needs your attention", computed
+// =========================================================================
+export const FIELD_REPORT_WINDOW_DAYS = 7;
+
+/** Reports dated within the last `days` days of NOW (report dates are "DD/MM HH:MM" in 2026). */
+export function reportsInLastDays(reports: ReportItem[], days: number = FIELD_REPORT_WINDOW_DAYS): ReportItem[] {
+  return reports.filter((r) => {
+    const d = daysBeforeNow(`${r.date.slice(0, 5)}/${NOW_DATE.getFullYear()}`);
+    return d >= 0 && d <= days;
+  });
+}
+
+/**
+ * One row per sector: climate risk, active warnings, farmers (register), reports in the last 7 days
+ * and acknowledgement per warning (delivery records). Highest risk first, then register order.
+ * `activeWarnings` must already carry delivery totals (`withDeliveryTotals`).
+ */
+export function computeSectorOverview(
+  register: SectorRegisterEntry[],
+  activeWarnings: WarningItem[],
+  reports: ReportItem[],
+  forecastRisk: Record<string, RiskLevel>
+): SectorOverviewItem[] {
+  const recent = reportsInLastDays(reports);
+  return register
+    .map((entry, order) => {
+      const covering = activeWarnings.filter((w) => w.status === 'Active' && warningCoversSector(w, entry.sector));
+      return {
+        order,
+        row: {
+          name: entry.sector,
+          risk: computeSectorClimateRisk(entry.sector, activeWarnings, forecastRisk),
+          farmersCount: entry.farmers,
+          reports7Days: recent.filter((r) => r.sector === entry.sector).length,
+          warnings: covering.map((w) => ({ id: w.id, title: w.title, level: w.severity, riskType: w.riskType })),
+          acknowledgement: covering.flatMap((w) => {
+            const b = w.sectorBreakdown?.find((s) => s.sector === entry.sector);
+            return b
+              ? [{ warningId: w.id, warningTitle: w.title, level: w.severity, acknowledged: b.acknowledgedCount, sent: b.totalCount, pct: b.percentage }]
+              : [];
+          }),
+        } as SectorOverviewItem,
+      };
+    })
+    .sort((a, b) => RISK_LEVEL_WEIGHT[b.row.risk] - RISK_LEVEL_WEIGHT[a.row.risk] || a.order - b.order)
+    .map((x) => x.row);
+}
+
+/**
+ * "Needs your attention": sectors where fewer than half acknowledged an active warning (once replies
+ * have started), then pest and disease reports still waiting for review, newest first.
+ */
+export function computeOfficerAttention(activeWarnings: WarningItem[], reports: ReportItem[]): OfficerAttentionItem[] {
+  const lowResponse: OfficerAttentionItem[] = activeWarnings
+    .filter((w) => w.status === 'Active' && (w.totalAcknowledged ?? 0) > 0)
+    .flatMap((w) =>
+      (w.sectorBreakdown || [])
+        .filter((b) => b.totalCount > 0 && b.percentage < LOW_RESPONSE_PCT)
+        .map((b) => ({
+          id: `low-${w.id}-${b.sector}`,
+          kind: 'low_response' as const,
+          level: w.severity,
+          title: `${b.sector}: only ${b.percentage}% acknowledged ${w.title}`,
+          caption: `${(b.totalCount - b.acknowledgedCount).toLocaleString()} farmers have not acknowledged it yet`,
+          unacknowledged: b.totalCount - b.acknowledgedCount,
+          pct: b.percentage,
+        }))
+    )
+    .sort((a, b) => a.pct - b.pct)
+    .map(({ pct: _pct, ...item }) => item);
+
+  const pestReports: OfficerAttentionItem[] = reports
+    .filter((r) => r.status === 'Under review' && r.type === 'Pest / disease')
+    .sort((a, b) => issuedAtSortKey(b.date) - issuedAtSortKey(a.date))
+    .map((r) => {
+      const pestWarning = activeWarnings.find(
+        (w) => w.status === 'Active' && w.riskGroup === 'pest_disease' && warningCoversSector(w, r.sector)
+      );
+      return {
+        id: `review-${r.id}`,
+        kind: 'report_review' as const,
+        level: pestWarning ? pestWarning.severity : 'Low',
+        title: `${r.sector}: new report of ${r.title.charAt(0).toLowerCase()}${r.title.slice(1)}`,
+        caption: `Reported by ${r.farmer} at ${r.date.slice(6)} · ${r.cell}`,
+        reportId: r.id,
+      };
+    });
+
+  return [...lowResponse, ...pestReports];
+}
 
 export function isWarningRelevantToFarmer(
   warning: WarningItem,
@@ -2199,26 +2001,9 @@ export function computeSectorForecastRisk(
   return result;
 }
 
-/** Active WEATHER warnings (excess rain, dry spell, temperature) covering a sector. Pest / disease warnings are excluded. */
+/** Active WEATHER warnings covering a sector (risk types in the weather group, including officer-added ones). Pest / disease warnings are excluded. */
 export function weatherWarningsForSector<W extends OfficerActiveWarning>(sectorName: string, activeWarnings: W[]): W[] {
-  return activeWarnings.filter((w) => {
-    if (w.status !== 'Active') return false;
-    const isWeather =
-      (w.category && w.category.toLowerCase().includes('weather')) ||
-      w.riskType === 'Excess rain' ||
-      w.riskType === 'Weather · Excess rain' ||
-      w.riskType === 'Dry spell' ||
-      w.riskType === 'Weather · Dry spell' ||
-      w.riskType === 'Temperature' ||
-      w.riskType === 'Weather · Temperature' ||
-      (!w.riskType && !w.title.toLowerCase().includes('blight') && !w.title.toLowerCase().includes('pest'));
-    if (!isWeather) return false;
-
-    return (
-      (w.sectors && (w.sectors.includes(sectorName) || w.sectors.length === 15)) ||
-      (w.affectedArea && w.affectedArea.toLowerCase().includes('all sectors'))
-    );
-  });
+  return activeWarnings.filter((w) => w.status === 'Active' && isWeatherWarning(w) && warningCoversSector(w, sectorName));
 }
 
 export function computeSectorClimateRisk(
@@ -2746,6 +2531,7 @@ export function computeCoopGroups(
     const acknowledgement = active.map((w) => {
       const level = w.level ?? w.severity;
       const acknowledgedCount = groupMembers.filter((m) => m.acknowledged[w.id]).length;
+      const inSector = w.sectorBreakdown?.find((b) => b.sector === g.sector);
       return {
         warningId: w.id,
         warningTitle: w.title,
@@ -2754,6 +2540,8 @@ export function computeCoopGroups(
         acknowledgedCount,
         totalCount: groupMembers.length,
         pct: groupMembers.length > 0 ? Math.round((acknowledgedCount / groupMembers.length) * 100) : 0,
+        sectorAcknowledged: inSector?.acknowledgedCount ?? 0,
+        sectorSent: inSector?.totalCount ?? 0,
       };
     });
 
@@ -2805,6 +2593,9 @@ export function computeCoopSummary(groups: CoopGroup[]) {
   );
   const rainAcknowledged = rainRows.reduce((sum, r) => sum + r.ack.acknowledgedCount, 0);
   const rainTotal = rainRows.reduce((sum, r) => sum + r.ack.totalCount, 0);
+  // All farmers in those sectors (officer's delivery records), not only members
+  const rainSectorAcknowledged = rainRows.reduce((sum, r) => sum + r.ack.sectorAcknowledged, 0);
+  const rainSectorSent = rainRows.reduce((sum, r) => sum + r.ack.sectorSent, 0);
 
   return {
     totalMembers,
@@ -2818,6 +2609,9 @@ export function computeCoopSummary(groups: CoopGroup[]) {
     rainTotal,
     rainPct: rainTotal > 0 ? Math.round((rainAcknowledged / rainTotal) * 100) : null,
     rainSectors: rainRows.map((r) => r.group.sector),
+    rainSectorAcknowledged,
+    rainSectorSent,
+    rainSectorPct: rainSectorSent > 0 ? Math.round((rainSectorAcknowledged / rainSectorSent) * 100) : null,
     memberReports7d: groups.reduce((sum, g) => sum + g.reports7Days, 0),
   };
 }

@@ -38,6 +38,10 @@ import {
   VoiceSettings,
   SectorRainForecast,
   StationReading,
+  RiskTypeItem,
+  SectorRegisterEntry,
+  WarningSectorDelivery,
+  ChannelDelivery,
 } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -130,6 +134,12 @@ import {
   INITIAL_PROCESSING_SETTINGS,
   INITIAL_MESSAGE_TEMPLATES,
   INITIAL_VOICE_SETTINGS,
+  INITIAL_RISK_TYPES,
+  INITIAL_SECTOR_REGISTER,
+  INITIAL_WARNING_DELIVERIES,
+  withDeliveryTotals,
+  buildWarningDeliveries,
+  warningCategoryFor,
 } from './data/musanzeData';
 import { AdminSecurityView } from './components/AdminSecurityView';
 import { ResearcherDashboardView } from './components/ResearcherDashboardView';
@@ -350,7 +360,18 @@ export default function App() {
   // UNIFIED APPLICATION STORE (Each type of data appears exactly once)
   // =========================================================================
   // 1. WARNINGS: Single unified array for Musanze District (active + history)
-  const [warnings, setWarnings] = useState<WarningItem[]>(INITIAL_WARNINGS);
+  const [warningRecords, setWarnings] = useState<WarningItem[]>(INITIAL_WARNINGS);
+  // 1b. WARNING DELIVERY: one record per warning and sector (sent and delivered by channel, acknowledged)
+  const [warningDeliveries, setWarningDeliveries] = useState<WarningSectorDelivery[]>(INITIAL_WARNING_DELIVERIES);
+  // 1c. RISK TYPES the officer can issue (four built in + any the officer adds)
+  const [riskTypes, setRiskTypes] = useState<RiskTypeItem[]>(INITIAL_RISK_TYPES);
+  // 1d. SECTOR REGISTER: registered farmers per sector, owned by the administrator
+  const [sectorRegister, setSectorRegister] = useState<SectorRegisterEntry[]>(INITIAL_SECTOR_REGISTER);
+  // Every page reads warnings with delivery totals computed from the same delivery records
+  const warnings = useMemo(
+    () => warningRecords.map((w) => withDeliveryTotals(w, warningDeliveries)),
+    [warningRecords, warningDeliveries]
+  );
 
   // 2. REPORTS: Single unified array for 52 field observations across Musanze
   const [reports, setReports] = useState<ReportItem[]>(INITIAL_52_REPORTS);
@@ -432,7 +453,6 @@ export default function App() {
   );
 
   // Dynamic counts computed directly from shared store
-  const officerActiveCount = officerActiveWarnings.length;
   const farmerActiveCount = farmerActiveAlerts.length;
   const reportsToReviewCount = reports.filter((r) => r.status === 'Under review').length;
 
@@ -977,26 +997,44 @@ export default function App() {
   // =========================================================================
   // WARNING MUTATION HANDLERS
   // =========================================================================
-  const handleIssueWarning = (newWarning: WarningItem) => {
-    const categoryLabel =
-      newWarning.riskType === 'Weather · Excess rain' || newWarning.riskType === 'Excess rain'
-        ? 'Weather · Excess rain'
-        : newWarning.riskType === 'Weather · Dry spell' || newWarning.riskType === 'Dry spell'
-        ? 'Weather · Dry spell'
-        : newWarning.riskType === 'Weather · Temperature' || newWarning.riskType === 'Temperature'
-        ? 'Weather · Temperature'
-        : newWarning.riskType === 'Pest'
-        ? 'Pest'
-        : 'Crop disease';
-
+  const handleIssueWarning = (newWarning: WarningItem, channels: ChannelDelivery['channel'][]) => {
+    const type = riskTypes.find((t) => t.name === newWarning.riskType);
     const warningToStore: WarningItem = {
       ...newWarning,
       status: 'Active',
       level: newWarning.severity,
-      category: categoryLabel,
+      riskGroup: type ? type.group : newWarning.riskGroup,
+      category: type ? warningCategoryFor(type) : newWarning.category,
     };
     setWarnings((prev) => [warningToStore, ...prev]);
+    // Every registered farmer in each chosen sector, from the administrator's sector register
+    setWarningDeliveries((prev) => [
+      ...prev,
+      ...buildWarningDeliveries(warningToStore.id, warningToStore.sectors, sectorRegister, channels),
+    ]);
     logAudit('Issued warning', `${warningToStore.title} · ${warningToStore.severity}`);
+  };
+
+  const handleAddRiskType = (type: RiskTypeItem) => {
+    setRiskTypes((prev) => [...prev, type]);
+    logAudit('Added risk type', `${type.name} · ${type.group === 'weather' ? 'Weather' : 'Pest and disease'}`);
+  };
+
+  const handleSaveSectorRegister = (farmersBySector: Record<string, number>) => {
+    const editor = accounts.find((a) => a.id === currentAccountId)?.fullName || 'Administrator';
+    const changed = sectorRegister.filter((e) => (farmersBySector[e.sector] ?? e.farmers) !== e.farmers);
+    setSectorRegister((prev) =>
+      prev.map((e) =>
+        (farmersBySector[e.sector] ?? e.farmers) !== e.farmers
+          ? { ...e, farmers: farmersBySector[e.sector], updatedAt: NOW_STAMP, updatedBy: editor }
+          : e
+      )
+    );
+    logAudit(
+      'Updated sector register',
+      changed.map((e) => `${e.sector} ${e.farmers} → ${farmersBySector[e.sector]}`).join(', ') || 'No changes'
+    );
+    showToast(`Sector register saved · ${changed.length} ${changed.length === 1 ? 'sector' : 'sectors'} updated`);
   };
 
   const handleEndWarning = (warningId: string) => {
@@ -1015,9 +1053,12 @@ export default function App() {
   };
 
   const handleUpdateWarning = (updatedWarning: WarningItem) => {
+    // Only the editable fields; delivery totals stay computed from `warningDeliveries`
+    const { timeframe, messageEn, severity } = updatedWarning;
     setWarnings((prev) =>
-      prev.map((w) => (w.id === updatedWarning.id ? { ...w, ...updatedWarning } : w))
+      prev.map((w) => (w.id === updatedWarning.id ? { ...w, timeframe, messageEn, severity, level: severity } : w))
     );
+    logAudit('Updated warning', `${updatedWarning.title} · ${severity}`);
   };
 
   const handleSaveRules = (updatedRules: ThresholdRuleItem[]) => {
@@ -1308,6 +1349,9 @@ export default function App() {
 
   const handleResetDemo = () => {
     setWarnings(INITIAL_WARNINGS);
+    setWarningDeliveries(INITIAL_WARNING_DELIVERIES);
+    setRiskTypes(INITIAL_RISK_TYPES);
+    setSectorRegister(INITIAL_SECTOR_REGISTER);
     setReports(INITIAL_52_REPORTS);
     setThresholdRules(INITIAL_THRESHOLD_RULES);
     setRainForecasts(INITIAL_RAIN_FORECASTS);
@@ -1490,6 +1534,8 @@ export default function App() {
                 onUpdateScope={handleUpdateAccountScope}
                 onSavePermissions={handleSavePermissions}
                 onImportAccounts={handleImportAccounts}
+                sectorRegister={sectorRegister}
+                onSaveSectorRegister={handleSaveSectorRegister}
               />
             )}
 
@@ -1575,10 +1621,10 @@ export default function App() {
               (role === 'officer' ? (
                 <OfficerDashboardView
                   forecastRisk={sectorForecastRisk}
-                  activeWarningsCount={officerActiveCount}
                   activeWarnings={officerActiveWarnings}
-                  reportsToReviewCount={reportsToReviewCount}
                   reports={reports}
+                  sectorRegister={sectorRegister}
+                  firstName={(accounts.find((a) => a.id === currentAccountId)?.fullName || 'Claudine Mukamana').split(' ')[0]}
                   onNavigateView={setCurrentView}
                   onShowToast={(msg) => {
                     setToastMessage(msg);
@@ -1696,6 +1742,9 @@ export default function App() {
                   onRemoveAdvice={handleRemoveAdvice}
                   authorName={reportNameOf(accounts.find((a) => a.id === currentAccountId)?.fullName || 'Claudine Mukamana')}
                   rainForecasts={rainForecasts}
+                  riskTypes={riskTypes}
+                  onAddRiskType={handleAddRiskType}
+                  sectorRegister={sectorRegister}
                   onIssueWarning={handleIssueWarning}
                   onEndWarning={handleEndWarning}
                   onUpdateWarning={handleUpdateWarning}
@@ -1822,6 +1871,7 @@ export default function App() {
                 }
                 warnings={warnings}
                 reports={reports}
+                sectorRegister={sectorRegister}
                 reportsList={generatedReports}
                 onReportsListChange={setGeneratedReports}
                 onShowToast={(msg) => {

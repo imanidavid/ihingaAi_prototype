@@ -36,34 +36,30 @@ export interface OfficerProfile {
   bellCount: number;
 }
 
-export interface SectorWarningItem {
-  title: string;
-  level: RiskLevel;
-}
 
-export interface SectorAcknowledgedItem {
-  label: string;
-  level: RiskLevel;
-  dotColor: string;
-}
 
+/** One row of the officer's sector overview — computed by `computeSectorOverview`, never seeded. */
 export interface SectorOverviewItem {
-  id: string;
   name: string;
   risk: RiskLevel;
-  activeWarningsCount: number;
   farmersCount: number;
   reports7Days: number;
-  acknowledgedItems: SectorAcknowledgedItem[];
-  warnings: SectorWarningItem[];
-  recentReports: {
-    id: string;
-    title: string;
-    farmer: string;
-    cell: string;
-    time: string;
-    type: 'Rainfall' | 'Flood / damage' | 'Crop condition' | 'Pest / disease';
-  }[];
+  /** Active warnings covering the sector (weather and pest/disease). */
+  warnings: { id: string; title: string; level: RiskLevel; riskType?: string }[];
+  /** Acknowledgement of each active warning in this sector, from `warningDeliveries`. */
+  acknowledgement: { warningId: string; warningTitle: string; level: RiskLevel; acknowledged: number; sent: number; pct: number }[];
+}
+
+/** One "Needs your attention" item on the officer dashboard — computed by `computeOfficerAttention`. */
+export interface OfficerAttentionItem {
+  id: string;
+  kind: 'low_response' | 'report_review';
+  level: RiskLevel;
+  title: string;
+  caption: string;
+  /** Low response: farmers who have not acknowledged. */
+  unacknowledged?: number;
+  reportId?: string;
 }
 
 export interface ChannelDelivery {
@@ -80,6 +76,39 @@ export interface SectorDeliveryBreakdown {
   percentage: number;
 }
 
+/** Which group a risk type belongs to. Only weather types raise sector climate risk. */
+export type RiskTypeGroup = 'weather' | 'pest_disease';
+
+/** A risk type the officer can pick when issuing a warning (store field `riskTypes`). */
+export interface RiskTypeItem {
+  id: string;
+  name: string;
+  group: RiskTypeGroup;
+  /** Added by an officer during the demo (the four built-in types are not custom). */
+  isCustom: boolean;
+  createdBy?: string;
+}
+
+/** Registered farmers in one sector (store field `sectorRegister`, owned by the administrator). */
+export interface SectorRegisterEntry {
+  sector: string;
+  farmers: number;
+  /** DD/MM/YYYY HH:MM */
+  updatedAt: string;
+  updatedBy: string;
+}
+
+/**
+ * One warning's delivery to one sector (store field `warningDeliveries`).
+ * Every total, channel split and acknowledgement percentage is computed from these records.
+ */
+export interface WarningSectorDelivery {
+  warningId: string;
+  sector: string;
+  channels: { channel: ChannelDelivery['channel']; sent: number; delivered: number }[];
+  acknowledged: number;
+}
+
 export interface WarningItem {
   id: string;
   title: string;
@@ -87,6 +116,8 @@ export interface WarningItem {
   level?: RiskLevel;
   category?: string;
   riskType?: string;
+  /** Group of the risk type when the warning was issued. Only 'weather' raises climate risk. */
+  riskGroup: RiskTypeGroup;
   status: 'Active' | 'Expired';
   timestamp?: string;
   affectedArea: string;
@@ -96,6 +127,8 @@ export interface WarningItem {
   timeframe: string;
   sourceRule?: string;
   recommendedActions: string[];
+  // The delivery fields below are never seeded: App computes them from `warningDeliveries`
+  // (`withDeliveryTotals`) so every page reads the same records.
   channels?: ChannelDelivery[];
   sectorBreakdown?: SectorDeliveryBreakdown[];
   totalSent?: number;
@@ -167,53 +200,13 @@ export interface OfficerCropRiskDetail {
   warningId?: string;
 }
 
-export interface OfficerWarningDelivery {
-  id: string;
-  title: string;
-  level: RiskLevel;
-  area: string;
-  sent: number;
-  delivered: number;
-  acknowledged: number;
-  acknowledgedPct: number;
-  unacknowledgedCount: number;
-}
 
-export interface OfficerReviewReport {
-  id: string;
-  title: string;
-  farmer: string;
-  sector: string;
-  cell: string;
-  time: string;
-  type: 'Rainfall' | 'Flood / damage' | 'Crop condition' | 'Pest / disease';
-  description?: string;
-}
 
-export interface OfficerAttentionItem {
-  id: string;
-  title: string;
-  actionText: string;
-  actionType: 'voice_call' | 'review_report';
-  toastMessage?: string;
-}
 
 export interface OfficerData {
   profile: OfficerProfile;
-  districtRiskLevel: RiskLevel;
-  activeWarningsCount: number;
-  affectedSectorsCount: number;
-  totalRegisteredFarmers: number;
-  affectedFarmersTotal: number;
-  reportsToReviewCount: number;
-  districtFieldReports7Days: number;
   heroBadge: string;
-  heroHeading: string;
   heroPhoto: string;
-  sectorOverviews: SectorOverviewItem[];
-  needsAttention: OfficerAttentionItem[];
-  warningDeliveries: OfficerWarningDelivery[];
-  reportsWaitingForReview: OfficerReviewReport[];
 }
 
 export interface DistrictData {
@@ -475,6 +468,9 @@ export interface CoopGroup {
     acknowledgedCount: number;
     totalCount: number;
     pct: number;
+    /** All farmers in the group's sector, from the officer's delivery records (`warningDeliveries`). */
+    sectorAcknowledged: number;
+    sectorSent: number;
   }[];
   /** Member field reports in the reports store (same records the officer sees). */
   memberReports: ReportItem[];
