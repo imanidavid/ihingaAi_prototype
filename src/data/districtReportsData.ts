@@ -132,7 +132,7 @@ export const INITIAL_52_DISTRICT_REPORTS: DistrictFieldReportItem[] = [
     sector: 'Kinigi',
     cell: 'Susa cell',
     type: 'Flood / damage',
-    date: '20/09 16:30',
+    date: '21/09 16:30',
     status: 'Verified',
     description: 'Runoff carried loose volcanic silt into the community access path drain.',
     forecastCheck: 'Matches post-rain sediment transport data · Consistent',

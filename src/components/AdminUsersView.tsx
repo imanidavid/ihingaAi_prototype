@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { AccessRequest, AccountStatus, AppRole, RolePermissions, UserAccount } from '../types';
+import { AccessRequest, AccountStatus, AppRole, RolePermissions, SectorRegisterEntry, UserAccount } from '../types';
 import { PageHeader, SegmentedTabs } from './coop/CoopUi';
 import { UsersTab } from './admin/UsersTab';
 import { AccessRequestsTab } from './admin/AccessRequestsTab';
 import { PermissionMatrixTab } from './admin/PermissionMatrixTab';
 import { BulkImportTab } from './admin/BulkImportTab';
+import { SectorRegisterTab } from './admin/SectorRegisterTab';
 
-type UsersTabId = 'users' | 'requests' | 'permissions' | 'import';
+type UsersTabId = 'users' | 'requests' | 'permissions' | 'import' | 'sectors';
 
 interface AdminUsersViewProps {
   accounts: UserAccount[];
@@ -20,6 +21,9 @@ interface AdminUsersViewProps {
   onUpdateScope: (accountId: string, scope: NonNullable<UserAccount['scope']>) => void;
   onSavePermissions: (next: RolePermissions, changes: number) => void;
   onImportAccounts: (accounts: UserAccount[], cooperative: string) => void;
+  /** Registered farmers per sector — the administrator owns these numbers. */
+  sectorRegister: SectorRegisterEntry[];
+  onSaveSectorRegister: (farmersBySector: Record<string, number>) => void;
 }
 
 export const AdminUsersView: React.FC<AdminUsersViewProps> = (props) => {
@@ -40,6 +44,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = (props) => {
           { id: 'requests', label: 'Access requests', count: pendingCount },
           { id: 'permissions', label: 'Permission matrix' },
           { id: 'import', label: 'Bulk import' },
+          { id: 'sectors', label: 'Sector register' },
         ]}
       />
       {tab === 'users' && (
@@ -63,6 +68,9 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = (props) => {
         <PermissionMatrixTab rolePermissions={props.rolePermissions} onSave={props.onSavePermissions} />
       )}
       {tab === 'import' && <BulkImportTab accounts={props.accounts} onImport={props.onImportAccounts} />}
+      {tab === 'sectors' && (
+        <SectorRegisterTab sectorRegister={props.sectorRegister} onSave={props.onSaveSectorRegister} />
+      )}
     </div>
   );
 };

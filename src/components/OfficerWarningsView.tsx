@@ -30,15 +30,28 @@ import {
   RiskLevel,
   CropAdvisory,
   SectorRainForecast,
+  RiskTypeItem,
+  RiskTypeGroup,
+  SectorRegisterEntry,
+  ChannelDelivery,
 } from '../types';
-import { RISK_LEVEL_WEIGHT, computeSectorForecastRisk, FORECAST_RISK_DAYS } from '../data/musanzeData';
+import {
+  RISK_LEVEL_WEIGHT,
+  computeSectorForecastRisk,
+  FORECAST_RISK_DAYS,
+  NOW,
+  LOW_RESPONSE_PCT,
+  RISK_TYPE_GROUP_LABELS,
+  registeredFarmers,
+} from '../data/musanzeData';
 import { CropAdviceModal } from './officer/CropAdviceModal';
 
 interface OfficerWarningsViewProps {
   activeWarnings: OfficerActiveWarning[];
   warningHistory: WarningHistoryItem[];
   thresholdRules: ThresholdRuleItem[];
-  onIssueWarning: (newWarning: OfficerActiveWarning) => void;
+  /** Delivery records are created by the store from the sector register and these channels. */
+  onIssueWarning: (newWarning: OfficerActiveWarning, channels: ChannelDelivery['channel'][]) => void;
   onEndWarning: (warningId: string) => void;
   onUpdateWarning: (warning: OfficerActiveWarning) => void;
   onSaveRules: (updatedRules: ThresholdRuleItem[]) => void;
@@ -50,25 +63,12 @@ interface OfficerWarningsViewProps {
   authorName: string;
   /** Forecast series, so the thresholds tab can preview which sectors each setting puts at risk. */
   rainForecasts: SectorRainForecast[];
+  /** Risk types the officer can issue (built in + added by officers). */
+  riskTypes: RiskTypeItem[];
+  onAddRiskType: (type: RiskTypeItem) => void;
+  /** Registered farmers per sector (administrator's sector register). */
+  sectorRegister: SectorRegisterEntry[];
 }
-
-const MUSANZE_SECTORS_DATA: { name: string; farmers: number }[] = [
-  { name: 'Kinigi', farmers: 620 },
-  { name: 'Busogo', farmers: 540 },
-  { name: 'Remera', farmers: 480 },
-  { name: 'Muhoza', farmers: 410 },
-  { name: 'Musanze', farmers: 220 },
-  { name: 'Cyuve', farmers: 210 },
-  { name: 'Gataraga', farmers: 195 },
-  { name: 'Gacaca', farmers: 190 },
-  { name: 'Nyange', farmers: 190 },
-  { name: 'Muko', farmers: 185 },
-  { name: 'Shingiro', farmers: 185 },
-  { name: 'Gashaki', farmers: 180 },
-  { name: 'Kimonyi', farmers: 175 },
-  { name: 'Rwaza', farmers: 175 },
-  { name: 'Nkotsi', farmers: 165 },
-];
 
 const PREFILL_MESSAGES: Record<string, string> = {
   'Excess rain':
@@ -95,7 +95,11 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
   onRemoveAdvice,
   authorName,
   rainForecasts,
+  riskTypes,
+  onAddRiskType,
+  sectorRegister,
 }) => {
+  const sectorNames = sectorRegister.map((r) => r.sector);
   const [adviceFor, setAdviceFor] = useState<OfficerActiveWarning | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'history' | 'thresholds'>('active');
 
@@ -110,6 +114,20 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
   const [level, setLevel] = useState<RiskLevel>('Watch');
   const [selectedSectors, setSelectedSectors] = useState<string[]>(['Kinigi']);
   const [warningTitle, setWarningTitle] = useState<string>('Excess rain — Kinigi');
+  // Add risk type (inline in the issue form)
+  const [isAddingType, setIsAddingType] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
+  const [newTypeGroup, setNewTypeGroup] = useState<RiskTypeGroup>('weather');
+  const newTypeNameTrimmed = newTypeName.trim();
+  const newTypeError =
+    newTypeNameTrimmed.length === 0
+      ? null
+      : riskTypes.some((t) => t.name.toLowerCase() === newTypeNameTrimmed.toLowerCase())
+      ? `${newTypeNameTrimmed} is already a risk type.`
+      : newTypeNameTrimmed.length > 30
+      ? 'Use 30 characters or fewer.'
+      : null;
+  const selectedRiskType = riskTypes.find((t) => t.name === riskType);
   const [timeframe, setTimeframe] = useState<string>('Mon 28/09 14:00 – Wed 30/09 18:00');
   const [messageEn, setMessageEn] = useState<string>(PREFILL_MESSAGES['Excess rain']);
   const [messageRw, setMessageRw] = useState<string>('');
@@ -123,20 +141,10 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
     inApp: true,
   });
 
-  // Duplicate warning detection:
-  // If a selected sector already has an active warning of the same risk type
-  const duplicateWarning = activeWarnings.find((w) => {
-    if (w.status !== 'Active') return false;
-    const sameRiskType =
-      (w.riskType && w.riskType === riskType) ||
-      (!w.riskType &&
-        ((riskType === 'Excess rain' && w.title.toLowerCase().includes('rain')) ||
-          (riskType === 'Pest / disease' && w.title.toLowerCase().includes('blight')) ||
-          (riskType === 'Dry spell' && w.title.toLowerCase().includes('dry')) ||
-          (riskType === 'Temperature' && w.title.toLowerCase().includes('temperature'))));
-    if (!sameRiskType) return false;
-    return selectedSectors.some((sec) => w.sectors.includes(sec));
-  });
+  // Duplicate warning detection: a selected sector already has an active warning of the same risk type
+  const duplicateWarning = activeWarnings.find(
+    (w) => w.status === 'Active' && w.riskType === riskType && selectedSectors.some((sec) => w.sectors.includes(sec))
+  );
 
   const duplicateSector = duplicateWarning
     ? selectedSectors.find((sec) => duplicateWarning.sectors.includes(sec))
@@ -150,11 +158,8 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
     setRulesState(thresholdRules);
   }, [thresholdRules]);
 
-  // Compute live farmers reached
-  const farmersReachedCount = selectedSectors.reduce((acc, secName) => {
-    const found = MUSANZE_SECTORS_DATA.find((s) => s.name === secName);
-    return acc + (found ? found.farmers : 0);
-  }, 0);
+  // Farmers reached = registered farmers in the chosen sectors (sector register)
+  const farmersReachedCount = selectedSectors.reduce((acc, secName) => acc + registeredFarmers(sectorRegister, secName), 0);
 
   const handleRiskTypeChange = (newType: string) => {
     setRiskType(newType);
@@ -175,12 +180,39 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
       setAction1('Mulch soil around plants to retain moisture.');
       setAction2('Water seedbeds during early evening.');
       setAction3('Hold off planting unshaded plots.');
-    } else {
+    } else if (newType === 'Temperature') {
       setLevel('Watch');
       setAction1('Provide shade to young vegetable seedlings.');
       setAction2('Check soil moisture levels daily.');
       setAction3('Harvest ripe crops before peak heat.');
+    } else {
+      // A risk type added by an officer: the officer writes the message and actions
+      setLevel('Watch');
+      setAction1('');
+      setAction2('');
+      setAction3('');
     }
+  };
+
+  const handleSaveRiskType = () => {
+    if (!newTypeNameTrimmed || newTypeError) return;
+    const type: RiskTypeItem = {
+      id: `rt-custom-${Date.now()}`,
+      name: newTypeNameTrimmed,
+      group: newTypeGroup,
+      isCustom: true,
+      createdBy: authorName,
+    };
+    onAddRiskType(type);
+    handleRiskTypeChange(type.name);
+    setIsAddingType(false);
+    setNewTypeName('');
+    setNewTypeGroup('weather');
+    onShowToast(
+      type.group === 'weather'
+        ? `${type.name} added. Its warnings raise sector climate risk.`
+        : `${type.name} added. Its warnings do not change climate risk.`
+    );
   };
 
   const handleToggleSector = (secName: string) => {
@@ -194,10 +226,10 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
   };
 
   const handleSelectAllSectors = () => {
-    if (selectedSectors.length === MUSANZE_SECTORS_DATA.length) {
+    if (selectedSectors.length === sectorNames.length) {
       setSelectedSectors([]);
     } else {
-      setSelectedSectors(MUSANZE_SECTORS_DATA.map((s) => s.name));
+      setSelectedSectors([...sectorNames]);
     }
   };
 
@@ -208,87 +240,38 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
       return;
     }
     if (duplicateWarning) {
-      onShowToast('Please resolve active duplicate warning first');
+      onShowToast(`${duplicateSector} already has an active ${riskType} warning`);
       return;
     }
 
     const title = warningTitle.trim() || `${riskType} — ${selectedSectors[0]}`;
     const actions = [action1, action2, action3].filter((a) => a.trim().length > 0);
+    const chosenChannels: ChannelDelivery['channel'][] = [
+      ...(channels.sms ? (['SMS'] as const) : []),
+      ...(channels.voice ? (['Voice'] as const) : []),
+      ...(channels.inApp ? (['In-app'] as const) : []),
+    ];
+    const issuedStamp = `${NOW.dateFormatted.slice(0, 5)} ${NOW.timeFormatted}`;
 
-    // Channel split for any issued warning = farmers reached, split in the
-    // same proportions as Heavy Rain Influx (SMS 82% · Voice 7% · In-app 11%).
-    // The three numbers must add up exactly to the farmers reached.
-    const smsSent = Math.round(farmersReachedCount * 0.82);
-    const voiceSent = Math.round(farmersReachedCount * 0.07);
-    const inAppSent = farmersReachedCount - smsSent - voiceSent;
-
-    const activeChannelsList: { channel: 'SMS' | 'Voice' | 'In-app'; sent: number; delivered: number; failed: number }[] = [];
-    if (channels.sms) {
-      const delivered = Math.round(smsSent * 0.98);
-      activeChannelsList.push({
-        channel: 'SMS',
-        sent: smsSent,
-        delivered,
-        failed: smsSent - delivered,
-      });
-    }
-    if (channels.voice) {
-      const delivered = Math.round(voiceSent * 0.93);
-      activeChannelsList.push({
-        channel: 'Voice',
-        sent: voiceSent,
-        delivered,
-        failed: voiceSent - delivered,
-      });
-    }
-    if (channels.inApp) {
-      activeChannelsList.push({
-        channel: 'In-app',
-        sent: inAppSent,
-        delivered: inAppSent,
-        failed: 0,
-      });
-    }
-
-    const sectorBreakdown = selectedSectors.map((secName) => {
-      const secData = MUSANZE_SECTORS_DATA.find((s) => s.name === secName);
-      const total = secData ? secData.farmers : 200;
-      return {
-        sector: secName,
-        acknowledgedCount: 0,
-        totalCount: total,
-        percentage: 0,
-      };
-    });
-
+    // Delivery (sent, delivered, acknowledged per sector) is stored by the app from the sector register
     const newWarning: OfficerActiveWarning = {
       id: `alert-${Date.now()}`,
       title,
       severity: level,
       riskType,
-      affectedArea:
-        selectedSectors.length === MUSANZE_SECTORS_DATA.length
-          ? 'All sectors'
-          : selectedSectors.join(', '),
+      riskGroup: selectedRiskType ? selectedRiskType.group : 'weather',
+      affectedArea: selectedSectors.length === sectorNames.length ? 'All sectors' : selectedSectors.join(', '),
       sectors: [...selectedSectors],
       timeframe,
-      // Source line: officer-issued -> "Issued by Claudine M. · 28/09 14:00"
-      sourceRule: 'Issued by Claudine M. · 28/09 14:00',
+      sourceRule: `Issued by ${authorName} · ${issuedStamp}`,
       recommendedActions: actions,
-      channels: activeChannelsList,
-      sectorBreakdown,
-      totalSent: farmersReachedCount,
-      totalDelivered: Math.round(farmersReachedCount * 0.98),
-      totalAcknowledged: 0,
-      unacknowledgedCount: farmersReachedCount,
-      acknowledgedPct: 0,
-      issuedAt: '28/09 14:00',
+      issuedAt: issuedStamp,
       status: 'Active',
       messageEn,
       messageRw,
     };
 
-    onIssueWarning(newWarning);
+    onIssueWarning(newWarning, chosenChannels);
     setIsIssueModalOpen(false);
     onShowToast(`Warning issued to ${farmersReachedCount.toLocaleString()} farmers`);
   };
@@ -589,13 +572,13 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                             <tr key={ch.channel} className="text-[#17271D]">
                               <td className="py-2 px-3 font-medium flex items-center gap-1.5">
                                 {ch.channel === 'SMS' && <MessageSquare className="w-3.5 h-3.5 text-[#1F4A34]" />}
-                                {ch.channel === 'Voice' && <PhoneCall className="w-3.5 h-3.5 text-[#D9A032]" />}
-                                {ch.channel === 'In-app' && <Smartphone className="w-3.5 h-3.5 text-[#3E8E55]" />}
+                                {ch.channel === 'Voice' && <PhoneCall className="w-3.5 h-3.5 text-[#1F4A34]" />}
+                                {ch.channel === 'In-app' && <Smartphone className="w-3.5 h-3.5 text-[#1F4A34]" />}
                                 <span>{ch.channel}</span>
                               </td>
                               <td className="py-2 px-2 tabular-nums">{ch.sent.toLocaleString()}</td>
                               <td className="py-2 px-2 text-[#2E6B40] font-semibold tabular-nums">{ch.delivered.toLocaleString()}</td>
-                              <td className="py-2 px-3 text-right text-[#C93B3B] tabular-nums">{ch.failed}</td>
+                              <td className="py-2 px-3 text-right text-[#17271D] tabular-nums">{ch.failed}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -621,9 +604,9 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                             <span className="font-semibold text-[#17271D]">{sec.sector}</span>
                             <div className="flex items-center gap-2">
                               {/* FIX 5: Sectors below 50% get outline chip 'Low response' with '!' icon */}
-                              {sec.percentage < 50 && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium border border-[#D9772F] text-[#B85718] bg-[#FBFCF8]">
-                                  <AlertTriangle className="w-3 h-3 text-[#B85718]" strokeWidth={1.5} />
+                              {(warning.totalAcknowledged ?? 0) > 0 && sec.percentage < LOW_RESPONSE_PCT && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium border border-[rgba(31,74,52,0.25)] text-[#17271D] bg-[#FBFCF8]">
+                                  <AlertTriangle className="w-3 h-3 text-[#5B665E]" strokeWidth={1.5} />
                                   <span>Low response</span>
                                 </span>
                               )}
@@ -659,7 +642,16 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
           <div className="p-4 rounded-xl bg-[#E4ECDB] border border-[rgba(31,74,52,0.12)] flex items-center gap-2.5 text-[13px] text-[#1F4A34] font-medium shadow-xs">
             <CheckCircle2 className="w-4 h-4 text-[#1F4A34] flex-shrink-0" />
             <span>
-              This season: 5 warnings · average acknowledged 62% · 4 of 5 confirmed by field reports
+              {(() => {
+                const all = [...activeWarnings, ...warningHistory];
+                // Warnings issued in this demo have no replies yet, so they don't count towards the average
+                const measured = all.filter((w) => (w.totalAcknowledged ?? 0) > 0);
+                const avg = measured.length
+                  ? Math.round(measured.reduce((sum, w) => sum + (w.acknowledgedPct ?? 0), 0) / measured.length)
+                  : 0;
+                const confirmed = all.filter((w) => w.confirmedByReports).length;
+                return `This season: ${all.length} warnings · average acknowledged ${avg}% · ${confirmed} of ${all.length} confirmed by field reports`;
+              })()}
             </span>
           </div>
 
@@ -863,8 +855,8 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
             <form onSubmit={handleSendWarning} className="space-y-4">
               {/* Duplicate check inline notice */}
               {duplicateWarning && duplicateSector && (
-                <div className="p-3.5 rounded-xl bg-[#F4F6EF] border border-[#D9A032]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[12.5px] animate-in fade-in">
-                  <div className="flex items-center gap-2 text-[#9E6905]">
+                <div className="p-3.5 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.20)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[12.5px] animate-in fade-in">
+                  <div className="flex items-center gap-2 text-[#17271D]">
                     <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                     <span>
                       <strong>{duplicateSector}</strong> already has an active {riskType} warning ({duplicateWarning.severity}).
@@ -904,23 +896,102 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                   <label className="block text-[12px] font-semibold text-[#5B665E] mb-1.5">
                     Risk type
                   </label>
-                  {/* Custom pill dropdown/selector (no native select) */}
+                  {/* Custom pill selector (no native select): built-in types + types added by officers */}
                   <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#F4F6EF]/80 border border-[rgba(31,74,52,0.12)]">
-                    {(['Excess rain', 'Pest / disease', 'Dry spell', 'Temperature'] as const).map((t) => (
+                    {riskTypes.map((t) => (
                       <button
-                        key={t}
+                        key={t.id}
                         type="button"
-                        onClick={() => handleRiskTypeChange(t)}
+                        onClick={() => handleRiskTypeChange(t.name)}
+                        title={`${RISK_TYPE_GROUP_LABELS[t.group]}${t.isCustom ? ' · added by an officer' : ''}`}
                         className={`px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all text-center cursor-pointer ${
-                          riskType === t
+                          riskType === t.name
                             ? 'bg-[#1F4A34] text-white font-semibold shadow-xs'
                             : 'bg-white text-[#17271D] hover:bg-[#E4ECDB] border border-[rgba(31,74,52,0.08)]'
                         }`}
                       >
-                        {t}
+                        {t.name}
                       </button>
                     ))}
+                    {!isAddingType && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingType(true)}
+                        className="px-2 py-1.5 rounded-lg text-[11px] font-medium text-center cursor-pointer bg-white text-[#1F4A34] border border-dashed border-[#1F4A34]/40 hover:bg-[#E4ECDB] flex items-center justify-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" strokeWidth={2} />
+                        <span>Add risk type</span>
+                      </button>
+                    )}
                   </div>
+                  {selectedRiskType && (
+                    <p className="mt-1.5 text-[11.5px] text-[#5B665E]">
+                      {RISK_TYPE_GROUP_LABELS[selectedRiskType.group]} ·{' '}
+                      {selectedRiskType.group === 'weather'
+                        ? 'raises sector climate risk'
+                        : 'does not change climate risk'}
+                    </p>
+                  )}
+                  {isAddingType && (
+                    <div className="mt-2 p-3 rounded-xl bg-white border border-[rgba(31,74,52,0.15)] space-y-2.5">
+                      <div>
+                        <label htmlFor="new-risk-type-name" className="block text-[11.5px] font-semibold text-[#5B665E] mb-1">
+                          Risk type name
+                        </label>
+                        <input
+                          id="new-risk-type-name"
+                          type="text"
+                          value={newTypeName}
+                          onChange={(e) => setNewTypeName(e.target.value)}
+                          placeholder="e.g. Hail"
+                          className="w-full h-9 px-3 rounded-full bg-white border border-[rgba(31,74,52,0.18)] text-[12.5px] text-[#17271D] focus:outline-hidden focus:border-[#1F4A34]"
+                        />
+                        {newTypeError && <p className="mt-1 text-[11.5px] text-[#17271D] font-medium">{newTypeError}</p>}
+                      </div>
+                      <div>
+                        <span className="block text-[11.5px] font-semibold text-[#5B665E] mb-1">Group</span>
+                        <div className="flex items-center bg-[#F4F6EF] p-1 rounded-full border border-[rgba(31,74,52,0.12)] w-fit">
+                          {(['weather', 'pest_disease'] as RiskTypeGroup[]).map((g) => (
+                            <button
+                              key={g}
+                              type="button"
+                              onClick={() => setNewTypeGroup(g)}
+                              className={`px-3 py-1 rounded-full text-[11.5px] font-medium cursor-pointer ${
+                                newTypeGroup === g ? 'bg-[#1F4A34] text-white' : 'text-[#5B665E] hover:text-[#17271D]'
+                              }`}
+                            >
+                              {RISK_TYPE_GROUP_LABELS[g]}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="mt-1 text-[11.5px] text-[#5B665E]">
+                          {newTypeGroup === 'weather'
+                            ? 'Weather warnings raise the climate risk of the sectors they cover.'
+                            : 'Pest and disease warnings do not change climate risk.'}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingType(false);
+                            setNewTypeName('');
+                          }}
+                          className="px-3 py-1 rounded-full bg-[#F4F6EF] text-[#5B665E] hover:text-[#17271D] text-[11.5px] font-medium cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveRiskType}
+                          disabled={!newTypeNameTrimmed || !!newTypeError}
+                          className="px-3 py-1 rounded-full bg-[#1F4A34] text-white text-[11.5px] font-medium hover:bg-[#2C6343] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add risk type
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -968,27 +1039,27 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                     onClick={handleSelectAllSectors}
                     className="text-[11.5px] font-medium text-[#1F4A34] hover:underline cursor-pointer"
                   >
-                    {selectedSectors.length === MUSANZE_SECTORS_DATA.length
+                    {selectedSectors.length === sectorNames.length
                       ? 'Deselect all'
-                      : 'Select all (15)'}
+                      : `Select all (${sectorNames.length})`}
                   </button>
                 </div>
 
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 p-3 rounded-xl bg-[#F4F6EF]/60 border border-[rgba(31,74,52,0.08)]">
-                  {MUSANZE_SECTORS_DATA.map((sec) => {
-                    const isSelected = selectedSectors.includes(sec.name);
+                  {sectorRegister.map((sec) => {
+                    const isSelected = selectedSectors.includes(sec.sector);
                     return (
                       <button
-                        key={sec.name}
+                        key={sec.sector}
                         type="button"
-                        onClick={() => handleToggleSector(sec.name)}
+                        onClick={() => handleToggleSector(sec.sector)}
                         className={`py-1.5 px-2 rounded-lg text-[11px] font-medium transition-all text-center cursor-pointer ${
                           isSelected
                             ? 'bg-[#1F4A34] text-white font-semibold shadow-xs'
                             : 'bg-white text-[#17271D] border border-[rgba(31,74,52,0.10)] hover:bg-[#E4ECDB]'
                         }`}
                       >
-                        {sec.name} ({sec.farmers})
+                        {sec.sector} ({sec.farmers})
                       </button>
                     );
                   })}
@@ -1000,7 +1071,7 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                     Will reach {farmersReachedCount.toLocaleString()} farmers
                   </span>
                   <span className="text-[#5B665E]">
-                    {selectedSectors.length} of {MUSANZE_SECTORS_DATA.length} sectors selected
+                    {selectedSectors.length} of {sectorNames.length} sectors selected
                   </span>
                 </div>
               </div>
@@ -1151,7 +1222,26 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
               </div>
 
               {/* Modal Buttons */}
-              <div className="pt-3 border-t border-[rgba(31,74,52,0.08)] flex items-center justify-end gap-2.5">
+              <div className="pt-3 border-t border-[rgba(31,74,52,0.08)] flex flex-col sm:flex-row sm:items-center justify-end gap-2.5">
+                {/* Why Send is off, right next to it */}
+                {duplicateWarning && duplicateSector && (
+                  <div className="sm:mr-auto flex flex-wrap items-center gap-2 text-[12px] text-[#17271D]" role="status">
+                    <AlertTriangle className="w-3.5 h-3.5 text-[#5B665E] flex-shrink-0" strokeWidth={1.75} />
+                    <span>
+                      Send is off: {duplicateSector} already has an active {riskType} warning.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsIssueModalOpen(false);
+                        setEditingWarning(duplicateWarning);
+                      }}
+                      className="px-3 py-1 rounded-full bg-white text-[#1F4A34] border border-[#1F4A34]/40 hover:bg-[#E4ECDB] text-[11.5px] font-semibold cursor-pointer"
+                    >
+                      Update that warning instead
+                    </button>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsIssueModalOpen(false)}
@@ -1162,6 +1252,7 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                 <button
                   type="submit"
                   disabled={selectedSectors.length === 0 || !warningTitle.trim() || !!duplicateWarning}
+                  title={duplicateWarning ? `${duplicateSector} already has an active ${riskType} warning` : undefined}
                   className="px-6 py-2 rounded-full bg-[#1F4A34] text-white text-[12.5px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Send to {farmersReachedCount.toLocaleString()} farmers
@@ -1195,6 +1286,36 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
             </div>
 
             <div className="space-y-3 text-[13px]">
+              <div>
+                <span className="block text-[12px] font-semibold text-[#5B665E] mb-1">Level</span>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(['Low', 'Watch', 'High', 'Critical'] as RiskLevel[]).map((lvl) => (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => setEditingWarning({ ...editingWarning, severity: lvl })}
+                      className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold border flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                        editingWarning.severity === lvl
+                          ? 'bg-[#1F4A34] text-white border-[#1F4A34] shadow-xs'
+                          : 'bg-white text-[#5B665E] border-[rgba(31,74,52,0.15)] hover:border-[#1F4A34]'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          lvl === 'Critical'
+                            ? 'bg-[#C93B3B]'
+                            : lvl === 'High'
+                            ? 'bg-[#D9772F]'
+                            : lvl === 'Watch'
+                            ? 'bg-[#D9A032]'
+                            : 'bg-[#3E8E55]'
+                        }`}
+                      />
+                      <span>{lvl}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div>
                 <label className="block text-[12px] font-semibold text-[#5B665E] mb-1">
                   Timeframe

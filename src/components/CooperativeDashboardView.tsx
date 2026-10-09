@@ -204,6 +204,12 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
                 ? 'No active rain warning'
                 : `${summary.rainAcknowledged} of ${summary.rainTotal} target growers (${summary.rainSectors.join(' & ')})`}
             </p>
+            {summary.rainSectorPct !== null && (
+              <p className="text-[11px] text-[#5B665E]">
+                All farmers in {summary.rainSectors.join(' & ')}: {summary.rainSectorAcknowledged.toLocaleString()} of{' '}
+                {summary.rainSectorSent.toLocaleString()} ({summary.rainSectorPct}%)
+              </p>
+            )}
           </div>
         </div>
 

@@ -23,15 +23,19 @@ import {
   GeneratedReportType,
   ReportSectionConfig,
   RiskLevel,
+  SectorRegisterEntry,
 } from '../types';
 import {
   INITIAL_GENERATED_REPORTS,
   INITIAL_SCHEDULED_REPORTS,
 } from '../data/reportsModuleData';
 import {
-  OFFICER_DATA,
   computeSectorClimateRisk,
   computeDistrictClimateRisk,
+  registeredFarmers,
+  totalRegisteredFarmers,
+  reportsInLastDays,
+  warningCoversSector,
 } from '../data/musanzeData';
 
 interface OfficerReportsViewProps {
@@ -46,6 +50,8 @@ interface OfficerReportsViewProps {
   authorName?: string;
   /** Each sector's forecast risk (forecast series + threshold rules). */
   forecastRisk: Record<string, RiskLevel>;
+  /** Registered farmers per sector (administrator's sector register). */
+  sectorRegister: SectorRegisterEntry[];
 }
 
 export const DISTRICT_REPORT_TYPES: GeneratedReportType[] = [
@@ -152,6 +158,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   reportTypes = DISTRICT_REPORT_TYPES,
   authorName = 'Claudine M.',
   forecastRisk,
+  sectorRegister,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'library' | 'scheduled'>('overview');
   const [internalReportsList, setInternalReportsList] = useState<GeneratedReport[]>(INITIAL_GENERATED_REPORTS);
@@ -210,23 +217,18 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   // =========================================================================
   // DYNAMIC COMPUTATIONS FROM SHARED STORE
   // =========================================================================
-  const allSectorNames = useMemo(() => OFFICER_DATA.sectorOverviews.map((s) => s.name), []);
+  const allSectorNames = useMemo(() => sectorRegister.map((s) => s.sector), [sectorRegister]);
+  const totalFarmers = totalRegisteredFarmers(sectorRegister);
+  const reports7Days = useMemo(() => reportsInLastDays(reports), [reports]);
   const activeWarnings = useMemo(() => warnings.filter((w) => w.status === 'Active'), [warnings]);
   const districtRisk = useMemo(
     () => computeDistrictClimateRisk(allSectorNames, activeWarnings, forecastRisk),
     [allSectorNames, activeWarnings, forecastRisk]
   );
 
-  // Original 5 warnings in Musanze store have full delivery data (acknowledged 65%, 58%, 66%, 71%, 52% -> average 62%)
-  // Exclude only warnings issued during the current demo session (e.g. newly issued warnings without delivery data)
-  const ORIGINAL_WARNING_IDS = useMemo(
-    () => ['alert-rain', 'alert-blight', 'alert-wind', 'alert-runoff', 'hist-3'],
-    []
-  );
-
-  const isDemoSessionWarning = (w: WarningItem): boolean => {
-    return !ORIGINAL_WARNING_IDS.includes(w.id);
-  };
+  // A warning nobody has acknowledged yet (issued in this demo) is too early to measure.
+  // Acknowledgement comes from the delivery records, the same ones the officer dashboard reads.
+  const isDemoSessionWarning = (w: WarningItem): boolean => (w.totalAcknowledged ?? 0) === 0;
 
   // Warnings measurable for acknowledgment (the 5 original warnings with delivery data)
   const measurableWarnings = useMemo(
@@ -243,31 +245,19 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   }, [measurableWarnings]);
 
   const warningsThisSeason = warnings.length; // 5
-  const activeFarmersText = '2,890 of 4,120';
+  const activeFarmersText = `2,890 of ${totalFarmers.toLocaleString()}`;
   const fieldReportsThisSeason = 196;
 
   // 15 Sectors computed table data
   const sectorRows = useMemo(() => {
-    return OFFICER_DATA.sectorOverviews.map((sec) => {
-      const risk = computeSectorClimateRisk(sec.name, activeWarnings, forecastRisk);
-      const activeWarningsForSector = activeWarnings.filter((w) => {
-        return (
-          (w.sectors && (w.sectors.includes(sec.name) || w.sectors.length === 15)) ||
-          (w.affectedArea && w.affectedArea.toLowerCase().includes('all sectors'))
-        );
-      }).length;
-
-      const sectorReportsCount = reports.filter((r) => r.sector === sec.name).length;
-
-      return {
-        name: sec.name,
-        risk,
-        activeWarningsCount: activeWarningsForSector,
-        reportsCount: sectorReportsCount,
-        farmersCount: sec.farmersCount,
-      };
-    });
-  }, [activeWarnings, reports]);
+    return sectorRegister.map((sec) => ({
+      name: sec.sector,
+      risk: computeSectorClimateRisk(sec.sector, activeWarnings, forecastRisk),
+      activeWarningsCount: activeWarnings.filter((w) => warningCoversSector(w, sec.sector)).length,
+      reportsCount: reports7Days.filter((r) => r.sector === sec.sector).length,
+      farmersCount: sec.farmers,
+    }));
+  }, [sectorRegister, activeWarnings, reports7Days, forecastRisk]);
 
   // Dynamic Executive Summary 3 sentences (updates if store changes)
   const dynamicExecutiveSummary = useMemo(() => {
@@ -286,25 +276,26 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
     });
 
     const sectorsCoveredCount = coveredSectorsSet.size;
-    const farmersCovered = OFFICER_DATA.sectorOverviews
-      .filter((s) => coveredSectorsSet.has(s.name))
-      .reduce((acc, s) => acc + s.farmersCount, 0);
+    const farmersCovered = Array.from(coveredSectorsSet).reduce(
+      (acc, s) => acc + registeredFarmers(sectorRegister, s),
+      0
+    );
 
     const sentence2 =
       activeCount > 0
-        ? `${activeCount} ${activeCount === 1 ? 'warning is' : 'warnings are'} active, covering ${
-            sectorsCoveredCount || 4
-          } of 15 sectors and ${(farmersCovered || 2050).toLocaleString()} farmers.`
+        ? `${activeCount} ${activeCount === 1 ? 'warning is' : 'warnings are'} active, covering ${sectorsCoveredCount} of ${
+            allSectorNames.length
+          } sectors and ${farmersCovered.toLocaleString()} farmers.`
         : 'No warnings are currently active across the district.';
 
     // Sentence 3: Busogo has the lowest response to the Heavy Rain Influx warning at 41%.
-    let sentence3 = 'Busogo has the lowest response to the Heavy Rain Influx warning at 41%.';
+    let sentence3 = '';
     if (activeWarnings.length > 0) {
       let lowestPct = 999;
       let lowestSector = '';
       let lowestWarningTitle = '';
 
-      activeWarnings.forEach((w) => {
+      activeWarnings.filter((w) => !isDemoSessionWarning(w)).forEach((w) => {
         w.sectorBreakdown?.forEach((sb) => {
           if (sb.percentage < lowestPct) {
             lowestPct = sb.percentage;
@@ -319,8 +310,8 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
       }
     }
 
-    return `${sentence1} ${sentence2} ${sentence3}`;
-  }, [districtRisk, activeWarnings, allSectorNames]);
+    return [sentence1, sentence2, sentence3].filter(Boolean).join(' ');
+  }, [districtRisk, activeWarnings, allSectorNames, sectorRegister]);
 
   // Compute period text for new report builder
   const getPeriodLabel = (pType: 'season' | 'month' | 'week' | 'custom'): string => {
@@ -395,7 +386,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
 
     // Risk by sector (sentence case)
     if (report.sections.riskBySector) {
-      lines.push(`"Risk by sector (15 sectors)"`);
+      lines.push(`"Risk by sector (${sectorRows.length} sectors)"`);
       lines.push(`"Sector","Climate risk","Active warnings","Field reports (7d)","Registered farmers"`);
       sectorRows.forEach((r) => {
         lines.push(`"${r.name}","${r.risk}","${r.activeWarningsCount}","${r.reportsCount}","${r.farmersCount}"`);
@@ -428,7 +419,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
       Object.entries(countsByType).forEach(([t, count]) => {
         lines.push(`"${t}","${count}"`);
       });
-      lines.push(`"Total 7-day reports","${reports.length}"`);
+      lines.push(`"Total 7-day reports","${reports7Days.length}"`);
       lines.push(`"Total season reports","196"`);
       lines.push(``);
     }
@@ -447,7 +438,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
     if (report.sections.engagement) {
       lines.push(`"Farmer engagement"`);
       lines.push(`"Metric","Value"`);
-      lines.push(`"Total registered farmers in Musanze","4,120"`);
+      lines.push(`"Total registered farmers in Musanze","${totalFarmers.toLocaleString()}"`);
       lines.push(`"Active farmers (last 30 days)","2,890 (70%)"`);
       lines.push(`"Weekly active farmers W1","1,980"`);
       lines.push(`"Weekly active farmers W2","2,310"`);
@@ -807,7 +798,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
                 </span>
               </div>
               <p className="text-[11.5px] text-[#5B665E] mt-2">
-                52 in the last 7 days
+                {reports7Days.length} in the last 7 days
               </p>
             </div>
           </div>
@@ -937,7 +928,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
               </div>
 
               <div className="mt-6 pt-3 border-t border-[rgba(31,74,52,0.06)] text-[11.5px] text-[#5B665E]">
-                Total registered: 4,120 farmers across 15 sectors
+                Total registered: {totalFarmers.toLocaleString()} farmers across {allSectorNames.length} sectors
               </div>
             </div>
           </div>
@@ -1464,7 +1455,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
                     <h2 className="text-[15px] font-semibold text-[#17271D]">
                       Field reports summary
                     </h2>
-                    <span className="text-[11.5px] text-[#5B665E]">{reports.length} reports in last 7 days</span>
+                    <span className="text-[11.5px] text-[#5B665E]">{reports7Days.length} reports in last 7 days</span>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1537,7 +1528,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
                   <div className="p-4 rounded-xl bg-[#F4F6EF]/70 border border-[rgba(31,74,52,0.08)] grid grid-cols-1 sm:grid-cols-3 gap-4 text-[12px]">
                     <div>
                       <span className="text-[#5B665E] block">Active reach (30d)</span>
-                      <span className="text-[16px] font-bold text-[#17271D]">2,890 of 4,120</span>
+                      <span className="text-[16px] font-bold text-[#17271D]">{activeFarmersText}</span>
                       <span className="text-[11px] text-[#3E8E55] block">70% response</span>
                     </div>
                     <div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CloudRain,
@@ -6,80 +6,101 @@ import {
   ShieldCheck,
   ChevronRight,
   PhoneCall,
-  RotateCcw,
-  Check,
   X,
   MapPin,
   Users,
-  FileText,
-  Clock,
-  ArrowRight,
-  Send,
+  CheckCircle2,
 } from 'lucide-react';
-import { NavView, SectorOverviewItem, OfficerActiveWarning, ReportItem, RiskLevel } from '../types';
+import { NavView, OfficerActiveWarning, ReportItem, RiskLevel, SectorRegisterEntry } from '../types';
 import {
   OFFICER_DATA,
-  computeSectorClimateRisk,
+  NOW_DATE,
+  LOW_RESPONSE_PCT,
+  RISK_LEVEL_COLORS,
+  FIELD_REPORT_WINDOW_DAYS,
   computeDistrictClimateRisk,
+  computeSectorOverview,
+  computeOfficerAttention,
+  reportsInLastDays,
+  totalRegisteredFarmers,
 } from '../data/musanzeData';
 
 interface OfficerDashboardViewProps {
-  activeWarningsCount?: number;
-  activeWarnings?: OfficerActiveWarning[];
-  reportsToReviewCount?: number;
-  reports?: ReportItem[];
+  /** Active warnings with delivery totals computed from `warningDeliveries`. */
+  activeWarnings: OfficerActiveWarning[];
+  reports: ReportItem[];
+  /** Registered farmers per sector (administrator's sector register). */
+  sectorRegister: SectorRegisterEntry[];
+  firstName: string;
   onNavigateView: (view: NavView) => void;
   onShowToast: (message: string) => void;
   /** Each sector's forecast risk (forecast series + threshold rules). */
   forecastRisk: Record<string, RiskLevel>;
 }
 
+const LEVELS_HIGH_FIRST: RiskLevel[] = ['Critical', 'High', 'Watch', 'Low'];
+
+const joinAnd = (items: string[]) =>
+  items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} & ${items[items.length - 1]}`;
+
 export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
-  activeWarningsCount = 2,
   activeWarnings,
-  reportsToReviewCount = 3,
   reports,
+  sectorRegister,
+  firstName,
   onNavigateView,
   onShowToast,
   forecastRisk,
 }) => {
-  const [selectedSector, setSelectedSector] = useState<SectorOverviewItem | null>(null);
+  const [selectedSectorName, setSelectedSectorName] = useState<string | null>(null);
 
-  const reportsWaitingList = reports
-    ? reports.filter((r) => r.status === 'Under review')
-    : OFFICER_DATA.reportsWaitingForReview;
-  const effectiveReportsToReviewCount = reports ? reportsWaitingList.length : reportsToReviewCount;
+  // Every number on this page is computed from the store: warnings + delivery records, reports,
+  // the sector register and the forecast risk.
+  const sectors = useMemo(
+    () => computeSectorOverview(sectorRegister, activeWarnings, reports, forecastRisk),
+    [sectorRegister, activeWarnings, reports, forecastRisk]
+  );
+  const selectedSector = sectors.find((s) => s.name === selectedSectorName) || null;
+  const districtRisk = computeDistrictClimateRisk(
+    sectors.map((s) => s.name),
+    activeWarnings,
+    forecastRisk
+  );
+  const riskCountLine = LEVELS_HIGH_FIRST.map((lvl) => ({ lvl, n: sectors.filter((s) => s.risk === lvl).length }))
+    .filter((x) => x.n > 0)
+    .map((x) => `${x.n} ${x.lvl}`)
+    .join(' · ');
+  const sectorsUnderWarning = sectors.filter((s) => s.warnings.length > 0);
+  const affectedSectors = sectors.filter((s) => s.risk !== 'Low');
+  const affectedFarmers = affectedSectors.reduce((sum, s) => sum + s.farmersCount, 0);
+  const totalFarmers = totalRegisteredFarmers(sectorRegister);
+  const reportsWaitingList = reports.filter((r) => r.status === 'Under review');
+  const reports7Days = reportsInLastDays(reports).length;
+  const attention = useMemo(() => computeOfficerAttention(activeWarnings, reports), [activeWarnings, reports]);
+  const reportSortKey = (d: string) => `${d.slice(3, 5)}${d.slice(0, 2)}${d.slice(6)}`;
+  const sectorRecentReports = selectedSector
+    ? reportsInLastDays(reports)
+        .filter((r) => r.sector === selectedSector.name)
+        .sort((x, y) => reportSortKey(y.date).localeCompare(reportSortKey(x.date)))
+    : [];
+  const hour = NOW_DATE.getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const heroHeading =
+    activeWarnings.length === 0
+      ? `${greeting}, ${firstName}. No active warnings in Musanze.`
+      : `${greeting}, ${firstName}. ${activeWarnings.length} active ${activeWarnings.length === 1 ? 'warning' : 'warnings'} across ${sectorsUnderWarning.length} ${sectorsUnderWarning.length === 1 ? 'sector' : 'sectors'}.`;
 
-  // Compute District Climate Risk dynamically from active weather warnings (FIX 1)
-  const computedDistrictRisk = activeWarnings
-    ? computeDistrictClimateRisk(
-        OFFICER_DATA.sectorOverviews.map((s) => s.name),
-        activeWarnings,
-        forecastRisk
-      )
-    : OFFICER_DATA.districtRiskLevel;
-
-  const getRiskChip = (risk: string) => {
-    if (risk === 'Watch') {
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#D9A032]/20 text-[#9E6905] border border-[#D9A032]/30">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#D9A032]" />
-          <span>Watch</span>
-        </span>
-      );
-    }
-    if (risk === 'High') {
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#D9772F]/20 text-[#B85718] border border-[#D9772F]/30">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#D9772F]" />
-          <span>High</span>
-        </span>
-      );
-    }
+  const getRiskChip = (risk: RiskLevel) => {
+    const styles: Record<RiskLevel, string> = {
+      Critical: 'bg-[#C93B3B]/15 text-[#C93B3B] border-[#C93B3B]/30',
+      High: 'bg-[#D9772F]/20 text-[#B85718] border-[#D9772F]/30',
+      Watch: 'bg-[#D9A032]/20 text-[#9E6905] border-[#D9A032]/30',
+      Low: 'bg-[#3E8E55]/15 text-[#2E6B40] border-[#3E8E55]/25',
+    };
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#3E8E55]/15 text-[#2E6B40] border border-[#3E8E55]/25">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#3E8E55]" />
-        <span>Low</span>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${styles[risk]}`}>
+        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: RISK_LEVEL_COLORS[risk] }} />
+        <span>{risk}</span>
       </span>
     );
   };
@@ -127,7 +148,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
 
             {/* Heading: 28px font-normal (weight 400) */}
             <h1 className="text-[26px] md:text-[28px] font-normal text-white leading-tight tracking-tight line-clamp-2 max-w-xl">
-              Good afternoon, Claudine. {activeWarningsCount} active warnings across 4 sectors.
+              {heroHeading}
             </h1>
           </div>
 
@@ -138,7 +159,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
               className="px-4 py-1.5 rounded-full bg-white text-[#17271D] text-[12px] font-medium hover:bg-[#F4F6EF] transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-98"
             >
               <Eye className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-              <span>Review observations ({reportsToReviewCount})</span>
+              <span>Review observations ({reportsWaitingList.length})</span>
             </button>
 
             <button
@@ -173,11 +194,11 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
             <span>District risk level</span>
             <span
               className={`w-2 h-2 rounded-full ${
-                computedDistrictRisk === 'Critical'
+                districtRisk === 'Critical'
                   ? 'bg-[#C93B3B]'
-                  : computedDistrictRisk === 'High'
+                  : districtRisk === 'High'
                   ? 'bg-[#D9772F]'
-                  : computedDistrictRisk === 'Watch'
+                  : districtRisk === 'Watch'
                   ? 'bg-[#D9A032]'
                   : 'bg-[#3E8E55]'
               }`}
@@ -185,7 +206,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
           </div>
           <div>
             <div className="text-[26px] font-semibold text-[#17271D]">
-              {computedDistrictRisk}
+              {districtRisk}
             </div>
             <p className="text-[11.5px] text-[#5B665E] mt-1">
               Musanze District climate risk
@@ -200,14 +221,14 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
         >
           <div className="flex items-center justify-between text-[#5B665E] text-[12.5px] mb-2">
             <span>Active warnings</span>
-            <AlertTriangle className="w-3.5 h-3.5 text-[#D9772F]" strokeWidth={1.5} />
+            <AlertTriangle className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
           </div>
           <div>
             <div className="text-[26px] font-semibold text-[#17271D]">
-              {activeWarningsCount}
+              {activeWarnings.length}
             </div>
             <p className="text-[11.5px] text-[#5B665E] mt-1">
-              Rain influx & Late blight
+              {activeWarnings.length === 0 ? 'No active warnings' : joinAnd(activeWarnings.map((w) => w.title))}
             </p>
           </div>
         </div>
@@ -220,10 +241,12 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
           </div>
           <div>
             <div className="text-[26px] font-semibold text-[#17271D] tabular-nums">
-              {OFFICER_DATA.affectedFarmersTotal.toLocaleString()} of {OFFICER_DATA.totalRegisteredFarmers.toLocaleString()}
+              {affectedFarmers.toLocaleString()} of {totalFarmers.toLocaleString()}
             </div>
             <p className="text-[11.5px] text-[#5B665E] mt-1">
-              Across 4 priority sectors
+              {affectedSectors.length === 0
+                ? 'No sector at Watch or above'
+                : `${affectedSectors.length} ${affectedSectors.length === 1 ? 'sector' : 'sectors'} at Watch or above`}
             </p>
           </div>
         </div>
@@ -236,15 +259,15 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
           <div className="flex items-center justify-between text-[#5B665E] text-[12.5px] mb-2">
             <span>Reports to review</span>
             <span className="w-5 h-5 rounded-full bg-[#1F4A34] text-white text-[11px] font-semibold flex items-center justify-center">
-              {reportsToReviewCount}
+              {reportsWaitingList.length}
             </span>
           </div>
           <div>
             <div className="text-[26px] font-semibold text-[#17271D]">
-              {reportsToReviewCount}
+              {reportsWaitingList.length}
             </div>
             <p className="text-[11.5px] text-[#5B665E] mt-1">
-              {OFFICER_DATA.districtFieldReports7Days} total in last 7 days
+              {reports7Days} total in last {FIELD_REPORT_WINDOW_DAYS} days
             </p>
           </div>
         </div>
@@ -260,11 +283,11 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
             <div>
               <h2 className="text-[18px] font-semibold text-[#17271D]">Sector overview</h2>
               <p className="text-[12.5px] text-[#5B665E]">
-                15 sectors in Musanze sorted by risk status · Click a row for sector reports
+                {sectors.length} sectors in Musanze sorted by risk status · Click a row for sector reports
               </p>
             </div>
             <span className="text-[12px] font-medium text-[#1F4A34] bg-[#E4ECDB] px-3 py-1 rounded-full border border-[rgba(31,74,52,0.10)]">
-              4 Watch · 11 Low
+              {riskCountLine}
             </span>
           </div>
 
@@ -282,65 +305,53 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[rgba(31,74,52,0.06)] text-[13px]">
-                {OFFICER_DATA.sectorOverviews.map((sec) => {
-                  // FIX 1: Sector climate risk = highest level among active WEATHER warnings covering that sector (Low if none)
-                  const secClimateRisk = activeWarnings
-                    ? computeSectorClimateRisk(sec.name, activeWarnings, forecastRisk)
-                    : sec.risk;
-
-                  return (
-                    <tr
-                      key={sec.id}
-                      onClick={() => setSelectedSector(sec)}
-                      className="hover:bg-[#F4F6EF]/70 transition-colors cursor-pointer group"
-                    >
-                      <td className="py-3 pl-2 font-medium text-[#17271D] flex items-center gap-1.5">
-                        <span className="group-hover:text-[#1F4A34] transition-colors">
-                          {sec.name}
-                        </span>
-                        <ChevronRight className="w-3.5 h-3.5 text-[#5B665E]/60 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </td>
-                      <td className="py-3">{getRiskChip(secClimateRisk)}</td>
-                      <td className="py-3 text-[#17271D]">
-                        {sec.activeWarningsCount > 0 ? (
-                          <span className="font-semibold text-[#B85718]">
-                            {sec.activeWarningsCount} active
-                          </span>
-                        ) : (
-                          <span className="text-[#5B665E]">—</span>
-                        )}
-                      </td>
-                      {/* FIX 6: Tabular figures, no monospace font */}
-                      <td className="py-3 text-[#17271D] tabular-nums text-[12.5px]">
-                        {sec.farmersCount.toLocaleString()}
-                      </td>
-                      <td className="py-3 text-[#17271D] tabular-nums text-[12.5px]">
-                        {sec.reports7Days}
-                      </td>
-                      <td className="py-3 pr-2 text-right font-medium">
-                        {/* FIX 3: Stacked values with colored level dots */}
-                        {sec.acknowledgedItems && sec.acknowledgedItems.length > 0 ? (
-                          <div className="flex flex-col items-end gap-1">
-                            {sec.acknowledgedItems.map((item, idx) => (
+                {sectors.map((sec) => (
+                  <tr
+                    key={sec.name}
+                    onClick={() => setSelectedSectorName(sec.name)}
+                    className="hover:bg-[#F4F6EF]/70 transition-colors cursor-pointer group"
+                  >
+                    <td className="py-3 pl-2 font-medium text-[#17271D] flex items-center gap-1.5">
+                      <span className="group-hover:text-[#1F4A34] transition-colors">{sec.name}</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-[#5B665E]/60 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </td>
+                    <td className="py-3">{getRiskChip(sec.risk)}</td>
+                    <td className="py-3 text-[#17271D] tabular-nums">
+                      {sec.warnings.length > 0 ? (
+                        <span className="font-semibold">{sec.warnings.length} active</span>
+                      ) : (
+                        <span className="text-[#5B665E]">—</span>
+                      )}
+                    </td>
+                    <td className="py-3 text-[#17271D] tabular-nums text-[12.5px]">
+                      {sec.farmersCount.toLocaleString()}
+                    </td>
+                    <td className="py-3 text-[#17271D] tabular-nums text-[12.5px]">{sec.reports7Days}</td>
+                    <td className="py-3 pr-2 text-right font-medium">
+                      {sec.acknowledgement.length > 0 ? (
+                        <div className="flex flex-col items-end gap-1">
+                          {sec.acknowledgement.map((a) => (
+                            <span
+                              key={a.warningId}
+                              title={`${a.warningTitle}: ${a.acknowledged.toLocaleString()} of ${a.sent.toLocaleString()}`}
+                              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#17271D] tabular-nums"
+                            >
                               <span
-                                key={idx}
-                                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#17271D] tabular-nums"
-                              >
-                                <span
-                                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                  style={{ backgroundColor: item.dotColor }}
-                                />
-                                <span>{item.label}</span>
+                                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: RISK_LEVEL_COLORS[a.level] }}
+                              />
+                              <span>
+                                {a.pct}% {a.warningTitle}
                               </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-[#5B665E]">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[#5B665E]">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -350,63 +361,66 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
         <div className="lg:col-span-4 bg-[#FBFCF8] rounded-[16px] p-5 md:p-6 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] space-y-4">
           <div>
             <h2 className="text-[18px] font-semibold text-[#17271D]">Needs your attention</h2>
-            <p className="text-[12.5px] text-[#5B665E]">2 priority actions in Musanze</p>
+            <p className="text-[12.5px] text-[#5B665E]">
+              {attention.length === 0
+                ? 'Nothing waiting in Musanze'
+                : `${attention.length} priority ${attention.length === 1 ? 'action' : 'actions'} in Musanze`}
+            </p>
           </div>
 
           <div className="space-y-3.5">
-            {/* Item 1: Busogo */}
-            <div className="p-4 rounded-xl bg-[#F4F6EF]/70 border border-[#D9A032]/35 space-y-3">
-              <div className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-[#D9A032]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <PhoneCall className="w-3.5 h-3.5 text-[#9E6905]" strokeWidth={1.75} />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-[13.5px] font-semibold text-[#17271D] leading-snug">
-                    Busogo: only 41% acknowledged the rain warning
-                  </h4>
-                  <p className="text-[11.5px] text-[#5B665E]">
-                    318 farmers have not confirmed delivery via SMS
-                  </p>
-                </div>
+            {attention.length === 0 && (
+              <div className="p-4 rounded-xl bg-[#F4F6EF]/70 border border-[rgba(31,74,52,0.08)] flex items-center gap-2.5 text-[12.5px] text-[#5B665E]">
+                <CheckCircle2 className="w-4 h-4 text-[#3E8E55] flex-shrink-0" strokeWidth={1.5} />
+                <span>Every sector is above {LOW_RESPONSE_PCT}% and no pest report is waiting.</span>
               </div>
+            )}
+            {attention.map((item) => (
+              <div
+                key={item.id}
+                className="p-4 rounded-xl bg-[#F4F6EF]/70 border space-y-3"
+                style={{
+                  borderColor:
+                    item.level === 'Low' ? 'rgba(31,74,52,0.10)' : `${RISK_LEVEL_COLORS[item.level]}59`,
+                }}
+              >
+                <div className="flex items-start gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-[#E4ECDB] flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {item.kind === 'low_response' ? (
+                      <PhoneCall className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.75} />
+                    ) : (
+                      <Eye className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.75} />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-[13.5px] font-semibold text-[#17271D] leading-snug">{item.title}</h4>
+                    <p className="text-[11.5px] text-[#5B665E]">{item.caption}</p>
+                  </div>
+                </div>
 
-              <div className="pt-1">
-                <button
-                  onClick={() => onShowToast('Voice message queued for 318 farmers')}
-                  className="w-full py-2 px-3 rounded-full bg-[#1F4A34] text-white text-[12px] font-medium hover:bg-[#2C6343] transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <PhoneCall className="w-3.5 h-3.5 text-[#E4ECDB]" strokeWidth={1.5} />
-                  <span>Resend by voice call</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Item 2: Muhoza */}
-            <div className="p-4 rounded-xl bg-[#F4F6EF]/70 border border-[#D9772F]/35 space-y-3">
-              <div className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-[#D9772F]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Eye className="w-3.5 h-3.5 text-[#B85718]" strokeWidth={1.75} />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-[13.5px] font-semibold text-[#17271D] leading-snug">
-                    Muhoza: new report of dark spots on potato leaves
-                  </h4>
-                  <p className="text-[11.5px] text-[#5B665E]">
-                    Reported by Eric H. at 12:15 · Kigombe cell
-                  </p>
+                <div className="pt-1">
+                  {item.kind === 'low_response' ? (
+                    <button
+                      onClick={() =>
+                        onShowToast(`Voice message queued for ${(item.unacknowledged || 0).toLocaleString()} farmers`)
+                      }
+                      className="w-full py-2 px-3 rounded-full bg-[#1F4A34] text-white text-[12px] font-medium hover:bg-[#2C6343] transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <PhoneCall className="w-3.5 h-3.5 text-[#E4ECDB]" strokeWidth={1.5} />
+                      <span>Resend by voice call</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => onNavigateView('observations')}
+                      className="w-full py-2 px-3 rounded-full bg-white text-[#17271D] border border-[rgba(31,74,52,0.20)] text-[12px] font-medium hover:bg-[#E4ECDB] transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
+                      <span>Review report</span>
+                    </button>
+                  )}
                 </div>
               </div>
-
-              <div className="pt-1">
-                <button
-                  onClick={() => onNavigateView('observations')}
-                  className="w-full py-2 px-3 rounded-full bg-white text-[#17271D] border border-[rgba(31,74,52,0.20)] text-[12px] font-medium hover:bg-[#E4ECDB] transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-                  <span>Review report</span>
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -432,59 +446,70 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
         </div>
 
         <div className="space-y-4">
-          {OFFICER_DATA.warningDeliveries.map((warn) => (
-            <div
-              key={warn.id}
-              className="p-4 rounded-xl bg-[#F4F6EF]/60 border border-[rgba(31,74,52,0.08)] flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-            >
-              {/* Left meta */}
-              <div className="space-y-1.5 max-w-sm">
-                <div className="flex items-center gap-2">
-                  {getRiskChip(warn.level)}
-                  <h3 className="text-[15px] font-semibold text-[#17271D]">{warn.title}</h3>
+          {activeWarnings.length === 0 && (
+            <p className="text-[12.5px] text-[#5B665E]">No active warnings to track.</p>
+          )}
+          {activeWarnings.map((warn) => {
+            const pct = warn.acknowledgedPct ?? 0;
+            return (
+              <div
+                key={warn.id}
+                className="p-4 rounded-xl bg-[#F4F6EF]/60 border border-[rgba(31,74,52,0.08)] flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+              >
+                {/* Left meta */}
+                <div className="space-y-1.5 max-w-sm">
+                  <div className="flex items-center gap-2">
+                    {getRiskChip(warn.severity)}
+                    <h3 className="text-[15px] font-semibold text-[#17271D]">{warn.title}</h3>
+                  </div>
+                  <div className="text-[12px] text-[#5B665E] flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#1F4A34]" />
+                    <span>{warn.affectedArea}</span>
+                  </div>
                 </div>
-                <div className="text-[12px] text-[#5B665E] flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-[#1F4A34]" />
-                  <span>{warn.area}</span>
-                </div>
-              </div>
 
-              {/* Delivery stats and progress bar */}
-              <div className="flex-1 max-w-md space-y-1.5">
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="text-[#5B665E]">
-                    Sent: <strong className="text-[#17271D]">{warn.sent.toLocaleString()}</strong> · Delivered:{' '}
-                    <strong className="text-[#17271D]">{warn.delivered.toLocaleString()}</strong>
-                  </span>
-                  <span className="font-semibold text-[#1F4A34]">
-                    {warn.acknowledged.toLocaleString()} acknowledged ({warn.acknowledgedPct}%)
-                  </span>
+                {/* Delivery stats and progress bar (from the delivery records) */}
+                <div className="flex-1 max-w-md space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 text-[12px]">
+                    <span className="text-[#5B665E]">
+                      Sent: <strong className="text-[#17271D] tabular-nums">{(warn.totalSent ?? 0).toLocaleString()}</strong> ·
+                      Delivered:{' '}
+                      <strong className="text-[#17271D] tabular-nums">{(warn.totalDelivered ?? 0).toLocaleString()}</strong>
+                    </span>
+                    <span className="font-semibold text-[#1F4A34] tabular-nums">
+                      {(warn.totalAcknowledged ?? 0).toLocaleString()} acknowledged ({pct}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 rounded-full bg-[rgba(31,74,52,0.12)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#3E8E55] transition-all duration-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  {(warn.totalAcknowledged ?? 0) > 0 && pct < LOW_RESPONSE_PCT && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium border border-[rgba(31,74,52,0.25)] text-[#17271D] bg-[#FBFCF8]">
+                      <AlertTriangle className="w-3 h-3 text-[#5B665E]" strokeWidth={1.5} />
+                      <span>Low response</span>
+                    </span>
+                  )}
                 </div>
-                <div className="w-full h-2.5 rounded-full bg-[rgba(31,74,52,0.12)] overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      warn.acknowledgedPct < 60 ? 'bg-[#D9772F]' : 'bg-[#3E8E55]'
-                    }`}
-                    style={{ width: `${warn.acknowledgedPct}%` }}
-                  />
-                </div>
-              </div>
 
-              {/* Action Button */}
-              <div className="flex-shrink-0">
-                <button
-                  onClick={() =>
-                    onShowToast(
-                      `Voice & SMS reminder queued for ${warn.unacknowledgedCount} unacknowledged farmers`
-                    )
-                  }
-                  className="px-3.5 py-1.5 rounded-full bg-white text-[#17271D] border border-[rgba(31,74,52,0.22)] text-[12px] font-medium hover:bg-[#E4ECDB] transition-all shadow-xs cursor-pointer active:scale-98"
-                >
-                  Resend to farmers who haven't acknowledged
-                </button>
+                {/* Action Button */}
+                <div className="flex-shrink-0">
+                  <button
+                    onClick={() =>
+                      onShowToast(
+                        `Voice & SMS reminder queued for ${(warn.unacknowledgedCount ?? 0).toLocaleString()} unacknowledged farmers`
+                      )
+                    }
+                    className="px-3.5 py-1.5 rounded-full bg-white text-[#17271D] border border-[rgba(31,74,52,0.22)] text-[12px] font-medium hover:bg-[#E4ECDB] transition-all shadow-xs cursor-pointer active:scale-98"
+                  >
+                    Resend to farmers who haven't acknowledged
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -497,7 +522,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
             <div className="flex items-center gap-2">
               <h2 className="text-[18px] font-semibold text-[#17271D]">Reports waiting for review</h2>
               <span className="px-2 py-0.5 rounded-full bg-[#1F4A34] text-white text-[11px] font-semibold">
-                {effectiveReportsToReviewCount}
+                {reportsWaitingList.length}
               </span>
             </div>
             <p className="text-[12.5px] text-[#5B665E]">
@@ -514,6 +539,9 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
         </div>
 
         <div className="divide-y divide-[rgba(31,74,52,0.06)] border border-[rgba(31,74,52,0.08)] rounded-xl overflow-hidden bg-white">
+          {reportsWaitingList.length === 0 && (
+            <div className="p-4 text-center text-[12.5px] text-[#5B665E]">No reports are waiting for review.</div>
+          )}
           {reportsWaitingList.map((rep) => (
             <div
               key={rep.id}
@@ -532,7 +560,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
                       {rep.sector} · {rep.cell}
                     </span>
                     <span>·</span>
-                    <span className="text-[#1F4A34] font-medium">{'time' in rep ? (rep as any).time : (rep as any).date}</span>
+                    <span className="text-[#1F4A34] font-medium tabular-nums">{rep.date}</span>
                   </div>
                 </div>
               </div>
@@ -557,7 +585,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
           role="dialog"
           aria-modal="true"
           className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs animate-in fade-in"
-          onClick={() => setSelectedSector(null)}
+          onClick={() => setSelectedSectorName(null)}
         >
           <div
             className="w-full max-w-md bg-[#FBFCF8] h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto"
@@ -569,7 +597,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-[20px] font-semibold text-[#17271D]">
-                      {selectedSector.name} Sector
+                      {selectedSector.name} sector
                     </h3>
                     {getRiskChip(selectedSector.risk)}
                   </div>
@@ -578,7 +606,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
                   </p>
                 </div>
                 <button
-                  onClick={() => setSelectedSector(null)}
+                  onClick={() => setSelectedSectorName(null)}
                   className="w-8 h-8 rounded-full bg-[#F4F6EF] flex items-center justify-center text-[#5B665E] hover:text-[#17271D] hover:bg-[#E4ECDB] transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
@@ -596,14 +624,14 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
                 <div className="p-3 rounded-xl bg-[#F4F6EF]/80 border border-[rgba(31,74,52,0.06)] text-center">
                   <span className="block text-[11px] text-[#5B665E]">Active warnings</span>
                   <span className="text-[16px] font-semibold text-[#17271D]">
-                    {selectedSector.activeWarningsCount}
+                    {selectedSector.warnings.length}
                   </span>
                 </div>
                 <div className="p-3 rounded-xl bg-[#F4F6EF]/80 border border-[rgba(31,74,52,0.06)] text-center">
                   <span className="block text-[11px] text-[#5B665E]">Acknowledged</span>
                   <span className="text-[14px] font-semibold text-[#17271D]">
-                    {selectedSector.acknowledgedItems && selectedSector.acknowledgedItems.length > 0
-                      ? selectedSector.acknowledgedItems.map((a) => a.label.split(' ')[0]).join(' / ')
+                    {selectedSector.acknowledgement.length > 0
+                      ? selectedSector.acknowledgement.map((a) => `${a.pct}%`).join(' / ')
                       : '—'}
                   </span>
                 </div>
@@ -614,34 +642,22 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
                 <h4 className="text-[13px] font-semibold text-[#17271D]">Active warnings</h4>
                 {selectedSector.warnings.length > 0 ? (
                   <div className="space-y-2">
-                    {selectedSector.warnings.map((w, idx) => {
-                      const isHigh = w.level === 'High';
+                    {selectedSector.warnings.map((w) => {
+                      const ack = selectedSector.acknowledgement.find((a) => a.warningId === w.id);
                       return (
                         <div
-                          key={idx}
-                          className={`p-3 rounded-xl border flex items-center justify-between text-[13px] text-[#17271D] ${
-                            isHigh
-                              ? 'bg-[#D9772F]/10 border-[#D9772F]/30'
-                              : 'bg-[#D9A032]/10 border-[#D9A032]/30'
-                          }`}
+                          key={w.id}
+                          className="p-3 rounded-xl border bg-[#F4F6EF]/70 border-[rgba(31,74,52,0.10)] flex items-center justify-between gap-2 text-[13px] text-[#17271D]"
                         >
-                          <div className="flex items-center gap-2.5">
-                            <AlertTriangle
-                              className={`w-4 h-4 flex-shrink-0 ${
-                                isHigh ? 'text-[#D9772F]' : 'text-[#D9A032]'
-                              }`}
-                            />
-                            <span className="font-medium">{w.title}</span>
+                          <div className="space-y-0.5">
+                            <span className="font-medium block">{w.title}</span>
+                            {ack && (
+                              <span className="text-[11.5px] text-[#5B665E] tabular-nums">
+                                {ack.acknowledged.toLocaleString()} of {ack.sent.toLocaleString()} acknowledged ({ack.pct}%)
+                              </span>
+                            )}
                           </div>
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold ${
-                              isHigh
-                                ? 'bg-[#D9772F]/20 text-[#B85718]'
-                                : 'bg-[#D9A032]/20 text-[#9E6905]'
-                            }`}
-                          >
-                            {w.level}
-                          </span>
+                          {getRiskChip(w.level)}
                         </div>
                       );
                     })}
@@ -657,7 +673,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-[13px] font-semibold text-[#17271D]">
-                    Recent reports (last 7 days)
+                    Recent reports (last {FIELD_REPORT_WINDOW_DAYS} days)
                   </h4>
                   <span className="text-[11.5px] text-[#5B665E]">
                     {selectedSector.reports7Days} reported
@@ -665,14 +681,12 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
                 </div>
 
                 <div className="divide-y divide-[rgba(31,74,52,0.06)] border border-[rgba(31,74,52,0.08)] rounded-xl overflow-hidden bg-white">
-                  {selectedSector.recentReports.length > 0 ? (
-                    selectedSector.recentReports.map((r) => (
+                  {sectorRecentReports.length > 0 ? (
+                    sectorRecentReports.map((r) => (
                       <div key={r.id} className="p-3 space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="text-[13px] font-medium text-[#17271D]">
-                            {r.title}
-                          </span>
-                          <span className="text-[11px] text-[#5B665E] tabular-nums">{r.time}</span>
+                          <span className="text-[13px] font-medium text-[#17271D]">{r.title}</span>
+                          <span className="text-[11px] text-[#5B665E] tabular-nums">{r.date}</span>
                         </div>
                         <div className="text-[11.5px] text-[#5B665E] flex items-center gap-1.5">
                           <span className="font-medium text-[#17271D]">{r.farmer}</span>
@@ -695,7 +709,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
             {/* Drawer Footer (Sentence case) */}
             <div className="pt-4 border-t border-[rgba(31,74,52,0.08)] flex items-center justify-end gap-2">
               <button
-                onClick={() => setSelectedSector(null)}
+                onClick={() => setSelectedSectorName(null)}
                 className="px-5 py-2 rounded-full bg-[#1F4A34] text-white text-[12.5px] font-medium hover:bg-[#2C6343] transition-colors shadow-xs cursor-pointer"
               >
                 Close
