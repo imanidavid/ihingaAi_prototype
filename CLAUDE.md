@@ -223,9 +223,10 @@ permission matrix (`view_research_data`, `export_data`). Reports offers research
 `PlaceholderView` any more.
 
 Farmer dashboard data sources (after Task 6): weather = latest `stationReadings` entry for the
-farmer's sector (officer Weather data → Manual upload adds readings with temperature and
-humidity); rainfall outlook = the sector's series in `rainForecasts` (officer "Rain forecast
-upload" replaces days); "N mm total" = sum of the 30-day series; affected sectors = sectors at
+farmer's sector (officer Weather data → Manual upload adds readings with temperature,
+humidity and wind); weather forecast card (`WeatherForecastCard`) = the sector's series in `rainForecasts` (rain, day high/low; officer "Rain forecast
+upload" replaces days); the card's "N mm in 10 days" = sum of the first 10 days, and its wind comes
+from the station reading (`windKmh`, optional in the upload); affected sectors = sectors at
 Watch or above (`computeAffectedSectors`); crop advice = `cropAdvisories`, written by the
 officer on an active warning (Warnings → "Add crop advice"), shown to a farmer only while
 that warning is active and only for their sector and crops (`visibleAdvisories`); the map
