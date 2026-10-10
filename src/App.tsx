@@ -48,7 +48,7 @@ import { Topbar } from './components/Topbar';
 import { FloatingDeviceSwitcher, PreviewMode } from './components/FloatingDeviceSwitcher';
 import { HeroBanner } from './components/HeroBanner';
 import { KpiStrip } from './components/KpiStrip';
-import { RainfallChartCard } from './components/RainfallChartCard';
+import { WeatherForecastCard } from './components/WeatherForecastCard';
 import { RecentAlertsCard } from './components/RecentAlertsCard';
 import { CropAdvisoriesSection } from './components/CropAdvisoriesSection';
 import { MusanzeRiskMapCard } from './components/MusanzeRiskMapCard';
@@ -469,6 +469,7 @@ export default function App() {
   const farmerForecast = useMemo(() => forecastDays(rainForecasts, farmerSector), [rainForecasts, farmerSector]);
   const farmerWeatherSummary = weatherSummaryFrom(farmerForecast, thresholdRules);
   const farmerReading = latestReading(stationReadings, farmerSector);
+  const farmerForecastSource = (rainForecasts.find((f) => f.sector === farmerSector) || rainForecasts[0])?.source || '';
   const farmerAdvisories = useMemo(
     () => visibleAdvisories(cropAdvisories, warnings, farmerSector, userSettings.cropsGrown),
     [cropAdvisories, warnings, farmerSector, userSettings.cropsGrown]
@@ -1306,6 +1307,7 @@ export default function App() {
         tempC: r.tempC,
         humidityPct: r.humidityPct,
         rainMm: r.rainMm,
+        windKmh: r.windKmh,
         source: 'Manual upload' as const,
       })),
     ]);
@@ -1329,17 +1331,23 @@ export default function App() {
     showToast(`${count} readings uploaded`);
   };
 
-  const handleUploadForecast = (updates: { sector: string; dayIndex: number; rainMm: number }[]) => {
+  const handleUploadForecast = (
+    updates: { sector: string; dayIndex: number; rainMm: number; tempMaxC?: number; tempMinC?: number }[]
+  ) => {
     const uploader = accounts.find((a) => a.id === currentAccountId)?.fullName || ROLE_LABELS[role];
     setRainForecasts((prev) =>
       prev.map((f) => {
         const mine = updates.filter((u) => u.sector === f.sector);
         if (mine.length === 0) return f;
         const dailyMm = [...f.dailyMm];
+        const dailyTempMaxC = [...f.dailyTempMaxC];
+        const dailyTempMinC = [...f.dailyTempMinC];
         mine.forEach((u) => {
           dailyMm[u.dayIndex] = u.rainMm;
+          if (u.tempMaxC !== undefined) dailyTempMaxC[u.dayIndex] = u.tempMaxC;
+          if (u.tempMinC !== undefined) dailyTempMinC[u.dayIndex] = u.tempMinC;
         });
-        return { ...f, dailyMm, source: `Uploaded by ${uploader} ${NOW_STAMP}` };
+        return { ...f, dailyMm, dailyTempMaxC, dailyTempMinC, source: `Uploaded by ${uploader} ${NOW_STAMP}` };
       })
     );
     const sectors = Array.from(new Set(updates.map((u) => u.sector)));
@@ -1676,10 +1684,16 @@ export default function App() {
                     onSelectRiskKpi={() => setCurrentView('forecast')}
                   />
 
-                  {/* Band 3 — 2/3 Rainfall Chart + 1/3 Recent Alerts List */}
+                  {/* Band 3 — 2/3 Weather forecast + 1/3 Recent Alerts List */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                     <div className="lg:col-span-8">
-                      <RainfallChartCard days={farmerForecast} />
+                      <WeatherForecastCard
+                        days={farmerForecast}
+                        reading={farmerReading}
+                        sector={farmerSector}
+                        rules={thresholdRules}
+                        forecastSource={farmerForecastSource}
+                      />
                     </div>
                     <div className="lg:col-span-4">
                       <RecentAlertsCard

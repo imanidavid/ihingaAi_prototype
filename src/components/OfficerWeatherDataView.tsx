@@ -112,6 +112,7 @@ export const OfficerWeatherDataView: React.FC<OfficerWeatherDataViewProps> = ({
                   <th className="py-2.5 px-3 font-semibold">Rain</th>
                   <th className="py-2.5 px-3 font-semibold">Temperature</th>
                   <th className="py-2.5 px-3 font-semibold">Humidity</th>
+                  <th className="py-2.5 px-3 font-semibold">Wind</th>
                   <th className="py-2.5 pl-3 font-semibold">Source</th>
                 </tr>
               </thead>
@@ -126,6 +127,7 @@ export const OfficerWeatherDataView: React.FC<OfficerWeatherDataViewProps> = ({
                     <td className="py-2.5 px-3 text-[#17271D]">{r.rainMm === undefined ? '—' : `${r.rainMm} mm`}</td>
                     <td className="py-2.5 px-3 text-[#17271D]">{r.tempC}°C</td>
                     <td className="py-2.5 px-3 text-[#17271D]">{r.humidityPct}%</td>
+                    <td className="py-2.5 px-3 text-[#17271D]">{r.windKmh === undefined ? '—' : `${r.windKmh} km/h`}</td>
                     <td className="py-2.5 pl-3">
                       <NeutralChip tone={r.source === 'Manual upload' ? 'tint' : 'outline'}>{r.source}</NeutralChip>
                     </td>
