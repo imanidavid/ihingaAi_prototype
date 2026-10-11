@@ -3364,3 +3364,42 @@ export function anonymisedReportId(reportId: string): string {
   for (let i = 0; i < reportId.length; i++) h = (h * 31 + reportId.charCodeAt(i)) >>> 0;
   return `R-${String(h % 100000).padStart(5, '0')}`;
 }
+
+// =========================================================================
+// DATE-TIME RANGES (warning timeframe, report period) — stored as values, text built from them
+// =========================================================================
+/** 00:00, 00:30 … 23:30 */
+export const HALF_HOUR_TIMES = Array.from(
+  { length: 48 },
+  (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`
+);
+
+/** 'DD/MM/YYYY HH:MM' -> Date */
+export function parseStamp(stamp: string): Date {
+  const [dmy, hhmm] = stamp.split(' ');
+  return parseDMY(dmy, hhmm || '00:00');
+}
+
+/** Date -> 'DD/MM/YYYY HH:MM' */
+export function formatStamp(d: Date): string {
+  return `${formatDMY(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** NOW + hours, as 'DD/MM/YYYY HH:MM' (quick chips "Next 24 h" etc.). */
+export function stampHoursFromNow(hours: number): string {
+  return formatStamp(new Date(NOW_DATE.getTime() + hours * 3600000));
+}
+
+/** "Mon 28/09 14:00 – Wed 30/09 18:00" from two 'DD/MM/YYYY HH:MM' values (dates only when no time). */
+export function formatTimeframe(start: string, end: string): string {
+  const part = (stamp: string) => {
+    const [dmy, hhmm] = stamp.split(' ');
+    return hhmm ? `${formatDayShort(dmy)} ${hhmm}` : formatDayShort(dmy);
+  };
+  return `${part(start)} – ${part(end)}`;
+}
+
+/** End must be after start. */
+export function isRangeValid(start: string, end: string): boolean {
+  return !!start && !!end && parseStamp(end).getTime() > parseStamp(start).getTime();
+}

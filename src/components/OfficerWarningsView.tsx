@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   Clock,
@@ -43,8 +43,13 @@ import {
   LOW_RESPONSE_PCT,
   RISK_TYPE_GROUP_LABELS,
   registeredFarmers,
+  NOW_STAMP,
+  stampHoursFromNow,
+  formatTimeframe,
+  isRangeValid,
 } from '../data/musanzeData';
 import { CropAdviceModal } from './officer/CropAdviceModal';
+import { DateTimeRangePicker } from './DateTimeRangePicker';
 
 interface OfficerWarningsViewProps {
   activeWarnings: OfficerActiveWarning[];
@@ -103,6 +108,8 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
   const [adviceFor, setAdviceFor] = useState<OfficerActiveWarning | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'history' | 'thresholds'>('active');
 
+  // Edit warning: timeframe picker values (seeded warnings have text only until the officer changes it)
+  const [editRange, setEditRange] = useState<{ start: string; end: string } | null>(null);
   // Modals & Drawers state
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [editingWarning, setEditingWarning] = useState<OfficerActiveWarning | null>(null);
@@ -128,7 +135,25 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
       ? 'Use 30 characters or fewer.'
       : null;
   const selectedRiskType = riskTypes.find((t) => t.name === riskType);
-  const [timeframe, setTimeframe] = useState<string>('Mon 28/09 14:00 – Wed 30/09 18:00');
+  // Timeframe is picked as start/end values (default: next 48 h from NOW); the text is built from them
+  const [startsAt, setStartsAt] = useState<string>(NOW_STAMP);
+  const [endsAt, setEndsAt] = useState<string>(stampHoursFromNow(48));
+  const timeframeValid = isRangeValid(startsAt, endsAt);
+
+  // Opening a new Issue form starts again at "next 48 h"; opening Edit loads the warning's picked values
+  useEffect(() => {
+    if (isIssueModalOpen) {
+      setStartsAt(NOW_STAMP);
+      setEndsAt(stampHoursFromNow(48));
+    }
+  }, [isIssueModalOpen]);
+  useEffect(() => {
+    setEditRange(
+      editingWarning?.startsAt && editingWarning?.endsAt
+        ? { start: editingWarning.startsAt, end: editingWarning.endsAt }
+        : null
+    );
+  }, [editingWarning?.id]);
   const [messageEn, setMessageEn] = useState<string>(PREFILL_MESSAGES['Excess rain']);
   const [messageRw, setMessageRw] = useState<string>('');
   // Plain language, max 10 words, no technical terms
@@ -243,6 +268,10 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
       onShowToast(`${duplicateSector} already has an active ${riskType} warning`);
       return;
     }
+    if (!timeframeValid) {
+      onShowToast('The warning must end after it starts');
+      return;
+    }
 
     const title = warningTitle.trim() || `${riskType} — ${selectedSectors[0]}`;
     const actions = [action1, action2, action3].filter((a) => a.trim().length > 0);
@@ -262,7 +291,9 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
       riskGroup: selectedRiskType ? selectedRiskType.group : 'weather',
       affectedArea: selectedSectors.length === sectorNames.length ? 'All sectors' : selectedSectors.join(', '),
       sectors: [...selectedSectors],
-      timeframe,
+      timeframe: formatTimeframe(startsAt, endsAt),
+      startsAt,
+      endsAt,
       sourceRule: `Issued by ${authorName} · ${issuedStamp}`,
       recommendedActions: actions,
       issuedAt: issuedStamp,
@@ -1079,17 +1110,19 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                 </div>
               </div>
 
-              {/* Timeframe */}
+              {/* Timeframe: start and end picked, text built from them */}
               <div>
                 <label className="block text-[12px] font-semibold text-[#5B665E] mb-1.5">
                   Timeframe
                 </label>
-                <input
-                  type="text"
-                  value={timeframe}
-                  onChange={(e) => setTimeframe(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white border border-[rgba(31,74,52,0.18)] text-[13px] text-[#17271D] focus:outline-hidden focus:ring-1 focus:ring-[#1F4A34]"
-                  placeholder="e.g. Mon 28/09 14:00 – Wed 30/09 18:00"
+                <DateTimeRangePicker
+                  start={startsAt}
+                  end={endsAt}
+                  minDate={NOW_STAMP.slice(0, 10)}
+                  onChange={(st, en) => {
+                    setStartsAt(st);
+                    setEndsAt(en);
+                  }}
                 />
               </div>
 
@@ -1254,7 +1287,7 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={selectedSectors.length === 0 || !warningTitle.trim() || !!duplicateWarning}
+                  disabled={selectedSectors.length === 0 || !warningTitle.trim() || !!duplicateWarning || !timeframeValid}
                   title={duplicateWarning ? `${duplicateSector} already has an active ${riskType} warning` : undefined}
                   className="px-6 py-2 whitespace-nowrap rounded-full bg-[#1F4A34] text-white text-[12.5px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1323,14 +1356,24 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                 <label className="block text-[12px] font-semibold text-[#5B665E] mb-1">
                   Timeframe
                 </label>
-                <input
-                  type="text"
-                  value={editingWarning.timeframe}
-                  onChange={(e) =>
-                    setEditingWarning({ ...editingWarning, timeframe: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded-xl bg-white border border-[rgba(31,74,52,0.18)]"
-                />
+                {editRange ? (
+                  <DateTimeRangePicker
+                    start={editRange.start}
+                    end={editRange.end}
+                    onChange={(st, en) => setEditRange({ start: st, end: en })}
+                  />
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-[#F4F6EF]/70 border border-[rgba(31,74,52,0.06)] text-[12.5px]">
+                    <span className="text-[#17271D]">{editingWarning.timeframe}</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditRange({ start: NOW_STAMP, end: stampHoursFromNow(24) })}
+                      className="px-3 py-1 rounded-full bg-white text-[#1F4A34] border border-[#1F4A34]/40 hover:bg-[#E4ECDB] text-[12px] font-semibold cursor-pointer"
+                    >
+                      Change timeframe
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1356,12 +1399,22 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                 Cancel
               </button>
               <button
+                disabled={!!editRange && !isRangeValid(editRange.start, editRange.end)}
                 onClick={() => {
-                  onUpdateWarning(editingWarning);
+                  onUpdateWarning(
+                    editRange
+                      ? {
+                          ...editingWarning,
+                          startsAt: editRange.start,
+                          endsAt: editRange.end,
+                          timeframe: formatTimeframe(editRange.start, editRange.end),
+                        }
+                      : editingWarning
+                  );
                   onShowToast('Warning updated');
                   setEditingWarning(null);
                 }}
-                className="px-5 py-2 rounded-full bg-[#1F4A34] text-white text-[12px] font-medium hover:bg-[#2C6343]"
+                className="px-5 py-2 rounded-full bg-[#1F4A34] text-white text-[12px] font-medium hover:bg-[#2C6343] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Save changes
               </button>

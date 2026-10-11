@@ -125,6 +125,9 @@ export interface WarningItem {
   sectors: string[];
   crops?: string[];
   timeframe: string;
+  /** Picked start/end ('DD/MM/YYYY HH:MM'); timeframe text is built from them. Seeded warnings only have text. */
+  startsAt?: string;
+  endsAt?: string;
   sourceRule?: string;
   recommendedActions: string[];
   // The delivery fields below are never seeded: App computes them from `warningDeliveries`
