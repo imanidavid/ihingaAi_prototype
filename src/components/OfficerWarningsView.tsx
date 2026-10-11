@@ -1110,11 +1110,8 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                 </div>
               </div>
 
-              {/* Timeframe: start and end picked, text built from them */}
+              {/* Starts / Ends picked, timeframe text built from them */}
               <div>
-                <label className="block text-[12px] font-semibold text-[#5B665E] mb-1.5">
-                  Timeframe
-                </label>
                 <DateTimeRangePicker
                   start={startsAt}
                   end={endsAt}
@@ -1353,9 +1350,6 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                 </div>
               </div>
               <div>
-                <label className="block text-[12px] font-semibold text-[#5B665E] mb-1">
-                  Timeframe
-                </label>
                 {editRange ? (
                   <DateTimeRangePicker
                     start={editRange.start}
@@ -1370,7 +1364,7 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                       onClick={() => setEditRange({ start: NOW_STAMP, end: stampHoursFromNow(24) })}
                       className="px-3 py-1 rounded-full bg-white text-[#1F4A34] border border-[#1F4A34]/40 hover:bg-[#E4ECDB] text-[12px] font-semibold cursor-pointer"
                     >
-                      Change timeframe
+                      Change dates
                     </button>
                   </div>
                 )}

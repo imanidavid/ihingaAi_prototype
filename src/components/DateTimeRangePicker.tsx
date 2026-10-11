@@ -58,7 +58,7 @@ export const DateTimeRangePicker: React.FC<DateTimeRangePickerProps> = ({
   const side = (label: string, part: { date: string; time: string }, set: (date: string, time: string) => void) => (
     <div className="space-y-1.5">
       <span className="block text-[12px] font-semibold text-[#17271D]">{label}</span>
-      <div className={withTime ? 'grid grid-cols-[1fr_120px] gap-2' : ''}>
+      <div className={withTime ? 'grid grid-cols-[minmax(0,1fr)_120px] gap-2' : ''}>
         <DatePicker value={part.date} onChange={(d) => set(d, part.time)} minDate={minDate} maxDate={maxDate} />
         {withTime && (
           <PillSelect
@@ -73,7 +73,8 @@ export const DateTimeRangePicker: React.FC<DateTimeRangePickerProps> = ({
   );
 
   return (
-    <div className="space-y-2.5">
+    // Container query: Starts and Ends sit side by side only when there is room (narrow modals stack them)
+    <div className="space-y-2.5 @container">
       {quickChips && (
         <div className="flex flex-wrap items-center gap-2">
           {QUICK_HOURS.map((h) => (
@@ -93,7 +94,7 @@ export const DateTimeRangePicker: React.FC<DateTimeRangePickerProps> = ({
           ))}
         </div>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 @xl:grid-cols-2 gap-3">
         {side(startLabel, s, (date, time) => onChange(join(date, time), end))}
         {side(endLabel, e, (date, time) => onChange(start, join(date, time)))}
       </div>
