@@ -63,3 +63,9 @@ Officer dashboard computed (09/10/2026):
 - [ ] The issue-warning form keeps the last sectors and risk type between opens; reset it on open.
 - [ ] Sector register changes only affect warnings issued afterwards (delivery records keep what was sent). Intentional.
 - [ ] One field report was dated 20/09 although every report is meant to be within the last 7 days (21–28/09); moved to 21/09 so the computed count stays 52.
+
+Found with the timeframe picker (11/10/2026):
+- [ ] Crop advice "When" (officer) is still free text ("Before Tue 14:00") — a single deadline, not a range. Could become a date + time pill.
+- [ ] Scheduled report frequency ("Every Monday 07:00") is still free text — a recurrence, not a range.
+- [ ] Seeded warnings have timeframe text only (no `startsAt`/`endsAt`); they get values when an officer changes the timeframe in Edit.
+

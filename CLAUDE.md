@@ -109,7 +109,10 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
     Government of Rwanda, RAB, Meteo Rwanda or MINAGRI. External feeds are labelled "simulated".
 12. **Dates DD/MM/YYYY.** Never use the native date input (currently true — no `type="date"`
     anywhere). Use `DatePicker` (`src/components/DatePicker.tsx`) and `PillSelect`
-    (`src/components/PillSelect.tsx`) for every new form. 17 older native `<select>` elements
+    (`src/components/PillSelect.tsx`) for every new form. Date/time ranges use
+    `DateTimeRangePicker` (Starts/Ends = date + half-hour pill, optional "Next 24/48/72 h" chips
+    from NOW); store the two values (`startsAt`/`endsAt`, 'DD/MM/YYYY HH:MM') and build the text
+    with `formatTimeframe()` — never a typed range. 17 older native `<select>` elements
     remain; replace them in the consistency pass (Task 9).
 13. **The floating demo control never covers content.** `<main>` carries `pb-32` (128px) —
     keep it at ≥ 96px.

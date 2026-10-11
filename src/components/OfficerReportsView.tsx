@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { DateTimeRangePicker } from './DateTimeRangePicker';
 import {
   FileText,
   Plus,
@@ -36,6 +37,8 @@ import {
   totalRegisteredFarmers,
   reportsInLastDays,
   warningCoversSector,
+  NOW,
+  parseDMY,
 } from '../data/musanzeData';
 
 interface OfficerReportsViewProps {
@@ -504,6 +507,13 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   // =========================================================================
   const handleGenerateReport = (e: React.FormEvent) => {
     e.preventDefault();
+    if (
+      newPeriodType === 'custom' &&
+      (!customStartDate || !customEndDate || parseDMY(customEndDate).getTime() < parseDMY(customStartDate).getTime())
+    ) {
+      onShowToast('The end date must be on or after the start date');
+      return;
+    }
 
     const computedPeriod = getPeriodLabel(newPeriodType);
 
@@ -1665,25 +1675,21 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
                 </div>
 
                 {newPeriodType === 'custom' && (
-                  <div className="grid grid-cols-2 gap-2 pt-2">
-                    <div>
-                      <span className="text-[11px] text-[#5B665E]">Start date (DD/MM/YYYY)</span>
-                      <input
-                        type="text"
-                        value={customStartDate}
-                        onChange={(e) => setCustomStartDate(e.target.value)}
-                        className="w-full py-1.5 px-2.5 rounded-lg bg-white border border-[rgba(31,74,52,0.18)] text-[12px]"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[11px] text-[#5B665E]">End date (DD/MM/YYYY)</span>
-                      <input
-                        type="text"
-                        value={customEndDate}
-                        onChange={(e) => setCustomEndDate(e.target.value)}
-                        className="w-full py-1.5 px-2.5 rounded-lg bg-white border border-[rgba(31,74,52,0.18)] text-[12px]"
-                      />
-                    </div>
+                  <div className="pt-2">
+                    <DateTimeRangePicker
+                      withTime={false}
+                      allowSame
+                      start={customStartDate}
+                      end={customEndDate}
+                      maxDate={NOW.dateFormatted}
+                      startLabel="Start date"
+                      endLabel="End date"
+                      onChange={(st, en) => {
+                        setCustomStartDate(st);
+                        setCustomEndDate(en);
+                        if (!isNameManuallyEdited) setReportName(`${newType} · ${st} – ${en}`);
+                      }}
+                    />
                   </div>
                 )}
               </div>
