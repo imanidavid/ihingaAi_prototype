@@ -171,6 +171,9 @@ export interface SectorRainForecast {
   /** DD/MM/YYYY of dailyMm[0] */
   startDate: string;
   dailyMm: number[];
+  /** Day high and low (°C), same length as dailyMm; the officer's forecast upload can replace them. */
+  dailyTempMaxC: number[];
+  dailyTempMinC: number[];
   source: string;
 }
 
@@ -186,6 +189,7 @@ export interface StationReading {
   tempC: number;
   humidityPct: number;
   rainMm?: number;
+  windKmh?: number;
   source: 'Station network' | 'Manual upload';
 }
 
@@ -231,7 +235,10 @@ export interface WeatherForecastDay {
   fullDate: string;
   rainfallMm: number;
   isPeak?: boolean;
+  /** Day high (°C). */
   temp: number;
+  /** Day low (°C), when the forecast carries one. */
+  tempMin?: number;
   humidity: number;
 }
 

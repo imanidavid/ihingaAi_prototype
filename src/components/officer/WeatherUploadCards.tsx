@@ -18,7 +18,7 @@ export const ManualUploadCard: React.FC<{ onUpload: (rows: ReturnType<typeof par
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[rgba(31,74,52,0.08)]">
         <div>
           <h3 className="text-[16px] font-semibold text-[#17271D]">Manual upload</h3>
-          <p className="text-[12px] text-[#5B665E]">Station readings as CSV: station, date (DD/MM/YYYY), time (HH:MM), rain_mm, temp_c, humidity_pct. The newest reading for a farmer's sector is the weather on their dashboard.</p>
+          <p className="text-[12px] text-[#5B665E]">Station readings as CSV: station, date (DD/MM/YYYY), time (HH:MM), rain_mm, temp_c, humidity_pct, and optional wind_kmh. The newest reading for a farmer's sector is the weather on their dashboard.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <input
@@ -68,6 +68,7 @@ export const ManualUploadCard: React.FC<{ onUpload: (rows: ReturnType<typeof par
                 <th className="py-2.5 px-3 font-semibold">Rain</th>
                 <th className="py-2.5 px-3 font-semibold">Temperature</th>
                 <th className="py-2.5 px-3 font-semibold">Humidity</th>
+                <th className="py-2.5 px-3 font-semibold">Wind</th>
                 <th className="py-2.5 pl-3 font-semibold">Check</th>
               </tr>
             </thead>
@@ -82,6 +83,7 @@ export const ManualUploadCard: React.FC<{ onUpload: (rows: ReturnType<typeof par
                   <td className="py-2.5 px-3 text-[#17271D]">{Number.isNaN(r.rainMm) ? '—' : `${r.rainMm} mm`}</td>
                   <td className="py-2.5 px-3 text-[#17271D]">{Number.isNaN(r.tempC) ? '—' : `${r.tempC}°C`}</td>
                   <td className="py-2.5 px-3 text-[#17271D]">{Number.isNaN(r.humidityPct) ? '—' : `${r.humidityPct}%`}</td>
+                  <td className="py-2.5 px-3 text-[#17271D]">{r.windKmh === undefined || Number.isNaN(r.windKmh) ? '—' : `${r.windKmh} km/h`}</td>
                   <td className="py-2.5 pl-3">
                     {r.errors.length === 0 ? (
                       <NeutralChip>
@@ -109,7 +111,7 @@ export const ManualUploadCard: React.FC<{ onUpload: (rows: ReturnType<typeof par
 /** Forecast upload: replaces days of the 30-day series in the store (rainfall outlook + sector forecast risk). */
 export const ForecastUploadCard: React.FC<{
   forecasts: SectorRainForecast[];
-  onUpload: (updates: { sector: string; dayIndex: number; rainMm: number }[]) => void;
+  onUpload: (updates: { sector: string; dayIndex: number; rainMm: number; tempMaxC?: number; tempMinC?: number }[]) => void;
 }> = ({ forecasts, onUpload }) => {
   const [csv, setCsv] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -123,7 +125,7 @@ export const ForecastUploadCard: React.FC<{
         <div>
           <h3 className="text-[16px] font-semibold text-[#17271D]">Rain forecast upload</h3>
           <p className="text-[12px] text-[#5B665E]">
-            CSV: sector, date (DD/MM/YYYY), rain_mm. Replaces those days in the 30-day forecast; sector risk updates at once.
+            CSV: sector, date (DD/MM/YYYY), rain_mm, and optional temp_max_c, temp_min_c. Replaces those days in the 30-day forecast; sector risk updates at once.
           </p>
           <p className="text-[12px] text-[#5B665E]">Current forecast: {sources.join(' · ')}</p>
         </div>
@@ -150,7 +152,9 @@ export const ForecastUploadCard: React.FC<{
             type="button"
             disabled={valid.length === 0}
             onClick={() => {
-              onUpload(valid.map((r) => ({ sector: r.sector, dayIndex: r.dayIndex, rainMm: r.rainMm })));
+              onUpload(
+                valid.map((r) => ({ sector: r.sector, dayIndex: r.dayIndex, rainMm: r.rainMm, tempMaxC: r.tempMaxC, tempMinC: r.tempMinC }))
+              );
               setCsv(null);
             }}
             className={PRIMARY_BUTTON}
@@ -174,6 +178,7 @@ export const ForecastUploadCard: React.FC<{
                 <th className="py-2.5 px-3 font-semibold">Date</th>
                 <th className="py-2.5 px-3 font-semibold">Now</th>
                 <th className="py-2.5 px-3 font-semibold">New</th>
+                <th className="py-2.5 px-3 font-semibold">High / low</th>
                 <th className="py-2.5 pl-3 font-semibold">Check</th>
               </tr>
             </thead>
@@ -187,6 +192,10 @@ export const ForecastUploadCard: React.FC<{
                     <td className="py-2.5 px-3 text-[#17271D]">{r.date}</td>
                     <td className="py-2.5 px-3 text-[#5B665E]">{current === undefined ? '—' : `${current} mm`}</td>
                     <td className="py-2.5 px-3 text-[#17271D] font-semibold">{Number.isNaN(r.rainMm) ? '—' : `${r.rainMm} mm`}</td>
+                    <td className="py-2.5 px-3 text-[#17271D] whitespace-nowrap">
+                      {r.tempMaxC === undefined || Number.isNaN(r.tempMaxC) ? '—' : `${r.tempMaxC}°C`} /{' '}
+                      {r.tempMinC === undefined || Number.isNaN(r.tempMinC) ? '—' : `${r.tempMinC}°C`}
+                    </td>
                     <td className="py-2.5 pl-3">
                       {r.errors.length === 0 ? (
                         <NeutralChip>

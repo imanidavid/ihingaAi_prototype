@@ -2090,10 +2090,15 @@ const SECTOR_RAIN_FACTOR: Record<string, number> = {
   Shingiro: 0.7,
 };
 
+/** Simulated seed only: day low = day high minus this. The officer's forecast upload replaces both. */
+const SEED_NIGHT_DROP_C = 9;
+
 export const INITIAL_RAIN_FORECASTS: SectorRainForecast[] = Object.entries(SECTOR_RAIN_FACTOR).map(([sector, f]) => ({
   sector,
   startDate: NOW.dateFormatted,
   dailyMm: RAINFALL_MONTH_30D.map((d) => Math.round(d.rainfallMm * f)),
+  dailyTempMaxC: RAINFALL_MONTH_30D.map((d) => d.temp),
+  dailyTempMinC: RAINFALL_MONTH_30D.map((d) => d.temp - SEED_NIGHT_DROP_C),
   source: 'Seasonal model run 28/09 12:00 (simulated)',
 }));
 
@@ -2116,10 +2121,25 @@ export function forecastDays(forecasts: SectorRainForecast[], sector: string): W
       fullDate: `${SHORT_MONTHS[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}`,
       rainfallMm: mm,
       isPeak: i === peakIdx,
-      temp: ref ? ref.temp : 0,
+      temp: f.dailyTempMaxC[i] ?? (ref ? ref.temp : 0),
+      tempMin: f.dailyTempMinC[i],
       humidity: ref ? ref.humidity : 0,
     };
   });
+}
+
+/** Plain-language day condition from the day's rain. "Heavy rain" starts at the rain rule's Watch level. */
+export type RainCondition = 'Dry' | 'Mostly dry' | 'Light rain' | 'Rain' | 'Heavy rain';
+/** Upper bounds (mm, exclusive) for the lighter conditions; display bands only, they do not change risk. */
+export const RAIN_CONDITION_BANDS: { below: number; condition: RainCondition }[] = [
+  { below: 1, condition: 'Dry' },
+  { below: 5, condition: 'Mostly dry' },
+  { below: 15, condition: 'Light rain' },
+];
+export function rainCondition(mm: number, rules: ThresholdRuleItem[]): RainCondition {
+  const watch = rainThresholds(rules)[0];
+  if (watch && mm >= watch.value) return 'Heavy rain';
+  return RAIN_CONDITION_BANDS.find((b) => mm < b.below)?.condition ?? 'Rain';
 }
 
 /** "Heavy rain expected Tuesday." when a day in the next 3 reaches the rain rule's Watch level. */
@@ -2146,12 +2166,12 @@ export const STATION_SECTOR: Record<string, string> = {
 };
 
 export const INITIAL_STATION_READINGS: StationReading[] = [
-  { id: 'st-1', station: 'Kinigi gauge', sector: 'Kinigi', date: '28/09/2026', time: '13:55', tempC: 22, humidityPct: 78, rainMm: 12, source: 'Station network' },
-  { id: 'st-2', station: 'Busogo gauge', sector: 'Busogo', date: '28/09/2026', time: '13:55', tempC: 21, humidityPct: 80, rainMm: 11, source: 'Station network' },
-  { id: 'st-3', station: 'Muhoza gauge', sector: 'Muhoza', date: '28/09/2026', time: '13:55', tempC: 23, humidityPct: 76, rainMm: 9, source: 'Station network' },
-  { id: 'st-4', station: 'Remera gauge', sector: 'Remera', date: '28/09/2026', time: '13:55', tempC: 22, humidityPct: 79, rainMm: 10, source: 'Station network' },
-  { id: 'st-5', station: 'Cyuve gauge', sector: 'Cyuve', date: '28/09/2026', time: '13:55', tempC: 23, humidityPct: 74, rainMm: 7, source: 'Station network' },
-  { id: 'st-6', station: 'Nyange gauge', sector: 'Nyange', date: '28/09/2026', time: '13:55', tempC: 22, humidityPct: 77, rainMm: 8, source: 'Station network' },
+  { id: 'st-1', station: 'Kinigi gauge', sector: 'Kinigi', date: '28/09/2026', time: '13:55', tempC: 22, humidityPct: 78, rainMm: 12, windKmh: 9, source: 'Station network' },
+  { id: 'st-2', station: 'Busogo gauge', sector: 'Busogo', date: '28/09/2026', time: '13:55', tempC: 21, humidityPct: 80, rainMm: 11, windKmh: 11, source: 'Station network' },
+  { id: 'st-3', station: 'Muhoza gauge', sector: 'Muhoza', date: '28/09/2026', time: '13:55', tempC: 23, humidityPct: 76, rainMm: 9, windKmh: 7, source: 'Station network' },
+  { id: 'st-4', station: 'Remera gauge', sector: 'Remera', date: '28/09/2026', time: '13:55', tempC: 22, humidityPct: 79, rainMm: 10, windKmh: 8, source: 'Station network' },
+  { id: 'st-5', station: 'Cyuve gauge', sector: 'Cyuve', date: '28/09/2026', time: '13:55', tempC: 23, humidityPct: 74, rainMm: 7, windKmh: 6, source: 'Station network' },
+  { id: 'st-6', station: 'Nyange gauge', sector: 'Nyange', date: '28/09/2026', time: '13:55', tempC: 22, humidityPct: 77, rainMm: 8, windKmh: 10, source: 'Station network' },
 ];
 
 /** Latest reading for a sector's station (falls back to the newest reading anywhere). */
@@ -3116,13 +3136,13 @@ export const INITIAL_PROCESSING_SETTINGS: ProcessingSettings = {
 
 /** Sample manual station upload: 4 valid rows, 2 with problems. Kinigi's 13:58 reading becomes the latest. */
 export const SAMPLE_RAIN_GAUGE_CSV = [
-  'station,date,time,rain_mm,temp_c,humidity_pct',
-  'Kinigi gauge,28/09/2026,13:58,14.5,21,84',
-  'Busogo gauge,28/09/2026,13:58,13.0,20,85',
-  'Muhoza gauge,27/09/2026,18:00,9.5,19,82',
-  'Remera gauge,27/09/2026,18:00,21.0,18,88',
-  'Kinigi gauge,31/09/2026,12:00,12.0,22,80',
-  'Busogo gauge,27/09/2026,18:00,-4,23,140',
+  'station,date,time,rain_mm,temp_c,humidity_pct,wind_kmh',
+  'Kinigi gauge,28/09/2026,13:58,14.5,21,84,14',
+  'Busogo gauge,28/09/2026,13:58,13.0,20,85,12',
+  'Muhoza gauge,27/09/2026,18:00,9.5,19,82,6',
+  'Remera gauge,27/09/2026,18:00,21.0,18,88,9',
+  'Kinigi gauge,31/09/2026,12:00,12.0,22,80,8',
+  'Busogo gauge,27/09/2026,18:00,-4,23,140,7',
 ].join('\n');
 
 export const RAIN_GAUGES = Object.keys(STATION_SECTOR);
@@ -3152,21 +3172,24 @@ export function parseRainGaugeCsv(text: string) {
     if (get('rain_mm') === '' || Number.isNaN(rain) || rain < 0 || rain > 300) errors.push('Rain must be 0–300 mm');
     if (get('temp_c') === '' || Number.isNaN(temp) || temp < -5 || temp > 40) errors.push('Temperature must be -5 to 40 °C');
     if (get('humidity_pct') === '' || Number.isNaN(humidity) || humidity < 0 || humidity > 100) errors.push('Humidity must be 0–100%');
-    return { line: i + 2, station, date, time, rainMm: rain, tempC: temp, humidityPct: humidity, errors };
+    // wind_kmh is optional; when given it must be a real speed
+    const windKmh = get('wind_kmh') === '' ? undefined : Number(get('wind_kmh'));
+    if (windKmh !== undefined && (Number.isNaN(windKmh) || windKmh < 0 || windKmh > 150)) errors.push('Wind must be 0–150 km/h');
+    return { line: i + 2, station, date, time, rainMm: rain, tempC: temp, humidityPct: humidity, windKmh, errors };
   });
   return { rows, headerError: null as string | null };
 }
 
 /** Sample forecast upload: replaces days in the store's 30-day series (2 rows with problems). */
 export const SAMPLE_FORECAST_CSV = [
-  'sector,date,rain_mm',
-  'Kinigi,29/09/2026,65',
-  'Kinigi,30/09/2026,34',
-  'Busogo,29/09/2026,62',
-  'Remera,29/09/2026,52',
-  'Muhoza,29/09/2026,45',
-  'Kinigi,27/09/2026,20',
-  'Nyabihu,29/09/2026,30',
+  'sector,date,rain_mm,temp_max_c,temp_min_c',
+  'Kinigi,29/09/2026,65,18,11',
+  'Kinigi,30/09/2026,34,20,12',
+  'Busogo,29/09/2026,62,19,11',
+  'Remera,29/09/2026,52,19,12',
+  'Muhoza,29/09/2026,45,21,13',
+  'Kinigi,27/09/2026,20,22,13',
+  'Nyabihu,29/09/2026,30,20,12',
 ].join('\n');
 
 export function parseForecastCsv(text: string, forecasts: SectorRainForecast[]) {
@@ -3191,7 +3214,13 @@ export function parseForecastCsv(text: string, forecasts: SectorRainForecast[]) 
       if (dayIndex < 0 || dayIndex >= f.dailyMm.length) errors.push(`Date must be within the ${f.dailyMm.length}-day forecast from ${f.startDate}`);
     }
     if (get('rain_mm') === '' || Number.isNaN(rain) || rain < 0 || rain > 300) errors.push('Rain must be 0–300 mm');
-    return { line: i + 2, sector, date, rainMm: rain, dayIndex, errors };
+    // temp_max_c and temp_min_c are optional; when given they replace the day's high and low
+    const tempMaxC = get('temp_max_c') === '' ? undefined : Number(get('temp_max_c'));
+    const tempMinC = get('temp_min_c') === '' ? undefined : Number(get('temp_min_c'));
+    const badTemp = (t: number | undefined) => t !== undefined && (Number.isNaN(t) || t < -5 || t > 40);
+    if (badTemp(tempMaxC) || badTemp(tempMinC)) errors.push('Temperature must be -5 to 40 °C');
+    else if (tempMaxC !== undefined && tempMinC !== undefined && tempMinC > tempMaxC) errors.push('Low must not be above high');
+    return { line: i + 2, sector, date, rainMm: rain, tempMaxC, tempMinC, dayIndex, errors };
   });
   return { rows, headerError: null as string | null };
 }
