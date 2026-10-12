@@ -11,8 +11,8 @@ import {
   Leaf,
   Check,
 } from 'lucide-react';
-import { CropAdvisory, UserProfileSettings } from '../types';
-import { PLAN_AHEAD_DATA as PLAN_AHEAD_ITEMS } from '../data/musanzeData';
+import { CropAdvisory, PlanAheadCategory, PlanAheadItem, UserProfileSettings } from '../types';
+import { formatPlanDue, PLAN_ALL_CROPS } from '../data/musanzeData';
 
 interface RecommendationsViewProps {
   settings: UserProfileSettings;
@@ -22,11 +22,14 @@ interface RecommendationsViewProps {
   onToggleSaveItem: (id: string) => void;
   /** Officer advice for active warnings in the farmer's area. */
   advisories: CropAdvisory[];
+  /** Officer's plan-ahead items for the crops this farmer grows. */
+  planItems: PlanAheadItem[];
 }
 
 export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
   settings,
   advisories: CROP_ADVISORIES,
+  planItems: PLAN_AHEAD_ITEMS,
   onOpenSettingsNotifications,
   onSelectAdvisory,
   savedItemIds,
@@ -61,8 +64,7 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
   // Plan ahead items filtered by selectedCrop
   const filteredPlanAhead = PLAN_AHEAD_ITEMS.filter((item) => {
     if (selectedCrop === 'All') return true;
-    if (item.cropTag === 'All crops') return true;
-    return item.cropTag.toLowerCase().includes(selectedCrop.toLowerCase());
+    return item.crop === PLAN_ALL_CROPS || item.crop === selectedCrop;
   });
 
   // Saved items list
@@ -70,7 +72,7 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
     id: string;
     type: 'card' | 'row';
     cardData?: CropAdvisory;
-    rowData?: (typeof PLAN_AHEAD_ITEMS)[0];
+    rowData?: PlanAheadItem;
   }[] = [
     ...CROP_ADVISORIES.map((adv) => ({
       id: adv.id,
@@ -88,19 +90,19 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
     savedItemIds.includes(item.id)
   );
 
-  const getPlanIcon = (type: string) => {
-    switch (type) {
-      case 'shield':
-        return <Shield className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />;
-      case 'sprout':
+  const getPlanIcon = (category: PlanAheadCategory) => {
+    switch (category) {
+      case 'Soil':
         return <Sprout className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />;
-      case 'calendar':
+      case 'Input timing':
         return <Calendar className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />;
-      case 'tag':
+      case 'Variety':
         return <Tag className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />;
-      case 'wheat':
-      default:
+      case 'Harvest':
         return <Wheat className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />;
+      case 'Risk mitigation':
+      default:
+        return <Shield className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />;
     }
   };
 
@@ -119,7 +121,7 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
         <div>
           <h1 className="text-[24px] font-semibold text-[#17271D]">Recommendations</h1>
           <p className="text-[13px] text-[#5B665E] mt-0.5">
-            For your farm in Kinigi, Musanze · based on this week's forecast
+            For your farm in {settings.sector}, Musanze · from your agricultural officer
           </p>
         </div>
         <button
@@ -198,7 +200,7 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
           >
             <span>Saved</span>
             <span className="w-4 h-4 rounded-full bg-white/20 text-[10px] font-semibold flex items-center justify-center">
-              {savedItemIds.length}
+              {savedItems.length}
             </span>
           </button>
         </div>
@@ -214,7 +216,7 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
             <div>
               <h2 className="text-[17px] font-semibold text-[#17271D]">Act this week</h2>
               <p className="text-[12px] text-[#5B665E]">
-                Urgent agronomic interventions keyed to Tuesday’s 48 mm rainfall influx
+                Your officer's advice for the warnings active in your area
               </p>
             </div>
 
@@ -333,7 +335,7 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
             <div>
               <h2 className="text-[17px] font-semibold text-[#17271D]">Plan ahead</h2>
               <p className="text-[12px] text-[#5B665E]">
-                Seasonal milestones, input applications, and variety selections for Season 2026/27 A & B
+                Season tasks from your officer for the crops you grow
               </p>
             </div>
 
@@ -346,15 +348,11 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
                 {filteredPlanAhead.map((item) => {
                   const isSaved = savedItemIds.includes(item.id);
                   return (
-                    <div
-                      key={item.id}
-                      onClick={() => onSelectAdvisory(item.advisoryEquivalent)}
-                      className="p-4 flex items-center justify-between gap-4 hover:bg-[rgba(31,74,52,0.02)] transition-colors cursor-pointer group"
-                    >
+                    <div key={item.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
                       {/* Left: category icon + title + one-line rationale */}
                       <div className="flex items-start gap-3.5 min-w-0 flex-1">
                         <div className="w-9 h-9 rounded-full bg-[#E4ECDB] border border-[rgba(31,74,52,0.12)] flex items-center justify-center flex-shrink-0 mt-0.5">
-                          {getPlanIcon(item.iconType)}
+                          {getPlanIcon(item.category)}
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2 mb-0.5">
@@ -363,22 +361,21 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
                             </span>
                             <span className="text-[11px] text-[#5B665E]">·</span>
                             <span className="text-[11px] text-[#5B665E] font-medium">
-                              {item.cropTag}
+                              {item.crop}
                             </span>
                           </div>
-                          <h4 className="text-[14px] font-semibold text-[#17271D] group-hover:text-[#1F4A34] transition-colors leading-snug">
-                            {item.title}
-                          </h4>
-                          <p className="text-[12px] text-[#5B665E] mt-0.5 leading-relaxed">
-                            {item.oneLineRationale}
-                          </p>
+                          <h4 className="text-[14px] font-semibold text-[#17271D] leading-snug">{item.title}</h4>
+                          <p className="text-[12px] text-[#5B665E] mt-0.5 leading-relaxed">{item.reason}</p>
+                          {item.authorName && (
+                            <p className="text-[11px] text-[#5B665E] mt-1">From {item.authorName}, agricultural officer</p>
+                          )}
                         </div>
                       </div>
 
                       {/* Right: timing chip + save bookmark + arrow button */}
                       <div className="flex items-center gap-2.5 flex-shrink-0">
                         <span className="px-3 py-1 rounded-full text-[11px] font-medium bg-[#F4F6EF] text-[#17271D] border border-[rgba(31,74,52,0.10)]">
-                          {item.timingChip}
+                          {formatPlanDue(item.due)}
                         </span>
 
                         <button
@@ -390,13 +387,11 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
                               : 'bg-white text-[#5B665E] hover:text-[#17271D] border border-[rgba(31,74,52,0.15)]'
                           }`}
                           title={isSaved ? 'Saved' : 'Save'}
+                          aria-label={isSaved ? `Remove ${item.title} from saved` : `Save ${item.title}`}
+                          aria-pressed={isSaved}
                         >
                           <Bookmark className="w-3.5 h-3.5" strokeWidth={1.5} />
                         </button>
-
-                        <div className="w-8 h-8 rounded-full bg-[#1F4A34] text-white flex items-center justify-center group-hover:bg-[#2C6343] transition-colors shadow-xs">
-                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" strokeWidth={1.5} />
-                        </div>
                       </div>
                     </div>
                   );
@@ -467,7 +462,7 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
                         <button
                           type="button"
                           onClick={(e) => handleSaveToggle(card.id, e)}
-                          className="px-3 py-1 rounded-full text-[11px] font-medium text-[#C93B3B] hover:bg-[#C93B3B]/10 transition-colors cursor-pointer"
+                          className="px-3 py-1 rounded-full text-[11px] font-medium text-[#5B665E] hover:text-[#17271D] hover:bg-[#E4ECDB] transition-colors cursor-pointer"
                         >
                           Remove
                         </button>
@@ -480,14 +475,10 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
                 } else if (item.type === 'row' && item.rowData) {
                   const row = item.rowData;
                   return (
-                    <div
-                      key={row.id}
-                      onClick={() => onSelectAdvisory(row.advisoryEquivalent)}
-                      className="p-4 flex items-center justify-between gap-4 hover:bg-[rgba(31,74,52,0.02)] transition-colors cursor-pointer group"
-                    >
+                    <div key={row.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
                       <div className="flex items-start gap-3.5 min-w-0 flex-1">
                         <div className="w-9 h-9 rounded-full bg-[#E4ECDB] border border-[rgba(31,74,52,0.12)] flex items-center justify-center flex-shrink-0 mt-0.5">
-                          {getPlanIcon(row.iconType)}
+                          {getPlanIcon(row.category)}
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
@@ -496,32 +487,25 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
                             </span>
                             <span className="text-[11px] text-[#5B665E]">·</span>
                             <span className="text-[11px] text-[#5B665E] font-medium">
-                              {row.cropTag}
+                              {row.crop}
                             </span>
                           </div>
-                          <h4 className="text-[14px] font-semibold text-[#17271D] group-hover:text-[#1F4A34] transition-colors leading-snug">
-                            {row.title}
-                          </h4>
-                          <p className="text-[12px] text-[#5B665E] mt-0.5 leading-relaxed">
-                            {row.oneLineRationale}
-                          </p>
+                          <h4 className="text-[14px] font-semibold text-[#17271D] leading-snug">{row.title}</h4>
+                          <p className="text-[12px] text-[#5B665E] mt-0.5 leading-relaxed">{row.reason}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2.5 flex-shrink-0">
                         <span className="px-3 py-1 rounded-full text-[11px] font-medium bg-[#F4F6EF] text-[#17271D] border border-[rgba(31,74,52,0.10)]">
-                          {row.timingChip}
+                          {formatPlanDue(row.due)}
                         </span>
                         <button
                           type="button"
                           onClick={(e) => handleSaveToggle(row.id, e)}
-                          className="px-3 py-1 rounded-full text-[11px] font-medium text-[#C93B3B] hover:bg-[#C93B3B]/10 transition-colors cursor-pointer"
+                          className="px-3 py-1 rounded-full text-[11px] font-medium text-[#5B665E] hover:text-[#17271D] hover:bg-[#E4ECDB] transition-colors cursor-pointer"
                         >
                           Remove
                         </button>
-                        <div className="w-8 h-8 rounded-full bg-[#1F4A34] text-white flex items-center justify-center group-hover:bg-[#2C6343] transition-colors shadow-xs">
-                          <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
-                        </div>
                       </div>
                     </div>
                   );

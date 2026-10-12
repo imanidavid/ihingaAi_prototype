@@ -33,12 +33,14 @@ module, no context and no reducer; state is passed down as props. Fields:
 `coopMembers` · `coopGroupRecords` · `meetings` · `equipmentBookings` · `rolePermissions` ·
 `auditEvents` · `loginAttempts` · `securitySettings` · `dataSources` · `processingRuns` ·
 `processingSettings` · `messageTemplates` · `voiceSettings` · `rainForecasts` ·
-`stationReadings` · `cropAdvisories` · `warningDeliveries` · `riskTypes` · `sectorRegister`
+`stationReadings` · `cropAdvisories` · `warningDeliveries` · `riskTypes` · `sectorRegister` ·
+`planAheadItems`
 
 Derived once in `App.tsx` and passed down: `coopGroups` (`computeCoopGroups`), `coopSummary`
 (`computeCoopSummary`), `sectorForecastRisk` (`computeSectorForecastRisk`), `affectedSectors`,
 `districtClimateRisk`, and for the farmer `farmerMember`, `farmerMeetings`, `farmerBookings`,
-`farmerForecast`, `farmerReading`, `farmerWeatherSummary`, `farmerAdvisories`.
+`farmerForecast`, `farmerReading`, `farmerWeatherSummary`, `farmerAdvisories`, `farmerCropRisk`,
+`farmerPlanItems`; and `districtCropRisk` for other roles.
 
 Open tabs share the store: `useTabSync` (`src/useTabSync.ts`) broadcasts every change over a
 `BroadcastChannel` and a new tab adopts the store of an open one, so an officer in one tab and a
@@ -124,7 +126,7 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
     keep it at ≥ 96px.
 14. **Reset demo** (`handleResetDemo`, `App.tsx`) must restore every store field to its
     initial value, including anything created during the demo. It currently resets all
-    twenty-nine fields; add every new field you introduce.
+    thirty fields; add every new field you introduce (also to `storeSnapshot`, which syncs open tabs).
 
 ## Roles (one shared store, desktop unless noted)
 
@@ -256,6 +258,21 @@ warning carries `riskGroup` (`weather` | `pest_disease`) and only `weather` rais
 (`isWeatherWarning`). The officer dashboard rows and "Needs your attention" come from
 `computeSectorOverview` and `computeOfficerAttention`; `OFFICER_DATA` now only holds the
 profile, hero badge and photo.
+
+Crop risk matrix and plan ahead (12/10/2026): **every section's data comes from the (mock) AI
+model or from a user through a screen where they enter it — never typed into a component.** The
+crop risk matrix is `computeCropRiskMatrix` (`musanzeData.ts`, "Crop risk model (simulated)"): per
+sector and crop it reads the 10-day forecast in `rainForecasts` against the officer's rules in
+`thresholdRules` (rain 40/60/80 mm, dry spell 7 dry days, temperature +3°C over the 30-day average
+high, late blight 85% humidity for 48 h on potato), then raises each cell to any active warning for
+that hazard, sector and crop (`hazardForWarning`). Farmers get their sector and crops
+(`farmerCropRisk`); other roles get the district maximum (`districtCropRisk`). Late Blight Threat
+is what makes potato disease High; ending it drops the cell to Low. Plan-ahead items are the store
+field `planAheadItems` (seed `INITIAL_PLAN_AHEAD_ITEMS`), written by the officer under Warnings →
+Plan ahead (crop, category Soil · Input timing · Variety · Harvest · Risk mitigation, title,
+reason, due by / not before a date, or a season from `PLAN_SEASON_OPTIONS`). A farmer sees items
+for "All crops" or a crop they grow (`planItemsForCrops`); bookmarks stay in `savedItemIds`.
+`CROP_RISK_MATRIX`, `PLAN_AHEAD_DATA` and `OFFICER_CROP_RISK_MAP` are gone.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 

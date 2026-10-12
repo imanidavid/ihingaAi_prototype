@@ -196,16 +196,6 @@ export interface StationReading {
   source: 'Station network' | 'Manual upload';
 }
 
-export interface OfficerCropRiskDetail {
-  crop: string;
-  risk: RiskLevel;
-  hazard: string;
-  affectedSectors: string;
-  growersCount: number;
-  linkedWarningTitle: string;
-  linkedWarningAckPct: number;
-  warningId?: string;
-}
 
 
 
@@ -274,15 +264,23 @@ export interface CropAdvisory {
   isDemo?: boolean;
 }
 
+export type PlanAheadCategory = 'Soil' | 'Input timing' | 'Variety' | 'Harvest' | 'Risk mitigation';
+
+/** When a plan-ahead task is due: by a date, not before a date, or in a season. Dates DD/MM/YYYY. */
+export type PlanAheadDue =
+  | { kind: 'by' | 'after'; date: string; time?: string }
+  | { kind: 'season'; season: string };
+
+/** A season task written by the agricultural officer (store field `planAheadItems`). */
 export interface PlanAheadItem {
   id: string;
-  category: string;
+  /** 'All crops' or one crop from CROP_OPTIONS. */
+  crop: string;
+  category: PlanAheadCategory;
   title: string;
-  oneLineRationale: string;
-  timingChip: string;
-  cropTag: 'All crops' | 'Irish Potato' | 'Climbing Beans' | 'Maize';
-  iconType: 'shield' | 'sprout' | 'calendar' | 'tag' | 'wheat';
-  advisoryEquivalent: CropAdvisory;
+  reason: string;
+  due: PlanAheadDue;
+  authorName?: string;
 }
 
 export type ObservationStatus =

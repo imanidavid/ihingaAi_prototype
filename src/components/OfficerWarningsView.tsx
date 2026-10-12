@@ -22,6 +22,7 @@ import {
   Users,
   CheckCircle2,
   XCircle,
+  CalendarClock,
 } from 'lucide-react';
 import {
   OfficerActiveWarning,
@@ -34,6 +35,7 @@ import {
   RiskTypeGroup,
   SectorRegisterEntry,
   ChannelDelivery,
+  PlanAheadItem,
 } from '../types';
 import {
   RISK_LEVEL_WEIGHT,
@@ -49,6 +51,7 @@ import {
   isRangeValid,
 } from '../data/musanzeData';
 import { CropAdviceModal } from './officer/CropAdviceModal';
+import { PlanAheadTab } from './officer/PlanAheadTab';
 import { DateTimeRangePicker } from './DateTimeRangePicker';
 
 interface OfficerWarningsViewProps {
@@ -65,6 +68,10 @@ interface OfficerWarningsViewProps {
   cropAdvisories: CropAdvisory[];
   onSaveAdvice: (advice: CropAdvisory) => void;
   onRemoveAdvice: (adviceId: string) => void;
+  /** Season tasks for farmers (Plan ahead tab). */
+  planAheadItems: PlanAheadItem[];
+  onSavePlanItem: (item: PlanAheadItem) => void;
+  onRemovePlanItem: (itemId: string) => void;
   authorName: string;
   /** Forecast series, so the thresholds tab can preview which sectors each setting puts at risk. */
   rainForecasts: SectorRainForecast[];
@@ -98,6 +105,9 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
   cropAdvisories,
   onSaveAdvice,
   onRemoveAdvice,
+  planAheadItems,
+  onSavePlanItem,
+  onRemovePlanItem,
   authorName,
   rainForecasts,
   riskTypes,
@@ -106,7 +116,7 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
 }) => {
   const sectorNames = sectorRegister.map((r) => r.sector);
   const [adviceFor, setAdviceFor] = useState<OfficerActiveWarning | null>(null);
-  const [activeTab, setActiveTab] = useState<'active' | 'history' | 'thresholds'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'history' | 'thresholds' | 'plan'>('active');
 
   // Edit warning: timeframe picker values (seeded warnings have text only until the officer changes it)
   const [editRange, setEditRange] = useState<{ start: string; end: string } | null>(null);
@@ -440,6 +450,18 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
           <Sliders className="w-3.5 h-3.5" strokeWidth={1.75} />
           <span>Thresholds & rules</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('plan')}
+          className={`px-4 py-1.5 text-[12px] font-medium rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'plan'
+              ? 'bg-[#1F4A34] text-white shadow-xs font-semibold'
+              : 'text-[#5B665E] hover:text-[#17271D]'
+          }`}
+        >
+          <CalendarClock className="w-3.5 h-3.5" strokeWidth={1.75} />
+          <span>Plan ahead ({planAheadItems.length})</span>
+        </button>
       </div>
 
       {/* ========================================================================= */}
@@ -751,6 +773,10 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
       {/* ========================================================================= */}
       {/* TAB: THRESHOLDS & RULES */}
       {/* ========================================================================= */}
+      {activeTab === 'plan' && (
+        <PlanAheadTab items={planAheadItems} authorName={authorName} onSave={onSavePlanItem} onRemove={onRemovePlanItem} />
+      )}
+
       {activeTab === 'thresholds' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

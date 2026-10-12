@@ -34,14 +34,18 @@ import {
   NOW,
   MUSANZE_RECORD,
   FORECAST_HORIZONS,
-  CROP_RISK_MATRIX,
-  CROP_ADVISORIES_DATA,
-  PLAN_AHEAD_DATA,
+  CROP_HAZARDS,
+  CropRiskMatrixRow,
+  cropRiskChipText,
+  INITIAL_CROP_ADVISORIES,
+  formatPlanDue,
+  PLAN_ALL_CROPS,
+  RISK_LEVEL_WEIGHT,
   RISK_LEVEL_COLORS,
   ALL_30_RWANDA_DISTRICTS,
   MUSANZE_SECTORS_CELLS,
 } from '../data/musanzeData';
-import { WeatherForecastDay, CropAdvisory, AlertItem, ObservationItem, RiskLevel, NotificationItem } from '../types';
+import { WeatherForecastDay, CropAdvisory, AlertItem, ObservationItem, RiskLevel, NotificationItem, PlanAheadItem } from '../types';
 
 interface MobileFrameProps {
   alerts?: AlertItem[];
@@ -64,6 +68,10 @@ interface MobileFrameProps {
   lowSectors: string[];
   /** Officer advice for active warnings in the farmer's area. */
   advisories: CropAdvisory[];
+  /** Crop risk matrix for the farmer's sector and crops (crop risk model, simulated). */
+  cropRisk: CropRiskMatrixRow[];
+  /** Officer's plan-ahead items for the farmer's crops. */
+  planItems: PlanAheadItem[];
   /** Farmer's current climate risk and first name. */
   riskLevel: RiskLevel;
   firstName: string;
@@ -82,6 +90,8 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
   riskSectors,
   lowSectors,
   advisories,
+  cropRisk,
+  planItems,
   riskLevel,
   firstName,
 }) => {
@@ -90,7 +100,7 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
   const [mobileView, setMobileView] = useState<'m1' | 'm2'>(initialSubView);
   const [activeTab, setActiveTab] = useState<'home' | 'forecast' | 'warnings' | 'advice'>('home');
   const [previousTab, setPreviousTab] = useState<'home' | 'forecast' | 'warnings' | 'advice'>('home');
-  const [activeAdvisory, setActiveAdvisory] = useState<CropAdvisory>(CROP_ADVISORIES_DATA[0]);
+  const [activeAdvisory, setActiveAdvisory] = useState<CropAdvisory>(advisories[0] || INITIAL_CROP_ADVISORIES[0]);
 
   // Forecast state
   const [forecastHorizon, setForecastHorizon] = useState<'10d' | 'month' | 'season'>('10d');
@@ -1021,54 +1031,45 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
 
                   {/* Crop Matrix: 3 stacked crop cards, each listing its 4 risk chips */}
                   <div className="bg-[#FBFCF8] rounded-[16px] p-3.5 border border-[rgba(31,74,52,0.10)] shadow-xs space-y-3">
-                    <h4 className="text-[13px] font-semibold text-[#17271D]">Crop Risk Matrix</h4>
+                    <h4 className="text-[13px] font-semibold text-[#17271D]">Crop risk matrix</h4>
 
-                    {CROP_RISK_MATRIX.map((row) => {
-                      const matchedAdvisory = CROP_ADVISORIES_DATA.find((a) => a.id === row.advisoryId) || CROP_ADVISORIES_DATA[0];
-                      const rRain = getRiskColor(row.excessRain.level);
-                      const rDry = getRiskColor(row.drySpell.level);
-                      const rTemp = getRiskColor(row.temperature.level);
-                      const rPest = getRiskColor(row.diseasePest.level);
-
+                    {cropRisk.map((row) => {
+                      const advice = advisories.find((a) => a.crop === row.crop);
+                      // The cell that matters most for this crop, with the model's reason
+                      const top = CROP_HAZARDS.map((h) => row.cells[h.id]).reduce((best, c) =>
+                        RISK_LEVEL_WEIGHT[c.level] > RISK_LEVEL_WEIGHT[best.level] ? c : best
+                      );
                       return (
                         <div
                           key={row.crop}
-                          onClick={() => handleOpenAdvisory(matchedAdvisory)}
-                          className="p-3 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.08)] cursor-pointer hover:border-[#1F4A34]/30 transition-all"
+                          onClick={advice ? () => handleOpenAdvisory(advice) : undefined}
+                          className={`p-3 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.08)] transition-all ${
+                            advice ? 'cursor-pointer hover:border-[#1F4A34]/30' : ''
+                          }`}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-[12px] font-semibold text-[#17271D]">{row.crop}</span>
-                            <span className="text-[10px] text-[#1F4A34] font-medium">View advice →</span>
+                            {advice && <span className="text-[10px] text-[#1F4A34] font-medium">View advice →</span>}
                           </div>
                           <div className="flex flex-wrap gap-1.5 text-[9.5px]">
-                            <span
-                              className="px-2 py-0.5 rounded-full font-semibold"
-                              style={{ backgroundColor: rRain.bg, color: rRain.text }}
-                            >
-                              Rain: {row.excessRain.chipText}
-                            </span>
-                            <span
-                              className="px-2 py-0.5 rounded-full font-semibold"
-                              style={{ backgroundColor: rDry.bg, color: rDry.text }}
-                            >
-                              Dry: {row.drySpell.chipText}
-                            </span>
-                            <span
-                              className="px-2 py-0.5 rounded-full font-semibold"
-                              style={{ backgroundColor: rTemp.bg, color: rTemp.text }}
-                            >
-                              Temp: {row.temperature.chipText}
-                            </span>
-                            <span
-                              className="px-2 py-0.5 rounded-full font-semibold"
-                              style={{ backgroundColor: rPest.bg, color: rPest.text }}
-                            >
-                              Blight/Pest: {row.diseasePest.chipText}
-                            </span>
+                            {CROP_HAZARDS.map((h) => {
+                              const c = getRiskColor(row.cells[h.id].level);
+                              return (
+                                <span
+                                  key={h.id}
+                                  className="px-2 py-0.5 rounded-full font-semibold"
+                                  style={{ backgroundColor: c.bg, color: c.text }}
+                                >
+                                  {h.short}: {cropRiskChipText(row.cells[h.id])}
+                                </span>
+                              );
+                            })}
                           </div>
+                          <p className="text-[10px] text-[#5B665E] mt-1.5 leading-snug">{top.reasons[top.reasons.length - 1]}</p>
                         </div>
                       );
                     })}
+                    <p className="text-[9.5px] text-[#5B665E]">Crop risk model (simulated) · next 10 days</p>
                   </div>
                 </div>
               )}
@@ -1229,25 +1230,24 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                   <div className="bg-[#FBFCF8] rounded-[16px] p-3.5 border border-[rgba(31,74,52,0.10)] shadow-xs">
                     <h4 className="text-[13px] font-semibold text-[#17271D] mb-2.5">Plan ahead</h4>
                     <div className="divide-y divide-[rgba(31,74,52,0.06)]">
-                      {PLAN_AHEAD_DATA.filter((item) => {
+                      {planItems.filter((item) => {
                         if (adviceCropFilter === 'All') return true;
-                        if (item.cropTag === 'All crops') return true;
-                        return item.cropTag.toLowerCase().includes(adviceCropFilter.toLowerCase());
+                        return item.crop === PLAN_ALL_CROPS || item.crop === adviceCropFilter;
                       }).map((item) => (
                         <div key={item.id} className="py-2.5 flex items-start gap-2.5">
                           <div className="w-7 h-7 rounded-full bg-[#E4ECDB] flex items-center justify-center flex-shrink-0 mt-0.5">
-                            {item.iconType === 'shield' && <Shield className="w-3.5 h-3.5 text-[#1F4A34]" />}
-                            {item.iconType === 'sprout' && <Sprout className="w-3.5 h-3.5 text-[#1F4A34]" />}
-                            {item.iconType === 'calendar' && <Calendar className="w-3.5 h-3.5 text-[#1F4A34]" />}
-                            {item.iconType === 'tag' && <Tag className="w-3.5 h-3.5 text-[#1F4A34]" />}
-                            {item.iconType === 'wheat' && <Wheat className="w-3.5 h-3.5 text-[#1F4A34]" />}
+                            {item.category === 'Soil' && <Sprout className="w-3.5 h-3.5 text-[#1F4A34]" />}
+                            {item.category === 'Input timing' && <Calendar className="w-3.5 h-3.5 text-[#1F4A34]" />}
+                            {item.category === 'Variety' && <Tag className="w-3.5 h-3.5 text-[#1F4A34]" />}
+                            {item.category === 'Harvest' && <Wheat className="w-3.5 h-3.5 text-[#1F4A34]" />}
+                            {item.category === 'Risk mitigation' && <Shield className="w-3.5 h-3.5 text-[#1F4A34]" />}
                           </div>
                           <div className="min-w-0 flex-1">
                             <span className="text-[11.5px] font-semibold text-[#17271D] block leading-tight">
                               {item.title}
                             </span>
                             <span className="text-[10px] text-[#5B665E] block mt-0.5">
-                              {item.cropTag} · {item.timingChip}
+                              {item.crop} · {formatPlanDue(item.due)}
                             </span>
                           </div>
                         </div>
