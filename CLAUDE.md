@@ -40,6 +40,12 @@ Derived once in `App.tsx` and passed down: `coopGroups` (`computeCoopGroups`), `
 `districtClimateRisk`, and for the farmer `farmerMember`, `farmerMeetings`, `farmerBookings`,
 `farmerForecast`, `farmerReading`, `farmerWeatherSummary`, `farmerAdvisories`.
 
+Open tabs share the store: `useTabSync` (`src/useTabSync.ts`) broadcasts every change over a
+`BroadcastChannel` and a new tab adopts the store of an open one, so an officer in one tab and a
+farmer in another see the same data. UI state (role, view, sign-in) stays per tab. Nothing is
+persisted: closing every tab or Reset demo (which also reaches the other tabs) starts from the seed.
+Add every new store field to `storeSnapshot` in `App.tsx` as well as to Reset demo.
+
 UI-only state alongside them: `role`, `currentAccountId` (who is signed in), `currentView`,
 `previewMode`, `drawerContent`,
 `searchQuery`, `toastMessage`, `isAuthenticated`, `hasUnsavedSettings`, plus the
@@ -227,7 +233,7 @@ permission matrix (`view_research_data`, `export_data`). Reports offers research
 
 Farmer dashboard data sources (after Task 6): weather = latest `stationReadings` entry for the
 farmer's sector (officer Weather data → Manual upload adds readings with temperature,
-humidity and wind); weather forecast card (`WeatherForecastCard`) = the sector's series in `rainForecasts` (rain, day high/low; officer "Rain forecast
+humidity and wind); weather forecast card (`WeatherForecastCard`, no chart: one small card per day for 10 days with rain as the main number, day high/low small) = the sector's series in `rainForecasts` (rain, day high/low; officer "Rain forecast
 upload" replaces days); the card's "N mm in 10 days" = sum of the first 10 days, and its wind comes
 from the station reading (`windKmh`, optional in the upload); affected sectors = sectors at
 Watch or above (`computeAffectedSectors`); crop advice = `cropAdvisories`, written by the
