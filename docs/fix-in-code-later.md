@@ -45,10 +45,9 @@ Farmer dashboard — sources still missing (08/10/2026):
 - [x] ~~Map: soil saturation (78%) and the other 29 districts are seeded values.~~ The map now shows only Musanze's 15 sectors, all computed (09/10/2026). `RWANDA_DISTRICTS` remains only for the sign-up district list.
 - [ ] Map: the sector boundaries are the 2012 geoBoundaries release (Open Data Rwanda); only the Musanze sector names are used, simplified to ~20 m.
 - [ ] Risk forecast page: the four horizon cards (excess rain, dry spell, temperature, season onset) and the season chart's monthly totals still come from `FORECAST_HORIZONS`; only the 10-day and month charts read `rainForecasts`.
-- [ ] Only the rain rule has numbers; dry spell, temperature and late blight rules don't feed the sector forecast risk yet.
+- [ ] Dry spell, temperature and late blight rules now have numbers and drive the crop risk matrix, but not the sector forecast risk (only rain does). Humidity per forecast day is the same template for every sector, and the temperature "normal" is the sector's 30-day average high (simulated).
 - [x] ~~Forecast temperature per day reused the seeded template series.~~ `rainForecasts` now holds day high/low per sector and the forecast upload can replace them (10/10/2026). Humidity per forecast day is still the seeded template (not shown on the farmer card).
 - [ ] Mobile frames (M1/M2) still show the old rain-only "Rainfall Outlook" card with its "vs normal" figures; move them to the weather forecast card layout in Task 9.
-- [ ] Crop risk matrix (`CROP_RISK_MATRIX`) and plan-ahead items (`PLAN_AHEAD_DATA`) are static and can open advice whose warning has ended.
 - [x] Officer dashboard sector table: farmers and reports columns still came from `OFFICER_DATA` — fixed (sector register + reports store).
 - [ ] Greeting is always "Good afternoon" (NOW is 14:00).
 - [ ] ~~Rainfall chart peak dot~~ (fixed 10/10/2026: the forecast card colours a day only by the level its rain reaches) and the "require action" KPI text use orange regardless of level (rule 4) — Task 9.
@@ -57,7 +56,7 @@ Farmer dashboard — sources still missing (08/10/2026):
 
 Officer dashboard computed (09/10/2026):
 - [ ] Officer bell count is still `OFFICER_DATA.profile.bellCount` (3); compute it from reports under review and attention items.
-- [ ] Risk forecast page, officer cell drawer: the fallback `growersCount` (690 / 1,640) and acknowledgement (58 / 65) are hard-coded; read them from the warning's delivery totals.
+- [x] ~~Risk forecast page, officer cell drawer: hard-coded growers and acknowledgement.~~ The drawer now reads the crop risk model cell and the linked warning's delivery totals (12/10/2026).
 - [ ] Reports page engagement figures (active farmers 2,890, weekly 1,980 · 2,310 · 2,640 · 2,890, 70%) and "196 reports this season" have no source in the store.
 - [ ] Nothing moves `acknowledged` on a delivery record yet (farmer Acknowledge button, SMS "1" reply). Wire both to `warningDeliveries` with the member-record fix above.
 - [ ] The issue-warning form keeps the last sectors and risk type between opens; reset it on open.

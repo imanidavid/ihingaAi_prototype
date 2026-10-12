@@ -13,16 +13,18 @@ import {
   AlertTriangle,
   ArrowRight,
 } from 'lucide-react';
-import { WeatherForecastDay, CropAdvisory, AppRole, OfficerCropRiskDetail, RiskLevel, OfficerActiveWarning } from '../types';
+import { WeatherForecastDay, CropAdvisory, AppRole, RiskLevel, OfficerActiveWarning } from '../types';
 import {
-  CROP_ADVISORIES_DATA as CROP_ADVISORIES,
   FORECAST_HORIZONS,
-  CROP_RISK_MATRIX,
+  CROP_HAZARDS,
+  CROP_RISK_MODEL_LABEL,
+  CropHazard,
+  CropRiskMatrixRow,
+  cropRiskChipText,
   SECTOR_RISK_NOTES,
   RISK_LEVEL_COLORS,
   RISK_LEVEL_WEIGHT,
   MUSANZE_RECORD,
-  OFFICER_CROP_RISK_MAP,
   computeSectorClimateRisk,
   RAINFALL_NORMAL_MM_PER_DAY,
   RAINFALL_NORMAL_MM_PER_MONTH_SEASON_CHART,
@@ -42,6 +44,10 @@ interface RiskForecastViewProps {
   userSector?: string;
   /** The farmer's sector forecast from the store (10-day and month charts). */
   forecastSeries?: WeatherForecastDay[];
+  /** Crop risk matrix from the crop risk model (farmer: their sector and crops; others: the district). */
+  cropRisk: CropRiskMatrixRow[];
+  /** Officer advice the viewer can open from a matrix cell (farmer: only advice visible to them). */
+  advisories: CropAdvisory[];
 }
 
 export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
@@ -53,12 +59,26 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
   forecastRisk,
   userSector,
   forecastSeries,
+  cropRisk,
+  advisories,
 }) => {
   const [horizon, setHorizon] = useState<HorizonType>('10d');
   const [isLowRiskExpanded, setIsLowRiskExpanded] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
-  const [selectedOfficerCropRisk, setSelectedOfficerCropRisk] = useState<OfficerCropRiskDetail | null>(null);
+  // Selected matrix cell: officers get the crop risk drawer, farmers a short "why" panel under the matrix
+  const [selectedCell, setSelectedCell] = useState<{ crop: string; hazard: CropHazard } | null>(null);
+  const selectedRow = selectedCell ? cropRisk.find((r) => r.crop === selectedCell.crop) : undefined;
+  const selectedCellData = selectedRow && selectedCell ? selectedRow.cells[selectedCell.hazard] : undefined;
+  const selectedHazardLabel = CROP_HAZARDS.find((h) => h.id === selectedCell?.hazard)?.label || '';
+  const selectedWarning = selectedCellData?.warningId
+    ? (activeWarnings || []).find((w) => w.id === selectedCellData.warningId)
+    : undefined;
+  const selectedAdvice = selectedCell
+    ? advisories.find((a) => a.crop === selectedCell.crop && (!selectedCellData?.warningId || a.linkedWarningId === selectedCellData.warningId)) ||
+      advisories.find((a) => a.crop === selectedCell.crop)
+    : undefined;
+  const isOfficer = role === 'officer';
 
   const handleExportCsv = () => {
     setToastMessage('Forecast exported');
@@ -187,26 +207,22 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
     }
   };
 
-  const handleCellClick = (crop: string, hazard: string, cellLevel: string, advisoryId: string) => {
-    if (role === 'officer') {
-      const key = `${crop}-${hazard}`;
-      const mapped = OFFICER_CROP_RISK_MAP[key] || {
-        crop,
-        risk: cellLevel as RiskLevel,
-        hazard,
-        affectedSectors: cellLevel === 'Low' ? 'None (optimal)' : 'Kinigi, Busogo, Remera',
-        growersCount: crop === 'Irish Potato' ? 690 : 1640,
-        linkedWarningTitle: cellLevel === 'High' ? 'Late Blight Threat' : cellLevel === 'Watch' ? 'Heavy Rain Influx' : 'None active',
-        linkedWarningAckPct: cellLevel === 'High' ? 58 : cellLevel === 'Watch' ? 65 : 0,
-        warningId: cellLevel === 'High' ? 'alert-blight' : cellLevel === 'Watch' ? 'alert-rain' : undefined,
-      };
-      setSelectedOfficerCropRisk(mapped);
-    } else {
-      if (onSelectAdvisory) {
-        const matched = CROP_ADVISORIES.find((a) => a.id === advisoryId) || CROP_ADVISORIES[0];
-        onSelectAdvisory(matched);
-      }
+  const getChipStyle = (level: RiskLevel) => {
+    switch (level) {
+      case 'High':
+        return 'bg-[#D9772F]/15 text-[#D9772F]';
+      case 'Watch':
+        return 'bg-[#D9A032]/20 text-[#9E6905]';
+      case 'Critical':
+        return 'bg-[#C93B3B]/15 text-[#C93B3B]';
+      case 'Low':
+      default:
+        return 'bg-[#3E8E55]/15 text-[#3E8E55]';
     }
+  };
+
+  const handleCellClick = (crop: string, hazard: CropHazard) => {
+    setSelectedCell((prev) => (prev && prev.crop === crop && prev.hazard === hazard ? null : { crop, hazard }));
   };
 
   return (
@@ -748,10 +764,12 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
       <div className="bg-[#FBFCF8] rounded-[16px] p-5 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)]">
         <div className="mb-4 pb-2 border-b border-[rgba(31,74,52,0.06)]">
           <h3 className="text-[16px] font-semibold text-[#17271D]">
-            Crop Risk Matrix
+            Crop risk matrix
           </h3>
           <p className="text-[12px] text-[#5B665E]">
-            Hazard vulnerability breakdown across Musanze priority crops. Tap any cell to view mitigation advice.
+            {userSector
+              ? `Your crops in ${userSector} over the next 10 days.`
+              : 'Musanze priority crops over the next 10 days (highest sector shown).'}
           </p>
         </div>
 
@@ -768,76 +786,72 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(31,74,52,0.06)] text-[13px]">
-              {CROP_RISK_MATRIX.map((row) => {
-                const matchedAdvisory =
-                  CROP_ADVISORIES.find((a) => a.id === row.advisoryId) || CROP_ADVISORIES[0];
-
-                const getChipStyle = (level: string) => {
-                  switch (level) {
-                    case 'High':
-                      return 'bg-[#D9772F]/15 text-[#D9772F]';
-                    case 'Watch':
-                      return 'bg-[#D9A032]/20 text-[#9E6905]';
-                    case 'Critical':
-                      return 'bg-[#C93B3B]/15 text-[#C93B3B]';
-                    case 'Low':
-                    default:
-                      return 'bg-[#3E8E55]/15 text-[#3E8E55]';
-                  }
-                };
-
-                return (
-                  <tr key={row.crop} className="hover:bg-[rgba(31,74,52,0.02)] transition-colors">
-                    <td className="py-3 px-3 font-semibold text-[#17271D]">
-                      {row.crop}
-                    </td>
-                    <td
-                      className="py-3 px-3 cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => handleCellClick(row.crop, 'Excess rain', row.excessRain.level, row.advisoryId)}
-                    >
-                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${getChipStyle(row.excessRain.level)}`}>
-                        {row.excessRain.chipText}
-                      </span>
-                    </td>
-                    <td
-                      className="py-3 px-3 cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => handleCellClick(row.crop, 'Dry spell', row.drySpell.level, row.advisoryId)}
-                    >
-                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${getChipStyle(row.drySpell.level)}`}>
-                        {row.drySpell.chipText}
-                      </span>
-                    </td>
-                    <td
-                      className="py-3 px-3 cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => handleCellClick(row.crop, 'Temperature', row.temperature.level, row.advisoryId)}
-                    >
-                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${getChipStyle(row.temperature.level)}`}>
-                        {row.temperature.chipText}
-                      </span>
-                    </td>
-                    <td
-                      className="py-3 px-3 cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => handleCellClick(row.crop, 'Disease / pest', row.diseasePest.level, row.advisoryId)}
-                    >
-                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${getChipStyle(row.diseasePest.level)}`}>
-                        {row.diseasePest.chipText}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+              {cropRisk.map((row) => (
+                <tr key={row.crop} className="hover:bg-[rgba(31,74,52,0.02)] transition-colors">
+                  <td className="py-3 px-3 font-semibold text-[#17271D]">{row.crop}</td>
+                  {CROP_HAZARDS.map((h) => {
+                    const cell = row.cells[h.id];
+                    const isSelected = selectedCell?.crop === row.crop && selectedCell.hazard === h.id;
+                    return (
+                      <td key={h.id} className="py-3 px-3">
+                        <button
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => handleCellClick(row.crop, h.id)}
+                          title={cell.reasons.join(' ')}
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold cursor-pointer hover:opacity-80 transition-opacity ${getChipStyle(cell.level)} ${
+                            isSelected ? 'ring-2 ring-[#1F4A34]/40' : ''
+                          }`}
+                        >
+                          {cropRiskChipText(cell)}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
 
+        {/* Farmer: why the model gave this level, and the officer's advice if there is one */}
+        {!isOfficer && selectedCell && selectedCellData && (
+          <div className="mt-3 p-3.5 rounded-xl bg-[#F4F6EF]/70 border border-[rgba(31,74,52,0.08)] space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold text-[#17271D]">
+                {selectedCell.crop} · {selectedHazardLabel}
+              </span>
+              {getLevelChip(selectedCellData.level)}
+            </div>
+            <ul className="space-y-1">
+              {selectedCellData.reasons.map((r) => (
+                <li key={r} className="text-[12px] text-[#5B665E] leading-relaxed">
+                  {r}
+                </li>
+              ))}
+            </ul>
+            {selectedAdvice && onSelectAdvisory ? (
+              <button
+                type="button"
+                onClick={() => onSelectAdvisory(selectedAdvice)}
+                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#1F4A34] hover:underline cursor-pointer"
+              >
+                <span>Advice: {selectedAdvice.title}</span>
+                <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+            ) : (
+              <p className="text-[12px] text-[#5B665E]">No advice from your officer for this crop right now.</p>
+            )}
+          </div>
+        )}
+
         {/* Caption below matrix */}
-        <div className="pt-3 border-t border-[rgba(31,74,52,0.06)] mt-3 flex items-center gap-2 text-[12px] text-[#5B665E]">
-          <Info className="w-4 h-4 text-[#D9772F] flex-shrink-0" strokeWidth={1.5} />
-          <span className="font-medium text-[#17271D]">
-            Late blight risk matches active High warning.
-          </span>
-          <span className="text-[#5B665E]">
-            Tap any cell to open {role === 'officer' ? 'crop risk details' : 'field mitigation advisory'}.
+        <div className="pt-3 border-t border-[rgba(31,74,52,0.06)] mt-3 flex flex-wrap items-center gap-2 text-[12px] text-[#5B665E]">
+          <Info className="w-4 h-4 text-[#1F4A34] flex-shrink-0" strokeWidth={1.5} />
+          <span className="font-medium text-[#17271D]">{CROP_RISK_MODEL_LABEL}.</span>
+          <span>
+            Uses the 10-day forecast, the warning rules and active warnings. Tap a cell to see{' '}
+            {isOfficer ? 'crop risk details' : 'why'}.
           </span>
         </div>
       </div>
@@ -845,101 +859,88 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
       {/* ========================================================================= */}
       {/* OFFICER CROP RISK DRAWER (FIX 5: Drawer title "Crop risk") */}
       {/* ========================================================================= */}
-      {selectedOfficerCropRisk && (
+      {isOfficer && selectedCell && selectedCellData && (
         <div
           role="dialog"
           aria-modal="true"
           className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs animate-in fade-in"
-          onClick={() => setSelectedOfficerCropRisk(null)}
+          onClick={() => setSelectedCell(null)}
         >
           <div
             className="w-full max-w-md bg-[#FBFCF8] h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="space-y-5">
-              {/* Header */}
               <div className="flex items-center justify-between pb-3 border-b border-[rgba(31,74,52,0.08)]">
                 <div>
                   <h3 className="text-[20px] font-semibold text-[#17271D]">Crop risk</h3>
-                  <p className="text-[12px] text-[#5B665E] mt-0.5">
-                    {selectedOfficerCropRisk.crop} · Musanze District
-                  </p>
+                  <p className="text-[12px] text-[#5B665E] mt-0.5">{selectedCell.crop} · Musanze District</p>
                 </div>
                 <button
-                  onClick={() => setSelectedOfficerCropRisk(null)}
+                  onClick={() => setSelectedCell(null)}
+                  aria-label="Close"
                   className="w-8 h-8 rounded-full bg-[#F4F6EF] flex items-center justify-center text-[#5B665E] hover:text-[#17271D] hover:bg-[#E4ECDB] transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Main detail content */}
               <div className="space-y-4">
-                {/* Risk Level & Hazard */}
                 <div className="p-4 rounded-xl bg-[#F4F6EF]/70 border border-[rgba(31,74,52,0.08)] space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[12px] text-[#5B665E] font-medium">Risk level</span>
-                    {getLevelChip(selectedOfficerCropRisk.risk)}
+                    {getLevelChip(selectedCellData.level)}
                   </div>
-                  <div className="text-[14px] font-semibold text-[#17271D]">
-                    {selectedOfficerCropRisk.hazard}
-                  </div>
+                  <div className="text-[14px] font-semibold text-[#17271D]">{selectedHazardLabel}</div>
                 </div>
 
-                {/* Affected sectors */}
                 <div className="p-3.5 rounded-xl bg-white border border-[rgba(31,74,52,0.08)] space-y-1">
-                  <span className="text-[11.5px] text-[#5B665E] block font-medium">
-                    Affected sectors
-                  </span>
+                  <span className="text-[11.5px] text-[#5B665E] block font-medium">Affected sectors</span>
                   <span className="text-[13.5px] font-semibold text-[#17271D] block">
-                    {selectedOfficerCropRisk.affectedSectors}
+                    {selectedCellData.sectors.length ? selectedCellData.sectors.join(', ') : 'None at Watch or above'}
                   </span>
                 </div>
 
-                {/* Number of growers */}
-                <div className="p-3.5 rounded-xl bg-white border border-[rgba(31,74,52,0.08)] space-y-1">
-                  <span className="text-[11.5px] text-[#5B665E] block font-medium">
-                    Registered growers
-                  </span>
-                  <span className="text-[15px] font-semibold text-[#17271D] tabular-nums block">
-                    {selectedOfficerCropRisk.growersCount.toLocaleString()} growers
-                  </span>
+                <div className="p-3.5 rounded-xl bg-white border border-[rgba(31,74,52,0.08)] space-y-1.5">
+                  <span className="text-[11.5px] text-[#5B665E] block font-medium">Why · {CROP_RISK_MODEL_LABEL}</span>
+                  <ul className="space-y-1">
+                    {selectedCellData.reasons.map((r) => (
+                      <li key={r} className="text-[12.5px] text-[#17271D] leading-relaxed">
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
-                {/* Linked active warning with acknowledged % */}
                 <div className="p-3.5 rounded-xl bg-[#E4ECDB]/60 border border-[rgba(31,74,52,0.12)] space-y-1.5">
-                  <span className="text-[11.5px] text-[#1F4A34] block font-semibold">
-                    Linked active warning
-                  </span>
-                  <div className="text-[13.5px] font-semibold text-[#17271D]">
-                    {selectedOfficerCropRisk.linkedWarningTitle}
-                  </div>
-                  {selectedOfficerCropRisk.linkedWarningAckPct > 0 ? (
-                    <div className="text-[12px] text-[#2E6B40] font-medium">
-                      {selectedOfficerCropRisk.linkedWarningAckPct}% acknowledged across target sectors
-                    </div>
+                  <span className="text-[11.5px] text-[#1F4A34] block font-semibold">Linked active warning</span>
+                  {selectedWarning ? (
+                    <>
+                      <div className="text-[13.5px] font-semibold text-[#17271D]">{selectedWarning.title}</div>
+                      <div className="text-[12px] text-[#5B665E] tabular-nums">
+                        {(selectedWarning.totalSent ?? 0).toLocaleString()} farmers sent ·{' '}
+                        {selectedWarning.acknowledgedPct ?? 0}% acknowledged
+                      </div>
+                    </>
                   ) : (
-                    <div className="text-[12px] text-[#5B665E]">
-                      No active warning currently issued for this hazard.
-                    </div>
+                    <div className="text-[12px] text-[#5B665E]">No active warning for this hazard and crop.</div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Footer Buttons: [Open warning] (No farmer advisory, no "Save", no plot location) */}
             <div className="pt-4 border-t border-[rgba(31,74,52,0.08)] flex items-center justify-end gap-2.5">
               <button
-                onClick={() => setSelectedOfficerCropRisk(null)}
+                onClick={() => setSelectedCell(null)}
                 className="px-4 py-2 rounded-full bg-[#F4F6EF] text-[#5B665E] text-[12.5px] font-medium hover:text-[#17271D]"
               >
                 Close
               </button>
-              {selectedOfficerCropRisk.warningId && (
+              {selectedWarning && (
                 <button
                   onClick={() => {
-                    const wid = selectedOfficerCropRisk.warningId;
-                    setSelectedOfficerCropRisk(null);
+                    const wid = selectedWarning.id;
+                    setSelectedCell(null);
                     if (onOpenWarning) onOpenWarning(wid);
                   }}
                   className="px-5 py-2 rounded-full bg-[#1F4A34] text-white text-[12.5px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer active:scale-98"

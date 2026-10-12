@@ -9,6 +9,7 @@ import {
   NavView,
   WarningItem,
   CropAdvisory,
+  PlanAheadItem,
   UserProfileSettings,
   ReportItem,
   AppRole,
@@ -122,6 +123,9 @@ import {
   SECTOR_RISK_NOTES,
   INITIAL_STATION_READINGS,
   INITIAL_CROP_ADVISORIES,
+  INITIAL_PLAN_AHEAD_ITEMS,
+  computeCropRiskMatrix,
+  planItemsForCrops,
   computeSectorForecastRisk,
   computeDistrictClimateRisk,
   computeAffectedSectors,
@@ -384,6 +388,8 @@ export default function App() {
   const [rainForecasts, setRainForecasts] = useState<SectorRainForecast[]>(INITIAL_RAIN_FORECASTS);
   const [stationReadings, setStationReadings] = useState<StationReading[]>(INITIAL_STATION_READINGS);
   const [cropAdvisories, setCropAdvisories] = useState<CropAdvisory[]>(INITIAL_CROP_ADVISORIES);
+  // Season tasks the officer writes for farmers (Warnings → Plan ahead)
+  const [planAheadItems, setPlanAheadItems] = useState<PlanAheadItem[]>(INITIAL_PLAN_AHEAD_ITEMS);
 
   // Each sector's forecast risk = highest level its forecast reaches under the officer's rain rule
   const sectorForecastRisk = useMemo(
@@ -441,8 +447,9 @@ export default function App() {
       warningDeliveries,
       riskTypes,
       sectorRegister,
+      planAheadItems,
     }),
-    [warningRecords, reports, thresholdRules, userSettings, messages, accounts, accessRequests, generatedReports, savedItemIds, readNotificationIds, coopMembers, coopGroupRecords, meetings, equipmentBookings, rolePermissions, auditEvents, loginAttempts, securitySettings, dataSources, processingRuns, processingSettings, messageTemplates, voiceSettings, rainForecasts, stationReadings, cropAdvisories, warningDeliveries, riskTypes, sectorRegister]
+    [warningRecords, reports, thresholdRules, userSettings, messages, accounts, accessRequests, generatedReports, savedItemIds, readNotificationIds, coopMembers, coopGroupRecords, meetings, equipmentBookings, rolePermissions, auditEvents, loginAttempts, securitySettings, dataSources, processingRuns, processingSettings, messageTemplates, voiceSettings, rainForecasts, stationReadings, cropAdvisories, warningDeliveries, riskTypes, sectorRegister, planAheadItems]
   );
   useTabSync(storeSnapshot, (state) => {
     if ('warnings' in state) setWarnings(state.warnings as typeof warningRecords);
@@ -474,6 +481,7 @@ export default function App() {
     if ('warningDeliveries' in state) setWarningDeliveries(state.warningDeliveries as typeof warningDeliveries);
     if ('riskTypes' in state) setRiskTypes(state.riskTypes as typeof riskTypes);
     if ('sectorRegister' in state) setSectorRegister(state.sectorRegister as typeof sectorRegister);
+    if ('planAheadItems' in state) setPlanAheadItems(state.planAheadItems as typeof planAheadItems);
   });
 
   // Groups with members, warnings, acknowledgement and member reports — computed once, used everywhere
@@ -541,6 +549,27 @@ export default function App() {
   const farmerAdvisories = useMemo(
     () => visibleAdvisories(cropAdvisories, warnings, farmerSector, userSettings.cropsGrown),
     [cropAdvisories, warnings, farmerSector, userSettings.cropsGrown]
+  );
+  // Crop risk matrix from the (simulated) crop risk model: the farmer's sector and crops, or the whole district
+  const farmerCropRisk = useMemo(
+    () =>
+      computeCropRiskMatrix(
+        [farmerSector],
+        thresholdRules,
+        rainForecasts,
+        warnings,
+        userSettings.cropsGrown.length ? userSettings.cropsGrown : undefined
+      ),
+    [farmerSector, thresholdRules, rainForecasts, warnings, userSettings.cropsGrown]
+  );
+  const districtCropRisk = useMemo(
+    () => computeCropRiskMatrix(allSectorNames, thresholdRules, rainForecasts, warnings),
+    [allSectorNames, thresholdRules, rainForecasts, warnings]
+  );
+  // Plan-ahead items for the crops the farmer grows
+  const farmerPlanItems = useMemo(
+    () => planItemsForCrops(planAheadItems, userSettings.cropsGrown),
+    [planAheadItems, userSettings.cropsGrown]
   );
 
   // =========================================================================
@@ -1361,6 +1390,21 @@ export default function App() {
     showToast('Advice removed');
   };
 
+  // Plan-ahead items (officer)
+  const handleSavePlanItem = (item: PlanAheadItem) => {
+    const isEdit = planAheadItems.some((p) => p.id === item.id);
+    setPlanAheadItems((prev) => (isEdit ? prev.map((p) => (p.id === item.id ? item : p)) : [...prev, item]));
+    logAudit(isEdit ? 'Edited plan-ahead item' : 'Added plan-ahead item', `${item.crop} · ${item.title}`);
+    showToast(isEdit ? 'Plan-ahead item saved' : `Plan-ahead item shared with ${item.crop === 'All crops' ? 'all farmers' : `${item.crop} growers`}`);
+  };
+
+  const handleRemovePlanItem = (itemId: string) => {
+    const item = planAheadItems.find((p) => p.id === itemId);
+    setPlanAheadItems((prev) => prev.filter((p) => p.id !== itemId));
+    logAudit('Removed plan-ahead item', item ? `${item.crop} · ${item.title}` : itemId);
+    showToast('Plan-ahead item removed');
+  };
+
   /** Officer manual upload: adds the readings and updates the "Manual upload" feed the admin watches. */
   const handleUploadReadings = (rows: ReturnType<typeof parseRainGaugeCsv>['rows']) => {
     const count = rows.length;
@@ -1433,6 +1477,7 @@ export default function App() {
     setRainForecasts(INITIAL_RAIN_FORECASTS);
     setStationReadings(INITIAL_STATION_READINGS);
     setCropAdvisories(INITIAL_CROP_ADVISORIES);
+    setPlanAheadItems(INITIAL_PLAN_AHEAD_ITEMS);
     setUserSettings(INITIAL_USER_SETTINGS);
     setAccounts(INITIAL_USER_ACCOUNTS);
     setAccessRequests(INITIAL_ACCESS_REQUESTS);
@@ -1570,6 +1615,8 @@ export default function App() {
               }))}
               lowSectors={allSectorNames.filter((n) => !affectedSectors.some((a) => a.sector === n))}
               advisories={farmerAdvisories}
+              cropRisk={farmerCropRisk}
+              planItems={farmerPlanItems}
               riskLevel={farmerClimateRisk}
               firstName={userSettings.fullName.split(' ')[0]}
               alerts={farmerWarnings}
@@ -1810,6 +1857,8 @@ export default function App() {
                 forecastRisk={sectorForecastRisk}
                 userSector={role === 'farmer' ? farmerSector : undefined}
                 forecastSeries={farmerForecast}
+                cropRisk={role === 'farmer' ? farmerCropRisk : districtCropRisk}
+                advisories={role === 'farmer' ? farmerAdvisories : cropAdvisories}
               />
             )}
 
@@ -1822,6 +1871,9 @@ export default function App() {
                   cropAdvisories={cropAdvisories}
                   onSaveAdvice={handleSaveAdvice}
                   onRemoveAdvice={handleRemoveAdvice}
+                  planAheadItems={planAheadItems}
+                  onSavePlanItem={handleSavePlanItem}
+                  onRemovePlanItem={handleRemovePlanItem}
                   authorName={reportNameOf(accounts.find((a) => a.id === currentAccountId)?.fullName || 'Claudine Mukamana')}
                   rainForecasts={rainForecasts}
                   riskTypes={riskTypes}
@@ -1905,6 +1957,7 @@ export default function App() {
             {currentView === 'recommendations' && (
               <RecommendationsView
                 advisories={farmerAdvisories}
+                planItems={farmerPlanItems}
                 settings={userSettings}
                 onOpenSettingsNotifications={() => setCurrentView('settings')}
                 onSelectAdvisory={handleSelectAdvisory}

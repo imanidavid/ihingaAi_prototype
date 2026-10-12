@@ -22,4 +22,9 @@ Roles can be shown in one tab (floating switcher) or in several tabs side by sid
    As Officer: Weather data → upload the sample station file → farmer weather 21°C / 84%; upload
    the sample forecast → Kinigi High on the farmer's map, month total 323 mm. As Admin: Security &
    audit shows both uploads by Claudine; Data sources shows the manual feed at 4 of 42.
-9. [Reset demo] restores everything in every role.
+9. As Farmer: Risk forecast → Crop risk matrix shows Irish Potato · Disease / pest High (late blight);
+   tap it → the model's reason and the active Late Blight Threat. As Officer: end Late Blight Threat →
+   the farmer's cell drops to Low. Warnings → Plan ahead → edit "Wait to topdress urea…" or add an
+   Irish Potato item → it appears in the farmer's Recommendations → Plan ahead (and mobile Advice);
+   bookmark it → Saved count goes up. A Wheat item does not reach Jean-Baptiste.
+10. [Reset demo] restores everything in every role.

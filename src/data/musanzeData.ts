@@ -5,6 +5,8 @@ import {
   CropAdvisory,
   ObservationItem,
   PlanAheadItem,
+  PlanAheadCategory,
+  PlanAheadDue,
   RiskLevel,
   UserProfileSettings,
   UserAccount,
@@ -51,7 +53,6 @@ import {
   WarningHistoryItem,
   WarningItem,
   ThresholdRuleItem,
-  OfficerCropRiskDetail,
 } from '../types';
 import { INITIAL_USER_ACCOUNTS } from './rwandaAdminData';
 import { INITIAL_52_DISTRICT_REPORTS } from './districtReportsData';
@@ -337,47 +338,213 @@ export const FORECAST_HORIZONS: Record<'10d' | 'month' | 'season', HorizonPackag
  * WARNINGS (one definition, used by dashboard Recent Alerts, Early Warnings desktop and mobile, M1 alerts):
  * - Active: "Heavy Rain Influx" · Watch · Kinigi, Busogo, Remera · issued 13:35 ("25 min ago") · Tue 02:00–14:00, peak 48 mm
  * - Active: "Late Blight Threat" · High · Irish Potato plots · Muhoza & Kinigi · issued 13:00 ("1h ago") · next 48–72 hours
-
-/**
- * CROP RISK MATRIX:
- * Maize rain = Watch (runoff).
- * Only allowed levels anywhere: Low, Watch, High, Critical.
  */
+
+// =========================================================================
+// CROP RISK MATRIX — the mock crop risk model (simulated). Every cell is computed from the
+// sector's forecast in `rainForecasts`, the officer's rules in `thresholdRules` and the active
+// warnings in `warnings`. Nothing is typed in: change a rule, a forecast or a warning and the
+// matrix follows. Only allowed levels anywhere: Low, Watch, High, Critical.
+// =========================================================================
+export const CROP_RISK_MODEL_LABEL = 'Crop risk model (simulated)';
+
+export type CropHazard = 'excessRain' | 'drySpell' | 'temperature' | 'diseasePest';
+export const CROP_HAZARDS: { id: CropHazard; label: string; short: string }[] = [
+  { id: 'excessRain', label: 'Excess rain', short: 'Rain' },
+  { id: 'drySpell', label: 'Dry spell', short: 'Dry' },
+  { id: 'temperature', label: 'Temperature', short: 'Temp' },
+  { id: 'diseasePest', label: 'Disease / pest', short: 'Pest' },
+];
+
+/** What each crop suffers from, in the model's words. */
+const CROP_RISK_PROFILES: { crop: string; rainCause: string; dryCause: string; blight?: boolean }[] = [
+  { crop: 'Irish Potato', rainCause: 'waterlogging', dryCause: 'small tubers', blight: true },
+  { crop: 'Climbing Beans', rainCause: 'lodging', dryCause: 'flower drop' },
+  { crop: 'Maize', rainCause: 'runoff', dryCause: 'poor emergence' },
+];
+export const CROP_RISK_CROPS = CROP_RISK_PROFILES.map((p) => p.crop);
+
+/** The blight rule's 48 h of high humidity, in forecast days. */
+const BLIGHT_HUMID_DAYS = 2;
+/** A day counts as dry under this much rain (mm). */
+export const DRY_DAY_MM = 2;
+
+export interface CropRiskCell {
+  level: RiskLevel;
+  /** Short cause shown in the chip when the level is above Low, e.g. "lodging". */
+  cause?: string;
+  /** Why the model gave this level (forecast numbers and warnings). */
+  reasons: string[];
+  /** Sectors where this cell is Watch or above. */
+  sectors: string[];
+  /** The active warning that raised the cell, if any. */
+  warningId?: string;
+}
 export interface CropRiskMatrixRow {
   crop: string;
-  excessRain: { level: RiskLevel; chipText: string };
-  drySpell: { level: RiskLevel; chipText: string };
-  temperature: { level: RiskLevel; chipText: string };
-  diseasePest: { level: RiskLevel; chipText: string };
-  advisoryId: string;
+  cells: Record<CropHazard, CropRiskCell>;
 }
 
-export const CROP_RISK_MATRIX: CropRiskMatrixRow[] = [
-  {
-    crop: 'Irish Potato',
-    excessRain: { level: 'Watch', chipText: 'Watch' },
-    drySpell: { level: 'Low', chipText: 'Low' },
-    temperature: { level: 'Low', chipText: 'Low' },
-    diseasePest: { level: 'High', chipText: 'High (late blight)' },
-    advisoryId: 'adv-potato',
-  },
-  {
-    crop: 'Climbing Beans',
-    excessRain: { level: 'Watch', chipText: 'Watch (lodging)' },
-    drySpell: { level: 'Low', chipText: 'Low' },
-    temperature: { level: 'Low', chipText: 'Low' },
-    diseasePest: { level: 'Low', chipText: 'Low' },
-    advisoryId: 'adv-beans',
-  },
-  {
-    crop: 'Maize',
-    excessRain: { level: 'Watch', chipText: 'Watch (runoff)' },
-    drySpell: { level: 'Low', chipText: 'Low' },
-    temperature: { level: 'Low', chipText: 'Low' },
-    diseasePest: { level: 'Low', chipText: 'Low' },
-    advisoryId: 'adv-maize',
-  },
-];
+function ruleValue(rules: ThresholdRuleItem[], id: string): { level: RiskLevel; value: number } | null {
+  const rule = rules.find((r) => r.id === id);
+  const t = rule?.isEnabled ? rule.thresholdsList.find((x) => typeof x.value === 'number') : undefined;
+  return t ? { level: t.level, value: t.value as number } : null;
+}
+
+function longestRun(values: boolean[]): { length: number; start: number } {
+  let best = { length: 0, start: 0 };
+  let run = 0;
+  values.forEach((v, i) => {
+    run = v ? run + 1 : 0;
+    if (run > best.length) best = { length: run, start: i - run + 1 };
+  });
+  return best;
+}
+
+/** Which matrix column a warning belongs to (custom weather types without a column are skipped). */
+export function hazardForWarning(w: WarningItem): CropHazard | null {
+  if (w.riskGroup === 'pest_disease') return 'diseasePest';
+  const type = (w.riskType || w.category || '').toLowerCase();
+  if (type.includes('rain')) return 'excessRain';
+  if (type.includes('dry')) return 'drySpell';
+  if (type.includes('temperature')) return 'temperature';
+  return null;
+}
+
+/** The model for one sector and crop, before warnings. */
+function modelCellsForSector(
+  sector: string,
+  profile: (typeof CROP_RISK_PROFILES)[number],
+  rules: ThresholdRuleItem[],
+  forecasts: SectorRainForecast[]
+): Record<CropHazard, { level: RiskLevel; reason: string }> {
+  const f = forecasts.find((x) => x.sector === sector);
+  const days = forecastDays(forecasts, sector).slice(0, FORECAST_RISK_DAYS);
+  const dayLabel = (i: number) => {
+    if (!f) return `day ${i + 1}`;
+    const start = parseDMY(f.startDate);
+    return formatDayShort(formatDMY(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)));
+  };
+
+  // Excess rain: wettest day against the officer's rain rule
+  const thresholds = rainThresholds(rules);
+  const rainMm = days.map((d) => d.rainfallMm);
+  const peak = Math.max(0, ...rainMm);
+  const peakIdx = rainMm.indexOf(peak);
+  const rainLevel = riskForRain(peak, thresholds);
+  const rainFrom = thresholds.find((t) => t.level === rainLevel);
+  const rain = {
+    level: rainLevel,
+    reason: !thresholds.length
+      ? 'Rain rule is turned off.'
+      : `Wettest day ${dayLabel(peakIdx)}: ${peak} mm${rainFrom ? ` (${rainLevel} from ${rainFrom.value} mm)` : ` (Watch from ${thresholds[0].value} mm)`}.`,
+  };
+
+  // Dry spell: longest run of dry days against the dry-spell rule
+  const dryRule = ruleValue(rules, 'rule-dry');
+  const dryRun = longestRun(rainMm.map((mm) => mm < DRY_DAY_MM));
+  const dry = {
+    level: (dryRule && dryRun.length >= dryRule.value ? dryRule.level : 'Low') as RiskLevel,
+    reason: !dryRule
+      ? 'Dry-spell rule is turned off.'
+      : `Longest dry run: ${dryRun.length} ${dryRun.length === 1 ? 'day' : 'days'} under ${DRY_DAY_MM} mm (${dryRule.level} from ${dryRule.value}).`,
+  };
+
+  // Temperature: hottest day against the 30-day average high + the temperature rule
+  const tempRule = ruleValue(rules, 'rule-temp');
+  const highs = f ? f.dailyTempMaxC : [];
+  const normal = highs.length ? highs.reduce((a, b) => a + b, 0) / highs.length : 0;
+  const hottest = Math.max(...days.map((d) => d.temp));
+  const above = Math.round((hottest - normal) * 10) / 10;
+  const temp = {
+    level: (tempRule && above >= tempRule.value ? tempRule.level : 'Low') as RiskLevel,
+    reason: !tempRule
+      ? 'Temperature rule is turned off.'
+      : `Hottest day ${hottest}°C, ${above > 0 ? `${above}°C above` : 'not above'} the 30-day average (${tempRule.level} from +${tempRule.value}°C).`,
+  };
+
+  // Disease: late blight for potato = humid days in a row against the blight rule (48 h)
+  let pest = { level: 'Low' as RiskLevel, reason: 'No disease signal in the forecast.' };
+  const blightRule = ruleValue(rules, 'rule-blight');
+  if (profile.blight && blightRule) {
+    const humid = longestRun(days.map((d) => d.humidity >= blightRule.value));
+    const level: RiskLevel = humid.length >= BLIGHT_HUMID_DAYS ? blightRule.level : 'Low';
+    pest = {
+      level,
+      reason: humid.length
+        ? `${humid.length === 1 ? `1 day at ${blightRule.value}%+ humidity (${dayLabel(humid.start)})` : `${humid.length} days in a row at ${blightRule.value}%+ humidity from ${dayLabel(humid.start)}`}; ${blightRule.level} needs ${BLIGHT_HUMID_DAYS} days (48 h).`
+        : `Humidity stays under ${blightRule.value}%.`,
+    };
+  }
+  return { excessRain: rain, drySpell: dry, temperature: temp, diseasePest: pest };
+}
+
+/**
+ * The crop risk matrix for one or more sectors. Each cell = the highest of (a) the model's
+ * level from the forecast and rules and (b) any active warning for that hazard, sector and crop.
+ * With several sectors (district view) each cell takes the highest sector.
+ */
+export function computeCropRiskMatrix(
+  sectors: string[],
+  rules: ThresholdRuleItem[],
+  forecasts: SectorRainForecast[],
+  warnings: WarningItem[],
+  crops: string[] = CROP_RISK_CROPS
+): CropRiskMatrixRow[] {
+  const active = warnings.filter((w) => w.status === 'Active');
+  const multi = sectors.length > 1;
+  return CROP_RISK_PROFILES.filter((p) => crops.includes(p.crop)).map((profile) => {
+    const cells = {} as Record<CropHazard, CropRiskCell>;
+    for (const { id } of CROP_HAZARDS) cells[id] = { level: 'Low', reasons: [], sectors: [] };
+    for (const sector of sectors) {
+      const model = modelCellsForSector(sector, profile, rules, forecasts);
+      for (const { id } of CROP_HAZARDS) {
+        let level = model[id].level;
+        let warning: WarningItem | undefined;
+        for (const w of active) {
+          if (hazardForWarning(w) !== id || !warningCoversSector(w, sector)) continue;
+          if (w.crops && w.crops.length > 0 && !w.crops.includes(profile.crop)) continue;
+          if (RISK_LEVEL_WEIGHT[w.severity] >= RISK_LEVEL_WEIGHT[level]) {
+            level = w.severity;
+            warning = w;
+          }
+        }
+        const cell = cells[id];
+        if (RISK_LEVEL_WEIGHT[level] > RISK_LEVEL_WEIGHT[cell.level] || (!multi && cell.reasons.length === 0)) {
+          cell.level = level;
+          cell.warningId = warning?.id;
+          cell.reasons = [
+            `${multi ? `${sector}: ` : ''}${model[id].reason}`,
+            ...(warning ? [`Active warning: ${warning.title} (${warning.severity}).`] : []),
+          ];
+        } else if (multi && cell.reasons.length === 0) {
+          cell.reasons = [`${sector}: ${model[id].reason}`];
+        }
+        if (RISK_LEVEL_WEIGHT[level] >= RISK_LEVEL_WEIGHT.Watch) cell.sectors.push(sector);
+      }
+    }
+    for (const { id } of CROP_HAZARDS) {
+      const cell = cells[id];
+      if (cell.level !== 'Low') {
+        cell.cause =
+          id === 'excessRain'
+            ? profile.rainCause
+            : id === 'drySpell'
+              ? profile.dryCause
+              : id === 'diseasePest'
+                ? (cell.warningId && active.find((w) => w.id === cell.warningId)?.title.replace(/ threat$/i, '').toLowerCase()) ||
+                  (profile.blight ? 'late blight' : undefined)
+                : 'heat';
+      }
+    }
+    return { crop: profile.crop, cells };
+  });
+}
+
+/** Chip text for a cell: "Watch (lodging)" or "Low". */
+export function cropRiskChipText(cell: CropRiskCell): string {
+  return cell.cause ? `${cell.level} (${cell.cause})` : cell.level;
+}
 
 /**
  * ADVISORIES:
@@ -477,8 +644,6 @@ export const INITIAL_CROP_ADVISORIES: CropAdvisory[] = [
   },
 ];
 
-/** Kept for plan-ahead items, which point at the seeded advice. */
-export const CROP_ADVISORIES_DATA = INITIAL_CROP_ADVISORIES;
 
 /** Advice a farmer sees: its warning is active, it covers their sector and one of their crops. */
 export function visibleAdvisories(
@@ -500,52 +665,69 @@ export const CROP_IMAGES: Record<string, string> = {
   Maize: maizeImg,
 };
 
-/**
- * PLAN AHEAD ITEMS
- */
-export const PLAN_AHEAD_DATA: PlanAheadItem[] = [
+// =========================================================================
+// PLAN AHEAD (store field `planAheadItems`) — written by the agricultural officer
+// (Warnings → Plan ahead). A farmer sees an item when it is for "All crops" or a crop they grow.
+// =========================================================================
+export const PLAN_CATEGORIES: PlanAheadCategory[] = ['Soil', 'Input timing', 'Variety', 'Harvest', 'Risk mitigation'];
+export const PLAN_ALL_CROPS = 'All crops';
+/** Seasons an item can be planned for (Rwanda's A, B and C seasons from NOW). */
+export const PLAN_SEASON_OPTIONS = ['Season 2026/27 A', 'Before Season 2027 B', 'Season 2027 B', 'Season 2027 C'];
+
+export const INITIAL_PLAN_AHEAD_ITEMS: PlanAheadItem[] = [
   {
     id: 'plan-1',
-    category: 'Soil Management',
+    crop: PLAN_ALL_CROPS,
+    category: 'Soil',
     title: 'Clear sediment from hillside terrace contours',
-    oneLineRationale: 'Maintains terrace storage capacity and prevents overflow onto lower plots.',
-    timingChip: 'By Wed 30/09',
-    cropTag: 'All crops',
-    iconType: 'shield',
-    advisoryEquivalent: CROP_ADVISORIES_DATA[1],
+    reason: 'Clean terraces hold the rain and stop overflow onto lower plots.',
+    due: { kind: 'by', date: '30/09/2026' },
+    authorName: 'Claudine M.',
   },
   {
     id: 'plan-2',
-    category: 'Harvest Protection',
-    title: 'Inspect climbing bean poles for wind firmness',
-    oneLineRationale: 'Reinforcing poles prevents crop lodging and foliage damage during wind gusts.',
-    timingChip: 'By Mon 28/09 18:00',
-    cropTag: 'Climbing Beans',
-    iconType: 'sprout',
-    advisoryEquivalent: CROP_ADVISORIES_DATA[1],
+    crop: 'Climbing Beans',
+    category: 'Harvest',
+    title: 'Check that bean poles stand firm in the wind',
+    reason: 'Firm poles keep plants standing and protect the harvest during gusts.',
+    due: { kind: 'by', date: '28/09/2026', time: '18:00' },
+    authorName: 'Claudine M.',
   },
   {
     id: 'plan-3',
-    category: 'Fertilizer Timing',
-    title: 'Delay topdress urea until storm front passes',
-    oneLineRationale: 'Heavy rain will leach nitrogen below root depth and waste inputs.',
-    timingChip: 'After Thu 01/10',
-    cropTag: 'Maize',
-    iconType: 'calendar',
-    advisoryEquivalent: CROP_ADVISORIES_DATA[2],
+    crop: 'Maize',
+    category: 'Input timing',
+    title: 'Wait to topdress urea until the storm passes',
+    reason: 'Heavy rain washes the fertiliser below the roots and wastes it.',
+    due: { kind: 'after', date: '01/10/2026' },
+    authorName: 'Claudine M.',
   },
   {
     id: 'plan-4',
-    category: 'Variety Selection',
-    title: 'Select certified late-blight tolerant seed for next cycle',
-    oneLineRationale: 'Tolerant varieties cut spray frequency and secure harvest yields.',
-    timingChip: 'Pre-Season B order',
-    cropTag: 'Irish Potato',
-    iconType: 'tag',
-    advisoryEquivalent: CROP_ADVISORIES_DATA[0],
+    crop: 'Irish Potato',
+    category: 'Variety',
+    title: 'Order certified blight-tolerant seed for next season',
+    reason: 'Tolerant varieties need fewer sprays and protect the harvest.',
+    due: { kind: 'season', season: 'Before Season 2027 B' },
+    authorName: 'Claudine M.',
   },
 ];
 
+/** "By Wed 30/09", "By Mon 28/09 18:00", "After Thu 01/10" or the season. */
+export function formatPlanDue(due: PlanAheadDue): string {
+  if (due.kind === 'season') return due.season;
+  return `${due.kind === 'by' ? 'By' : 'After'} ${formatDayShort(due.date)}${due.time ? ` ${due.time}` : ''}`;
+}
+
+/** Items for a farmer: "All crops" or one of their crops (no crops set = everything). Dated items first. */
+export function planItemsForCrops(items: PlanAheadItem[], crops: string[]): PlanAheadItem[] {
+  // Dated items by date, then season items in season order
+  const sortKey = (i: PlanAheadItem) =>
+    i.due.kind === 'season' ? 1e15 + PLAN_SEASON_OPTIONS.indexOf(i.due.season) : parseDMY(i.due.date, i.due.time).getTime();
+  return items
+    .filter((i) => i.crop === PLAN_ALL_CROPS || crops.length === 0 || crops.includes(i.crop))
+    .sort((a, b) => sortKey(a) - sortKey(b));
+}
 
 export const SECTORS_WATCH_LIST = [
   { name: 'Kinigi', isUserSector: true, reason: 'Volcanic foothill slope runoff' },
@@ -1811,7 +1993,7 @@ export const INITIAL_THRESHOLD_RULES: ThresholdRuleItem[] = [
     description: 'Monitors consecutive hours of high humidity and leaf wetness during potato vegetative stage.',
     lastTriggered: '28/09 13:00',
     thresholdsList: [
-      { label: 'Humidity 85%+ for 48 h → High', level: 'High' },
+      { label: '85 % humidity for 48 h → High', level: 'High', value: 85, unit: '% humidity for 48 h' },
     ],
   },
   {
@@ -1822,7 +2004,7 @@ export const INITIAL_THRESHOLD_RULES: ThresholdRuleItem[] = [
     description: 'Alerts farmers when consecutive dry days threaten newly planted beans or maize emergence.',
     lastTriggered: '01/09',
     thresholdsList: [
-      { label: '7+ days under 2 mm → Watch', level: 'Watch' },
+      { label: '7 dry days → Watch', level: 'Watch', value: 7, unit: 'dry days (under 2 mm)' },
     ],
   },
   {
@@ -1830,130 +2012,13 @@ export const INITIAL_THRESHOLD_RULES: ThresholdRuleItem[] = [
     name: 'Temperature anomaly',
     hazardType: 'Temperature',
     isEnabled: true,
-    description: 'Detects extreme heat spikes or cold snaps exceeding historical seasonal standard deviation.',
+    description: 'Flags a forecast day this much hotter than the 30-day average high (the normal used by the crop risk model).',
     lastTriggered: 'Never triggered',
     thresholdsList: [
-      { label: '3°C+ above normal → Watch', level: 'Watch' },
+      { label: '3 °C above normal → Watch', level: 'Watch', value: 3, unit: '°C above normal' },
     ],
   },
 ];
-
-export const OFFICER_CROP_RISK_MAP: Record<string, OfficerCropRiskDetail> = {
-  'Irish Potato-Excess rain': {
-    crop: 'Irish Potato',
-    risk: 'Low',
-    hazard: 'Excess rain',
-    affectedSectors: 'Kinigi, Busogo',
-    growersCount: 690,
-    linkedWarningTitle: 'Heavy Rain Influx',
-    linkedWarningAckPct: 65,
-    warningId: 'alert-rain',
-  },
-  'Irish Potato-Dry spell': {
-    crop: 'Irish Potato',
-    risk: 'Low',
-    hazard: 'Dry spell',
-    affectedSectors: 'None (moisture adequate)',
-    growersCount: 690,
-    linkedWarningTitle: 'None active',
-    linkedWarningAckPct: 0,
-  },
-  'Irish Potato-Temperature': {
-    crop: 'Irish Potato',
-    risk: 'Low',
-    hazard: 'Temperature anomaly',
-    affectedSectors: 'None (optimal 15–20°C)',
-    growersCount: 690,
-    linkedWarningTitle: 'None active',
-    linkedWarningAckPct: 0,
-  },
-  'Irish Potato-Disease / pest': {
-    crop: 'Irish Potato',
-    risk: 'High',
-    hazard: 'Late blight (Phytophthora infestans)',
-    affectedSectors: 'Muhoza & Kinigi',
-    growersCount: 690,
-    linkedWarningTitle: 'Late Blight Threat',
-    linkedWarningAckPct: 58,
-    warningId: 'alert-blight',
-  },
-
-  'Climbing Beans-Excess rain': {
-    crop: 'Climbing Beans',
-    risk: 'Watch',
-    hazard: 'Excess rain & slope runoff',
-    affectedSectors: 'Kinigi, Busogo, Remera',
-    growersCount: 1640,
-    linkedWarningTitle: 'Heavy Rain Influx',
-    linkedWarningAckPct: 65,
-    warningId: 'alert-rain',
-  },
-  'Climbing Beans-Dry spell': {
-    crop: 'Climbing Beans',
-    risk: 'Low',
-    hazard: 'Dry spell',
-    affectedSectors: 'None',
-    growersCount: 1640,
-    linkedWarningTitle: 'None active',
-    linkedWarningAckPct: 0,
-  },
-  'Climbing Beans-Temperature': {
-    crop: 'Climbing Beans',
-    risk: 'Low',
-    hazard: 'Temperature anomaly',
-    affectedSectors: 'None',
-    growersCount: 1640,
-    linkedWarningTitle: 'None active',
-    linkedWarningAckPct: 0,
-  },
-  'Climbing Beans-Disease / pest': {
-    crop: 'Climbing Beans',
-    risk: 'Low',
-    hazard: 'Anthracnose & aphid monitoring',
-    affectedSectors: 'Kinigi (minor isolated)',
-    growersCount: 1640,
-    linkedWarningTitle: 'None active',
-    linkedWarningAckPct: 0,
-  },
-
-  'Maize-Excess rain': {
-    crop: 'Maize',
-    risk: 'Watch',
-    hazard: 'Excess rain & soil saturation',
-    affectedSectors: 'Kinigi, Busogo, Remera',
-    growersCount: 1640,
-    linkedWarningTitle: 'Heavy Rain Influx',
-    linkedWarningAckPct: 65,
-    warningId: 'alert-rain',
-  },
-  'Maize-Dry spell': {
-    crop: 'Maize',
-    risk: 'Low',
-    hazard: 'Dry spell',
-    affectedSectors: 'None',
-    growersCount: 1640,
-    linkedWarningTitle: 'None active',
-    linkedWarningAckPct: 0,
-  },
-  'Maize-Temperature': {
-    crop: 'Maize',
-    risk: 'Low',
-    hazard: 'Temperature anomaly',
-    affectedSectors: 'None',
-    growersCount: 1640,
-    linkedWarningTitle: 'None active',
-    linkedWarningAckPct: 0,
-  },
-  'Maize-Disease / pest': {
-    crop: 'Maize',
-    risk: 'Low',
-    hazard: 'Fall armyworm monitoring',
-    affectedSectors: 'None',
-    growersCount: 1640,
-    linkedWarningTitle: 'None active',
-    linkedWarningAckPct: 0,
-  },
-};
 
 export { INITIAL_52_DISTRICT_REPORTS, INITIAL_52_REPORTS } from './districtReportsData';
 
