@@ -283,6 +283,14 @@ dashboard Seasonal calendar card computes window and phase status from NOW
 (`seasonPhaseStatus`, `windowProgress`) and its footer reads the farmer's first crop phase.
 `CROP_RECORD` is gone.
 
+Farmer observations (12/10/2026): "My reports" = `reports` whose `farmer` equals the signed-in
+farmer's report name (`reportNameOf`); App stamps that name on every new report, so the modal and
+mobile form never type a name. KPIs: reports this season (`reportsThisSeason`, from
+`SEASON_START_DATE`), verified, and "Used in forecasts" = `computeReportValidation` on the farmer's
+own reports (the same rule as the research page). "Reports near you" = the farmer's sector in the
+last `FIELD_REPORT_WINDOW_DAYS` (`reportsInLastDays`), one bar per `REPORT_TYPES`. Seed report
+photos are planned files in `public/media/` (media manifest); a missing photo shows no thumbnail.
+
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 
 ## Cross-role flows (the demo — must always work)

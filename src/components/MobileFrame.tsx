@@ -41,6 +41,7 @@ import {
   formatPlanDue,
   PLAN_ALL_CROPS,
   RISK_LEVEL_WEIGHT,
+  nowReportStamp,
   RISK_LEVEL_COLORS,
   ALL_30_RWANDA_DISTRICTS,
   MUSANZE_SECTORS_CELLS,
@@ -220,19 +221,19 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
 
     const newReport: ObservationItem = {
       id: `obs-${Date.now()}`,
-      farmer: 'Jean-Baptiste N.',
+      farmer: '', // App stamps the signed-in farmer's name
       type: reportType,
       title: reportNotes.trim().length > 34 ? `${reportNotes.trim().slice(0, 34)}...` : reportNotes.trim(),
       sector: sector || 'Kinigi',
       cell: cell || 'Bisoke',
       location: `${sector || 'Kinigi'} · ${cell || 'Bisoke'}`,
-      date: '28/09 14:00',
+      date: nowReportStamp(),
       status: 'Submitted',
       photoUrl: reportPhoto || undefined,
       description: reportNotes.trim(),
       timeline: [
-        { step: 'Saved on your phone · 28/09 14:00', time: '28/09 14:00', status: 'completed' },
-        { step: 'Sent', time: '28/09 14:01', status: 'completed' },
+        { step: `Saved on your phone · ${nowReportStamp()}`, time: nowReportStamp(), status: 'completed' },
+        { step: 'Sent', time: nowReportStamp(), status: 'completed' },
         { step: 'Received by officer', time: 'Pending review', status: 'current' },
         { step: 'Verified', status: 'upcoming' },
       ],

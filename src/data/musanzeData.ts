@@ -1940,6 +1940,23 @@ export const INITIAL_WARNING_DELIVERIES: WarningSectorDelivery[] = [
 // =========================================================================
 export const FIELD_REPORT_WINDOW_DAYS = 7;
 
+/** The four report types farmers choose from, in display order. */
+export const REPORT_TYPES: ReportItem['type'][] = ['Rainfall', 'Flood / damage', 'Crop condition', 'Pest / disease'];
+
+/** Start of the current season (first day of land preparation in the season calendar). */
+export const SEASON_START_DATE = MUSANZE_SEASON_CALENDAR.phases[0].start;
+
+/** Reports dated on or after the season start (report dates are "DD/MM HH:MM" in NOW's year). */
+export function reportsThisSeason(reports: ReportItem[]): ReportItem[] {
+  const start = parseDMY(SEASON_START_DATE).getTime();
+  return reports.filter((r) => parseDMY(`${r.date.slice(0, 5)}/${NOW_DATE.getFullYear()}`).getTime() >= start);
+}
+
+/** "DD/MM HH:MM" for NOW, the format reports use. */
+export function nowReportStamp(): string {
+  return `${NOW.dateFormatted.slice(0, 5)} ${NOW.timeFormatted}`;
+}
+
 /** Reports dated within the last `days` days of NOW (report dates are "DD/MM HH:MM" in 2026). */
 export function reportsInLastDays(reports: ReportItem[], days: number = FIELD_REPORT_WINDOW_DAYS): ReportItem[] {
   return reports.filter((r) => {

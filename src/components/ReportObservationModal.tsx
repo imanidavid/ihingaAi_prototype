@@ -19,19 +19,24 @@ interface ReportObservationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmitSuccess: (report: ObservationItem) => void;
+  /** The farmer's own sector and cell ("Use my location" and the form defaults). */
+  defaultSector: string;
+  defaultCell: string;
 }
 
 export const ReportObservationModal: React.FC<ReportObservationModalProps> = ({
   isOpen,
   onClose,
   onSubmitSuccess,
+  defaultSector,
+  defaultCell,
 }) => {
   const [reportType, setReportType] = useState<'rainfall' | 'crop condition' | 'pest' | 'damage'>('rainfall');
   const [district, setDistrict] = useState<string>('Musanze');
-  const [sector, setSector] = useState<string>('Kinigi');
-  const [cell, setCell] = useState<string>('Bisoke');
+  const [sector, setSector] = useState<string>(defaultSector);
+  const [cell, setCell] = useState<string>(defaultCell);
   const [usedGps, setUsedGps] = useState<boolean>(false);
-  const [displayDate, setDisplayDate] = useState<string>('28/09/2026'); // today is 28/09/2026
+  const [displayDate, setDisplayDate] = useState<string>(NOW.dateFormatted);
   const [selectedDay, setSelectedDay] = useState<number>(28);
   const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
   const [description, setDescription] = useState<string>('');
@@ -51,8 +56,8 @@ export const ReportObservationModal: React.FC<ReportObservationModalProps> = ({
 
   const handleUseMyLocation = () => {
     setDistrict('Musanze');
-    setSector('Kinigi');
-    setCell('Bisoke');
+    setSector(defaultSector);
+    setCell(defaultCell);
     setUsedGps(true);
   };
 
@@ -93,18 +98,18 @@ export const ReportObservationModal: React.FC<ReportObservationModalProps> = ({
 
     const newReport: ObservationItem = {
       id: `obs-${Date.now()}`,
-      farmer: 'Jean-Baptiste N.',
+      farmer: '', // App stamps the signed-in farmer's name
       type: typeLabelMap[reportType] || 'Rainfall',
       title: description.trim().length > 34 ? `${description.trim().slice(0, 34)}...` : description.trim(),
-      sector: sector || 'Kinigi',
-      cell: cell || 'Bisoke',
-      location: `${sector || 'Kinigi'} · ${cell || 'Bisoke'}`,
-      date: `${displayDate.slice(0, 5)} 14:00`,
+      sector: sector || defaultSector,
+      cell: cell || defaultCell,
+      location: `${sector || defaultSector} · ${cell || defaultCell}`,
+      date: `${displayDate.slice(0, 5)} ${NOW.timeFormatted}`,
       status: 'Submitted',
       photoUrl: photoPreview || undefined,
       description: description.trim(),
       timeline: [
-        { step: 'Submitted', time: `${displayDate.slice(0, 5)} 14:00`, status: 'completed' },
+        { step: 'Submitted', time: `${displayDate.slice(0, 5)} ${NOW.timeFormatted}`, status: 'completed' },
         { step: 'Received by officer', status: 'current' },
         { step: 'Verified', status: 'upcoming' },
       ],
