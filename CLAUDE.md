@@ -34,13 +34,13 @@ module, no context and no reducer; state is passed down as props. Fields:
 `auditEvents` · `loginAttempts` · `securitySettings` · `dataSources` · `processingRuns` ·
 `processingSettings` · `messageTemplates` · `voiceSettings` · `rainForecasts` ·
 `stationReadings` · `cropAdvisories` · `warningDeliveries` · `riskTypes` · `sectorRegister` ·
-`planAheadItems`
+`planAheadItems` · `cropPlantings`
 
 Derived once in `App.tsx` and passed down: `coopGroups` (`computeCoopGroups`), `coopSummary`
 (`computeCoopSummary`), `sectorForecastRisk` (`computeSectorForecastRisk`), `affectedSectors`,
 `districtClimateRisk`, and for the farmer `farmerMember`, `farmerMeetings`, `farmerBookings`,
 `farmerForecast`, `farmerReading`, `farmerWeatherSummary`, `farmerAdvisories`, `farmerCropRisk`,
-`farmerPlanItems`; and `districtCropRisk` for other roles.
+`farmerPlanItems`, `farmerCropPhases`; and `districtCropRisk` for other roles.
 
 Open tabs share the store: `useTabSync` (`src/useTabSync.ts`) broadcasts every change over a
 `BroadcastChannel` and a new tab adopts the store of an open one, so an officer in one tab and a
@@ -126,7 +126,7 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
     keep it at ≥ 96px.
 14. **Reset demo** (`handleResetDemo`, `App.tsx`) must restore every store field to its
     initial value, including anything created during the demo. It currently resets all
-    thirty fields; add every new field you introduce (also to `storeSnapshot`, which syncs open tabs).
+    thirty-one fields; add every new field you introduce (also to `storeSnapshot`, which syncs open tabs).
 
 ## Roles (one shared store, desktop unless noted)
 
@@ -273,6 +273,15 @@ Plan ahead (crop, category Soil · Input timing · Variety · Harvest · Risk mi
 reason, due by / not before a date, or a season from `PLAN_SEASON_OPTIONS`). A farmer sees items
 for "All crops" or a crop they grow (`planItemsForCrops`); bookmarks stay in `savedItemIds`.
 `CROP_RISK_MATRIX`, `PLAN_AHEAD_DATA` and `OFFICER_CROP_RISK_MAP` are gone.
+
+Crop phases (12/10/2026): the farmer enters each crop's planting date (Crop calendar → Crop
+phases → "Change date"; store field `cropPlantings`, one row per account and crop). The crop
+growth model (`CROP_GROWTH_MODEL`, `computeCropPhase`, "Crop growth model (simulated)") turns days
+since planting at NOW into the stage, the stage dates, % to harvest and the harvest window;
+"From your officer" is the farmer's active advice or next plan-ahead item for that crop. The
+dashboard Seasonal calendar card computes window and phase status from NOW
+(`seasonPhaseStatus`, `windowProgress`) and its footer reads the farmer's first crop phase.
+`CROP_RECORD` is gone.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 

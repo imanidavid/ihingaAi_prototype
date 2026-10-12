@@ -27,4 +27,7 @@ Roles can be shown in one tab (floating switcher) or in several tabs side by sid
    the farmer's cell drops to Low. Warnings → Plan ahead → edit "Wait to topdress urea…" or add an
    Irish Potato item → it appears in the farmer's Recommendations → Plan ahead (and mobile Advice);
    bookmark it → Saved count goes up. A Wheat item does not reach Jean-Baptiste.
-10. [Reset demo] restores everything in every role.
+10. As Farmer: Crop calendar → Crop phases shows Irish Potato "Early growth · day 23", harvest
+    Thu 24/12 – Fri 08/01. Change date → 01/08/2026 → "Tuber filling · day 58", harvest moves to
+    19/11 – 04/12; the dashboard's Seasonal calendar footer follows.
+11. [Reset demo] restores everything in every role.
