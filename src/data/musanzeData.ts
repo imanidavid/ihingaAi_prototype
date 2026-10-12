@@ -20,6 +20,7 @@ import {
   CoopEquipment,
   CoopDirectoryEntry,
   CropWindow,
+  CropPlanting,
   EquipmentBooking,
   RegisteredFarmer,
   TrainingMaterial,
@@ -756,35 +757,117 @@ export const SECTORS_LOW_LIST = [
  * - Climbing Beans: planted 12/09/2026 · now vegetative · staking early Oct · flowering and podding Nov · harvest mid-Dec to early Jan
  * - Maize: planted 20/09/2026 · now emergence · top-dress late Oct · harvest Feb
  */
-export const CROP_RECORD = [
-  {
-    id: 'potato',
-    crop: 'Irish Potato',
-    plantedDate: '05/09/2026',
-    currentStage: 'Early vegetative (day 23)',
-    nextAction: 'Spray window opens Tue 14:00 · Tuber initiation mid-Oct',
-    seasonProgressPercent: 20,
-    harvestWindow: 'Early Jan 2027',
+// =========================================================================
+// CROP PHASES — the farmer enters each crop's planting date (store field `cropPlantings`,
+// Crop calendar → Crop phases); the crop growth model (simulated) turns days since planting
+// into the stage, season progress, next stage and harvest window, all counted from NOW.
+// =========================================================================
+export const CROP_GROWTH_MODEL_LABEL = 'Crop growth model (simulated)';
+
+/** Days after planting at which each stage starts, and the harvest window (simulated reference values). */
+export const CROP_GROWTH_MODEL: Record<string, { stages: { name: string; fromDay: number }[]; harvestFromDay: number; harvestToDay: number }> = {
+  'Irish Potato': {
+    stages: [
+      { name: 'Sprouting', fromDay: 0 },
+      { name: 'Early growth', fromDay: 21 },
+      { name: 'Tuber start', fromDay: 41 },
+      { name: 'Tuber filling', fromDay: 56 },
+      { name: 'Ripening', fromDay: 96 },
+    ],
+    harvestFromDay: 110,
+    harvestToDay: 125,
   },
-  {
-    id: 'beans',
-    crop: 'Climbing Beans',
-    plantedDate: '12/09/2026',
-    currentStage: 'Vegetative',
-    nextAction: 'Reinforce hillside trellising before staking in early October',
-    seasonProgressPercent: 22,
-    harvestWindow: 'Mid-Dec to early Jan 2027',
+  'Climbing Beans': {
+    stages: [
+      { name: 'Coming up', fromDay: 0 },
+      { name: 'Early growth', fromDay: 11 },
+      { name: 'Flowering', fromDay: 41 },
+      { name: 'Pod filling', fromDay: 56 },
+      { name: 'Ripening', fromDay: 86 },
+    ],
+    harvestFromDay: 95,
+    harvestToDay: 110,
   },
-  {
-    id: 'maize',
-    crop: 'Maize',
-    plantedDate: '20/09/2026',
-    currentStage: 'Emergence',
-    nextAction: 'Clear volcanic furrow channels · Top-dress with urea late October',
-    seasonProgressPercent: 6,
-    harvestWindow: 'February 2027',
+  Maize: {
+    stages: [
+      { name: 'Coming up', fromDay: 0 },
+      { name: 'Early growth', fromDay: 15 },
+      { name: 'Tasselling', fromDay: 71 },
+      { name: 'Grain filling', fromDay: 91 },
+      { name: 'Ripening', fromDay: 131 },
+    ],
+    harvestFromDay: 140,
+    harvestToDay: 160,
   },
+};
+
+export const FARMER_DEMO_ACCOUNT_ID = 'acc-farmer-jb';
+
+/** Crop plantings entered by farmers (store field `cropPlantings`). */
+export const INITIAL_CROP_PLANTINGS: CropPlanting[] = [
+  { id: 'plant-jb-potato', accountId: FARMER_DEMO_ACCOUNT_ID, crop: 'Irish Potato', plantedDate: '05/09/2026' },
+  { id: 'plant-jb-beans', accountId: FARMER_DEMO_ACCOUNT_ID, crop: 'Climbing Beans', plantedDate: '12/09/2026' },
+  { id: 'plant-jb-maize', accountId: FARMER_DEMO_ACCOUNT_ID, crop: 'Maize', plantedDate: '20/09/2026' },
 ];
+
+function addDays(dmy: string, days: number): string {
+  const d = parseDMY(dmy);
+  return formatDMY(new Date(d.getFullYear(), d.getMonth(), d.getDate() + days));
+}
+
+export interface CropPhase {
+  crop: string;
+  plantedDate: string;
+  /** Days since planting at NOW (negative = planting date is in the future). */
+  day: number;
+  stage: string;
+  stages: { name: string; startDate: string; status: 'done' | 'now' | 'next' }[];
+  nextStage?: { name: string; date: string };
+  /** Share of the days from planting to the first harvest day (0–100). */
+  progressPct: number;
+  harvestFrom: string;
+  harvestTo: string;
+  isHarvestTime: boolean;
+}
+
+/** One crop on the farmer's Crop phases card. */
+export interface FarmerCropPhase {
+  crop: string;
+  planting?: CropPlanting;
+  phase: CropPhase | null;
+  /** The officer's active advice or next plan-ahead item for this crop. */
+  nextTodo?: string;
+}
+
+/** The crop growth model for one planting, counted from NOW. Null when the model has no data for the crop. */
+export function computeCropPhase(planting: CropPlanting): CropPhase | null {
+  const model = CROP_GROWTH_MODEL[planting.crop];
+  if (!model) return null;
+  const startOfToday = new Date(NOW_DATE.getFullYear(), NOW_DATE.getMonth(), NOW_DATE.getDate());
+  const day = Math.round((startOfToday.getTime() - parseDMY(planting.plantedDate).getTime()) / 86400000);
+  let current = -1;
+  model.stages.forEach((st, i) => {
+    if (day >= st.fromDay) current = i;
+  });
+  const stages = model.stages.map((st, i) => ({
+    name: st.name,
+    startDate: addDays(planting.plantedDate, st.fromDay),
+    status: (i < current ? 'done' : i === current ? 'now' : 'next') as 'done' | 'now' | 'next',
+  }));
+  const next = stages[current + 1];
+  return {
+    crop: planting.crop,
+    plantedDate: planting.plantedDate,
+    day,
+    stage: current >= 0 ? model.stages[current].name : 'Not planted yet',
+    stages,
+    nextStage: next ? { name: next.name, date: next.startDate } : undefined,
+    progressPct: Math.max(0, Math.min(100, Math.round((day / model.harvestFromDay) * 100))),
+    harvestFrom: addDays(planting.plantedDate, model.harvestFromDay),
+    harvestTo: addDays(planting.plantedDate, model.harvestToDay),
+    isHarvestTime: day >= model.harvestFromDay && day <= model.harvestToDay,
+  };
+}
 
 // Seasonal calendar data for Musanze: 6 month cards (Sep–Feb, Sep highlighted)
 export const MUSANZE_SEASON_CALENDAR_MONTHS = [
@@ -856,39 +939,39 @@ export const MUSANZE_SEASON_CALENDAR_MONTHS = [
   },
 ];
 
-// Seasonal calendar overview for Musanze dashboard preview
+// Seasonal calendar overview for the dashboard card: Musanze season windows (reference dates).
+// Status and progress are computed from NOW by computeSeasonPhases / windowProgress.
 export const MUSANZE_SEASON_CALENDAR = {
   seasonName: 'Season 2026/27 A',
-  currentMonth: 'September 2026',
-  currentDay: 28,
-  plantingWindow: {
-    startMonth: 'Sep',
-    startDay: 15,
-    endMonth: 'Oct',
-    endDay: 10,
-    dates: 'Sep 15 – Oct 10',
-    status: 'Active',
-    label: 'Planting Window',
-    progress: 55,
-  },
-  harvestWindow: {
-    startMonth: 'Jan',
-    startDay: 10,
-    endMonth: 'Feb',
-    endDay: 25,
-    dates: 'Jan 10 – Feb 25',
-    status: 'Upcoming',
-    label: 'Harvest Window',
-    progress: 0,
-  },
+  plantingWindow: { label: 'Planting window', start: '15/09/2026', end: '10/10/2026' },
+  harvestWindow: { label: 'Harvest window', start: '10/01/2027', end: '25/02/2027' },
   phases: [
-    { name: 'Land Preparation', dates: 'Aug 15 – Sep 14', status: 'Completed' },
-    { name: 'Planting & Sowing', dates: 'Sep 15 – Oct 10', status: 'Active (Now)' },
-    { name: 'Weeding & Fungicide', dates: 'Oct 15 – Nov 20', status: 'Upcoming' },
-    { name: 'Bean Podding & Tuber Bulking', dates: 'Nov 25 – Dec 30', status: 'Upcoming' },
-    { name: 'Harvest & Post-Harvest', dates: 'Jan 10 – Feb 25', status: 'Upcoming' },
+    { name: 'Land preparation', start: '15/08/2026', end: '14/09/2026' },
+    { name: 'Planting and sowing', start: '15/09/2026', end: '10/10/2026' },
+    { name: 'Weeding and spraying', start: '15/10/2026', end: '20/11/2026' },
+    { name: 'Pods and tubers fill', start: '25/11/2026', end: '30/12/2026' },
+    { name: 'Harvest and storage', start: '10/01/2027', end: '25/02/2027' },
   ],
 };
+
+/** "15/09–10/10" style range. */
+export function formatDayMonthRange(start: string, end: string): string {
+  return `${start.slice(0, 5)}–${end.slice(0, 5)}`;
+}
+
+/** Share of a window that has passed at NOW (0–100). */
+export function windowProgress(start: string, end: string): number {
+  const s = parseDMY(start).getTime();
+  const e = parseDMY(end, '23:59').getTime();
+  return Math.max(0, Math.min(100, Math.round(((NOW_DATE.getTime() - s) / (e - s)) * 100)));
+}
+
+export type SeasonPhaseStatus = 'Done' | 'Now' | 'Coming';
+export function seasonPhaseStatus(start: string, end: string): SeasonPhaseStatus {
+  if (NOW_DATE.getTime() > parseDMY(end, '23:59').getTime()) return 'Done';
+  if (NOW_DATE.getTime() >= parseDMY(start).getTime()) return 'Now';
+  return 'Coming';
+}
 
 // Initial user profile settings state
 /**
@@ -935,7 +1018,6 @@ const DEFAULT_FARMER_SETTINGS: UserProfileSettings = {
   messageLanguage: 'Kinyarwanda',
 };
 
-export const FARMER_DEMO_ACCOUNT_ID = 'acc-farmer-jb';
 
 export const INITIAL_USER_SETTINGS: UserProfileSettings = userSettingsFromAccount(
   INITIAL_USER_ACCOUNTS.find((a) => a.id === FARMER_DEMO_ACCOUNT_ID)!

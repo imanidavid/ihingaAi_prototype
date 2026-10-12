@@ -10,6 +10,7 @@ import {
   WarningItem,
   CropAdvisory,
   PlanAheadItem,
+  CropPlanting,
   UserProfileSettings,
   ReportItem,
   AppRole,
@@ -124,8 +125,11 @@ import {
   INITIAL_STATION_READINGS,
   INITIAL_CROP_ADVISORIES,
   INITIAL_PLAN_AHEAD_ITEMS,
+  INITIAL_CROP_PLANTINGS,
+  computeCropPhase,
   computeCropRiskMatrix,
   planItemsForCrops,
+  formatPlanDue,
   computeSectorForecastRisk,
   computeDistrictClimateRisk,
   computeAffectedSectors,
@@ -390,6 +394,8 @@ export default function App() {
   const [cropAdvisories, setCropAdvisories] = useState<CropAdvisory[]>(INITIAL_CROP_ADVISORIES);
   // Season tasks the officer writes for farmers (Warnings → Plan ahead)
   const [planAheadItems, setPlanAheadItems] = useState<PlanAheadItem[]>(INITIAL_PLAN_AHEAD_ITEMS);
+  // Planting dates farmers enter (Crop calendar → Crop phases); the crop growth model reads them
+  const [cropPlantings, setCropPlantings] = useState<CropPlanting[]>(INITIAL_CROP_PLANTINGS);
 
   // Each sector's forecast risk = highest level its forecast reaches under the officer's rain rule
   const sectorForecastRisk = useMemo(
@@ -448,8 +454,9 @@ export default function App() {
       riskTypes,
       sectorRegister,
       planAheadItems,
+      cropPlantings,
     }),
-    [warningRecords, reports, thresholdRules, userSettings, messages, accounts, accessRequests, generatedReports, savedItemIds, readNotificationIds, coopMembers, coopGroupRecords, meetings, equipmentBookings, rolePermissions, auditEvents, loginAttempts, securitySettings, dataSources, processingRuns, processingSettings, messageTemplates, voiceSettings, rainForecasts, stationReadings, cropAdvisories, warningDeliveries, riskTypes, sectorRegister, planAheadItems]
+    [warningRecords, reports, thresholdRules, userSettings, messages, accounts, accessRequests, generatedReports, savedItemIds, readNotificationIds, coopMembers, coopGroupRecords, meetings, equipmentBookings, rolePermissions, auditEvents, loginAttempts, securitySettings, dataSources, processingRuns, processingSettings, messageTemplates, voiceSettings, rainForecasts, stationReadings, cropAdvisories, warningDeliveries, riskTypes, sectorRegister, planAheadItems, cropPlantings]
   );
   useTabSync(storeSnapshot, (state) => {
     if ('warnings' in state) setWarnings(state.warnings as typeof warningRecords);
@@ -482,6 +489,7 @@ export default function App() {
     if ('riskTypes' in state) setRiskTypes(state.riskTypes as typeof riskTypes);
     if ('sectorRegister' in state) setSectorRegister(state.sectorRegister as typeof sectorRegister);
     if ('planAheadItems' in state) setPlanAheadItems(state.planAheadItems as typeof planAheadItems);
+    if ('cropPlantings' in state) setCropPlantings(state.cropPlantings as typeof cropPlantings);
   });
 
   // Groups with members, warnings, acknowledgement and member reports — computed once, used everywhere
@@ -570,6 +578,22 @@ export default function App() {
   const farmerPlanItems = useMemo(
     () => planItemsForCrops(planAheadItems, userSettings.cropsGrown),
     [planAheadItems, userSettings.cropsGrown]
+  );
+  // Crop phases: each crop the farmer grows, their planting date and the crop growth model's stage
+  const farmerCropPhases = useMemo(
+    () =>
+      userSettings.cropsGrown.map((crop) => {
+        const planting = cropPlantings.find((p) => p.accountId === currentAccountId && p.crop === crop);
+        const advice = farmerAdvisories.find((a) => a.crop === crop);
+        const plan = farmerPlanItems.find((p) => p.crop === crop);
+        return {
+          crop,
+          planting,
+          phase: planting ? computeCropPhase(planting) : null,
+          nextTodo: advice ? advice.title : plan ? `${plan.title} (${formatPlanDue(plan.due)})` : undefined,
+        };
+      }),
+    [userSettings.cropsGrown, cropPlantings, currentAccountId, farmerAdvisories, farmerPlanItems]
   );
 
   // =========================================================================
@@ -1390,6 +1414,18 @@ export default function App() {
     showToast('Advice removed');
   };
 
+  // Planting dates (farmer)
+  const handleSavePlanting = (crop: string, plantedDate: string) => {
+    setCropPlantings((prev) => {
+      const existing = prev.find((p) => p.accountId === currentAccountId && p.crop === crop);
+      return existing
+        ? prev.map((p) => (p === existing ? { ...p, plantedDate } : p))
+        : [...prev, { id: `plant-demo-${Date.now()}`, accountId: currentAccountId, crop, plantedDate }];
+    });
+    logAudit('Saved planting date', `${crop} · ${plantedDate}`);
+    showToast(`${crop} planting date saved`);
+  };
+
   // Plan-ahead items (officer)
   const handleSavePlanItem = (item: PlanAheadItem) => {
     const isEdit = planAheadItems.some((p) => p.id === item.id);
@@ -1478,6 +1514,7 @@ export default function App() {
     setStationReadings(INITIAL_STATION_READINGS);
     setCropAdvisories(INITIAL_CROP_ADVISORIES);
     setPlanAheadItems(INITIAL_PLAN_AHEAD_ITEMS);
+    setCropPlantings(INITIAL_CROP_PLANTINGS);
     setUserSettings(INITIAL_USER_SETTINGS);
     setAccounts(INITIAL_USER_ACCOUNTS);
     setAccessRequests(INITIAL_ACCESS_REQUESTS);
@@ -1840,6 +1877,7 @@ export default function App() {
                     </div>
                     <div className="lg:col-span-4">
                       <SeasonalCalendarCard
+                        cropPhases={farmerCropPhases}
                         onViewFullCalendar={() => setCurrentView('calendar')}
                       />
                     </div>
@@ -1946,6 +1984,8 @@ export default function App() {
 
             {currentView === 'calendar' && (
               <CropCalendarView
+                cropPhases={farmerCropPhases}
+                onSavePlanting={handleSavePlanting}
                 cooperativeMeetings={farmerMeetings}
                 cooperativeBookings={farmerBookings}
                 memberName={farmerMember?.fullName}

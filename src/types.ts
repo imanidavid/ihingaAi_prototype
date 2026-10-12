@@ -434,6 +434,16 @@ export interface CoopDirectoryEntry {
 }
 
 /** A dated item on the cooperative calendar that is not a meeting or booking (from the crop calendar). */
+/** A crop planting entered by a farmer (store field `cropPlantings`). */
+export interface CropPlanting {
+  id: string;
+  /** The farmer's account id. */
+  accountId: string;
+  crop: string;
+  /** DD/MM/YYYY */
+  plantedDate: string;
+}
+
 export interface CropWindow {
   id: string;
   title: string;

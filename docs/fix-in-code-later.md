@@ -51,7 +51,8 @@ Farmer dashboard — sources still missing (08/10/2026):
 - [x] Officer dashboard sector table: farmers and reports columns still came from `OFFICER_DATA` — fixed (sector register + reports store).
 - [ ] Greeting is always "Good afternoon" (NOW is 14:00).
 - [ ] ~~Rainfall chart peak dot~~ (fixed 10/10/2026: the forecast card colours a day only by the level its rain reaches) and the "require action" KPI text use orange regardless of level (rule 4) — Task 9.
-- [ ] Seasonal calendar card unchanged (Task 7).
+- [x] ~~Seasonal calendar card unchanged.~~ Window and phase status, progress and the footer are computed from NOW and the farmer's crop phases (12/10/2026).
+- [ ] Crop calendar month cards (`MUSANZE_SEASON_CALENDAR_MONTHS`: activity, crops, moisture, advice) are still typed text; build them from the crop growth model, `rainForecasts` and plan-ahead items in Task 7.
 
 
 Officer dashboard computed (09/10/2026):
