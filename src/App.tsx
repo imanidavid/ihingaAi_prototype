@@ -82,6 +82,7 @@ import {
 } from './data/rwandaAdminData';
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { AdminUsersView } from './components/AdminUsersView';
+import { useTabSync } from './useTabSync';
 import { PlaceholderView } from './components/PlaceholderView';
 import {
   INITIAL_USER_SETTINGS,
@@ -407,6 +408,73 @@ export default function App() {
   const [coopGroupRecords, setCoopGroupRecords] = useState<CoopGroupRecord[]>(INITIAL_COOP_GROUPS);
   const [meetings, setMeetings] = useState<CoopMeeting[]>(INITIAL_COOP_MEETINGS);
   const [equipmentBookings, setEquipmentBookings] = useState<EquipmentBooking[]>(INITIAL_EQUIPMENT_BOOKINGS);
+
+  // Every shared store field, kept the same in all open tabs (officer in one tab, farmer in another)
+  const storeSnapshot = useMemo(
+    () => ({
+      warnings: warningRecords,
+      reports,
+      thresholdRules,
+      userSettings,
+      messages,
+      accounts,
+      accessRequests,
+      generatedReports,
+      savedItemIds,
+      readNotificationIds,
+      coopMembers,
+      coopGroupRecords,
+      meetings,
+      equipmentBookings,
+      rolePermissions,
+      auditEvents,
+      loginAttempts,
+      securitySettings,
+      dataSources,
+      processingRuns,
+      processingSettings,
+      messageTemplates,
+      voiceSettings,
+      rainForecasts,
+      stationReadings,
+      cropAdvisories,
+      warningDeliveries,
+      riskTypes,
+      sectorRegister,
+    }),
+    [warningRecords, reports, thresholdRules, userSettings, messages, accounts, accessRequests, generatedReports, savedItemIds, readNotificationIds, coopMembers, coopGroupRecords, meetings, equipmentBookings, rolePermissions, auditEvents, loginAttempts, securitySettings, dataSources, processingRuns, processingSettings, messageTemplates, voiceSettings, rainForecasts, stationReadings, cropAdvisories, warningDeliveries, riskTypes, sectorRegister]
+  );
+  useTabSync(storeSnapshot, (state) => {
+    if ('warnings' in state) setWarnings(state.warnings as typeof warningRecords);
+    if ('reports' in state) setReports(state.reports as typeof reports);
+    if ('thresholdRules' in state) setThresholdRules(state.thresholdRules as typeof thresholdRules);
+    if ('userSettings' in state) setUserSettings(state.userSettings as typeof userSettings);
+    if ('messages' in state) setMessages(state.messages as typeof messages);
+    if ('accounts' in state) setAccounts(state.accounts as typeof accounts);
+    if ('accessRequests' in state) setAccessRequests(state.accessRequests as typeof accessRequests);
+    if ('generatedReports' in state) setGeneratedReports(state.generatedReports as typeof generatedReports);
+    if ('savedItemIds' in state) setSavedItemIds(state.savedItemIds as typeof savedItemIds);
+    if ('readNotificationIds' in state) setReadNotificationIds(state.readNotificationIds as typeof readNotificationIds);
+    if ('coopMembers' in state) setCoopMembers(state.coopMembers as typeof coopMembers);
+    if ('coopGroupRecords' in state) setCoopGroupRecords(state.coopGroupRecords as typeof coopGroupRecords);
+    if ('meetings' in state) setMeetings(state.meetings as typeof meetings);
+    if ('equipmentBookings' in state) setEquipmentBookings(state.equipmentBookings as typeof equipmentBookings);
+    if ('rolePermissions' in state) setRolePermissions(state.rolePermissions as typeof rolePermissions);
+    if ('auditEvents' in state) setAuditEvents(state.auditEvents as typeof auditEvents);
+    if ('loginAttempts' in state) setLoginAttempts(state.loginAttempts as typeof loginAttempts);
+    if ('securitySettings' in state) setSecuritySettings(state.securitySettings as typeof securitySettings);
+    if ('dataSources' in state) setDataSources(state.dataSources as typeof dataSources);
+    if ('processingRuns' in state) setProcessingRuns(state.processingRuns as typeof processingRuns);
+    if ('processingSettings' in state) setProcessingSettings(state.processingSettings as typeof processingSettings);
+    if ('messageTemplates' in state) setMessageTemplates(state.messageTemplates as typeof messageTemplates);
+    if ('voiceSettings' in state) setVoiceSettings(state.voiceSettings as typeof voiceSettings);
+    if ('rainForecasts' in state) setRainForecasts(state.rainForecasts as typeof rainForecasts);
+    if ('stationReadings' in state) setStationReadings(state.stationReadings as typeof stationReadings);
+    if ('cropAdvisories' in state) setCropAdvisories(state.cropAdvisories as typeof cropAdvisories);
+    if ('warningDeliveries' in state) setWarningDeliveries(state.warningDeliveries as typeof warningDeliveries);
+    if ('riskTypes' in state) setRiskTypes(state.riskTypes as typeof riskTypes);
+    if ('sectorRegister' in state) setSectorRegister(state.sectorRegister as typeof sectorRegister);
+  });
 
   // Groups with members, warnings, acknowledgement and member reports — computed once, used everywhere
   const coopGroups = useMemo(
