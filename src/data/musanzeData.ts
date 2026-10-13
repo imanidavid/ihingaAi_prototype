@@ -3320,12 +3320,28 @@ export function stampSortKey(stamp: string): number {
 }
 
 /** Data feeds behind the forecasts (all simulated in the prototype). */
+/**
+ * The forecast model behind IHINGA AI (simulated in this prototype). It was trained on the datasets
+ * below and reads the data sources every run to produce the 15 sector forecasts in `rainForecasts`.
+ * Dataset years are illustrative.
+ */
+export const FORECAST_MODEL = {
+  name: 'IHINGA forecast model',
+  trainedOn: [
+    { source: 'Meteo Rwanda', what: 'Daily rain and temperature from the Musanze weather stations', years: '2010–2025' },
+    { source: 'MINAGRI', what: 'Crop calendars and planting data for Musanze', years: '2015–2025' },
+    { source: 'Satellite', what: 'Daily rain estimates for every sector', years: '2010–2025' },
+    { source: 'Satellite', what: 'How green the crops are, every week', years: '2015–2025' },
+  ],
+};
+
+/** The data the model reads every run (store field `dataSources`; all simulated). */
 export const INITIAL_DATA_SOURCES: DataSourceStatus[] = [
-  { id: 'ds-stations', name: 'Weather station network', kind: 'Station network', status: 'Healthy', lastSync: '28/09 13:55', note: '6 of 6 stations reporting', endpoint: 'stations.ihinga.demo/musanze', schedule: 'Every 15 minutes', recordsToday: 336, expectedToday: 336 },
-  { id: 'ds-satellite', name: 'Satellite rainfall', kind: 'Satellite', status: 'Healthy', lastSync: '28/09 12:00', note: 'Daily estimate received', endpoint: 'satellite.ihinga.demo/rain-daily', schedule: 'Daily at 12:00', recordsToday: 15, expectedToday: 15 },
-  { id: 'ds-vegetation', name: 'Vegetation index', kind: 'Satellite', status: 'Healthy', lastSync: '27/09 06:00', note: 'Weekly composite', endpoint: 'satellite.ihinga.demo/ndvi-weekly', schedule: 'Weekly on Sunday', recordsToday: 15, expectedToday: 15 },
-  { id: 'ds-seasonal', name: 'Seasonal forecast', kind: 'Forecast model', status: 'Healthy', lastSync: '01/09 08:00', note: 'Season 2026/27 A outlook', endpoint: 'forecast.ihinga.demo/seasonal', schedule: 'Monthly on day 1', recordsToday: 15, expectedToday: 15 },
-  { id: 'ds-manual', name: 'Manual upload', kind: 'File upload', status: 'Delayed', lastSync: '21/09 16:30', note: 'Weekly rain gauge upload is overdue', endpoint: 'Officer upload (Weather data page)', schedule: 'Weekly (manual)', recordsToday: 0, expectedToday: 42 },
+  { id: 'ds-stations', name: 'Weather stations (Meteo Rwanda)', kind: 'Station network', status: 'Healthy', lastSync: '28/09 13:55', note: '6 of 6 Musanze stations sending', endpoint: 'stations.ihinga.demo/musanze', schedule: 'Every 15 minutes', recordsToday: 336, expectedToday: 336 },
+  { id: 'ds-satellite', name: 'Satellite rain', kind: 'Satellite', status: 'Healthy', lastSync: '28/09 12:00', note: 'Rain estimate for every sector', endpoint: 'satellite.ihinga.demo/rain-daily', schedule: 'Daily at 12:00', recordsToday: 15, expectedToday: 15 },
+  { id: 'ds-vegetation', name: 'Crop greenness (satellite)', kind: 'Satellite', status: 'Healthy', lastSync: '27/09 06:00', note: 'Weekly picture of every sector', endpoint: 'satellite.ihinga.demo/ndvi-weekly', schedule: 'Weekly on Sunday', recordsToday: 15, expectedToday: 15 },
+  { id: 'ds-crops', name: 'Crop data (MINAGRI)', kind: 'Crop data', status: 'Healthy', lastSync: '01/09 08:00', note: 'Season 2026/27 A crop calendar', endpoint: 'crops.ihinga.demo/musanze', schedule: 'Monthly on day 1', recordsToday: 15, expectedToday: 15 },
+  { id: 'ds-manual', name: 'Officer uploads', kind: 'File upload', status: 'Delayed', lastSync: '21/09 16:30', note: 'Weekly rain gauge file is late', endpoint: 'Officer upload (Weather data page)', schedule: 'Weekly (by the officer)', recordsToday: 0, expectedToday: 42 },
 ];
 
 /** Kept for the admin dashboard; reads the seeded list. */
@@ -3396,13 +3412,13 @@ export const ENCRYPTION_STATUS = [
 // DATA PROCESSING
 // =========================================================================
 export const PROCESSING_STAGES = [
-  { id: 'ingest', label: 'Ingest', detail: 'Collect records from every source' },
-  { id: 'clean', label: 'Clean', detail: 'Remove duplicates and impossible values' },
-  { id: 'gaps', label: 'Fill gaps', detail: 'Estimate missing hours and days' },
-  { id: 'outliers', label: 'Check outliers', detail: 'Flag values far from neighbours' },
-  { id: 'aggregate', label: 'Aggregate', detail: 'Daily, dekadal and monthly totals' },
-  { id: 'normals', label: 'Climate normals', detail: 'Compare with the long-term average' },
-  { id: 'ready', label: 'Ready for forecast', detail: 'Hand over to the risk model' },
+  { id: 'ingest', label: 'Collect', detail: 'Bring in new readings from every source' },
+  { id: 'clean', label: 'Check', detail: 'Remove repeated and impossible readings' },
+  { id: 'gaps', label: 'Fill missing', detail: 'Estimate readings that did not arrive' },
+  { id: 'outliers', label: 'Set aside odd readings', detail: 'Hold back readings far from nearby stations' },
+  { id: 'aggregate', label: 'Add up', detail: 'Totals per day, 10 days and month' },
+  { id: 'normals', label: 'Compare with normal', detail: 'Compare with the long-term average' },
+  { id: 'ready', label: 'Update forecast', detail: 'The forecast model makes the new 15 sector forecasts' },
 ] as const;
 
 export const INITIAL_PROCESSING_RUNS: ProcessingRun[] = [
@@ -3413,6 +3429,25 @@ export const INITIAL_PROCESSING_RUNS: ProcessingRun[] = [
 ];
 
 export const PROCESSING_SCHEDULE = { every: 'Every 6 hours', nextAt: '28/09/2026 18:00' };
+
+/** Plain words for the processing settings and run history (stored values stay technical). */
+export const PROCESSING_LABELS = {
+  gapMethod: {
+    'Linear between neighbours': 'Average of the readings before and after',
+    'Nearest station': 'Copy the nearest station',
+    'Climatology for the day': 'Use the normal for that day',
+  } as Record<ProcessingSettings['gapMethod'], string>,
+  outlier: { 2: 'Strict (sets aside more)', 3: 'Normal', 4: 'Relaxed (sets aside fewer)' } as Record<number, string>,
+  interpolation: {
+    'Inverse distance': 'Blend nearby stations (closer counts more)',
+    'Nearest station': 'Use the nearest station',
+    'Kriging (simulated)': 'Advanced blending (simulated)',
+  } as Record<ProcessingSettings['interpolation'], string>,
+  aggregation: { Daily: 'Day', Dekadal: '10 days', Monthly: 'Month' } as Record<ProcessingSettings['aggregation'], string>,
+  trigger: { Scheduled: 'Automatic', 'Run now': 'By the administrator', Reprocess: 'Redone by the administrator' } as Record<ProcessingRun['trigger'], string>,
+  status: { Completed: 'Done', 'Completed with warnings': 'Done, some data missing' } as Record<ProcessingRun['status'], string>,
+  sourceStatus: { Healthy: 'Up to date', Delayed: 'Late', Error: 'Not working' } as Record<DataSourceStatus['status'], string>,
+};
 
 export const INITIAL_PROCESSING_SETTINGS: ProcessingSettings = {
   gapMethod: 'Linear between neighbours',
