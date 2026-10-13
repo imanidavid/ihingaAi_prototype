@@ -3680,6 +3680,19 @@ export function computeReportValidation(reports: ObservationItem[]) {
   return { used: used.length, matched, pct: used.length > 0 ? Math.round((matched / used.length) * 100) : 0, reports: used };
 }
 
+/** Every sector's forecast as CSV rows: sector, date, rain_mm, temp_max_c, temp_min_c. */
+export function forecastsToCsv(forecasts: SectorRainForecast[]): string {
+  const rows = ['sector,date,rain_mm,temp_max_c,temp_min_c'];
+  for (const f of forecasts) {
+    const start = parseDMY(f.startDate);
+    f.dailyMm.forEach((mm, i) => {
+      const date = formatDMY(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+      rows.push(`${f.sector},${date},${mm},${f.dailyTempMaxC[i] ?? ''},${f.dailyTempMinC[i] ?? ''}`);
+    });
+  }
+  return rows.join('\n');
+}
+
 /** Anonymised report id for research exports (no farmer names). */
 export function anonymisedReportId(reportId: string): string {
   let h = 0;

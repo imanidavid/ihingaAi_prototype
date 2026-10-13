@@ -1973,12 +1973,13 @@ export default function App() {
 
             {currentView === 'dashboard' && role === 'researcher' && (
               <ResearcherDashboardView
-                forecastRisk={sectorForecastRisk}
                 warnings={warnings}
                 reports={reports}
-                dataSources={dataSources}
+                rainForecasts={rainForecasts}
+                permissions={rolePermissions[role]}
                 currentAccount={accounts.find((a) => a.id === currentAccountId)}
                 onNavigateView={setCurrentView}
+                onExport={(what) => logAudit('Exported data', what)}
               />
             )}
 

@@ -48,15 +48,15 @@ export const ResearcherModelView: React.FC<ResearcherModelViewProps> = ({ warnin
     <div className="space-y-6">
       <PageHeader
         title="Model performance"
-        subtitle="How well forecasts and warnings matched what happened · prototype results, simulated data"
+        subtitle="Did the forecast and the warnings match what really happened? · prototype results, simulated data"
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: Target, label: 'Rain forecast hits, 10 days', value: `${skill.pct}%`, caption: `${skill.hits} of ${skill.days} days` },
-          { icon: Ruler, label: 'Average error', value: `${skill.meanAbsErrorMm} mm`, caption: `90% of days within ±${errorBand} mm` },
-          { icon: Scale, label: 'Bias', value: `${skill.biasMm > 0 ? '+' : ''}${skill.biasMm} mm/day`, caption: skill.biasMm < 0 ? 'Forecast a little too dry' : skill.biasMm > 0 ? 'Forecast a little too wet' : 'No bias' },
-          { icon: ShieldCheck, label: 'Warning hit rate', value: `${hitRate.confirmed} of ${hitRate.total}`, caption: `${hitRate.pct}% confirmed by field reports` },
+          { icon: Target, label: 'Rain forecast was right', value: `${skill.hits} of ${skill.days} days`, caption: 'Within 3 mm or 20% of the rain gauge' },
+          { icon: Ruler, label: 'Usual miss', value: `${skill.meanAbsErrorMm} mm a day`, caption: `9 days in 10 it missed by less than ${errorBand} mm` },
+          { icon: Scale, label: 'Too wet or too dry?', value: skill.biasMm < 0 ? 'A little too dry' : skill.biasMm > 0 ? 'A little too wet' : 'About right', caption: `${skill.biasMm > 0 ? '+' : ''}${skill.biasMm} mm a day on average` },
+          { icon: ShieldCheck, label: 'Warnings that really happened', value: `${hitRate.confirmed} of ${hitRate.total}`, caption: "Farmers' reports confirmed the hazard" },
         ].map((k) => (
           <div key={k.label} className={`${CARD_CLASS} p-5 flex items-start gap-3`}>
             <IconCircle icon={k.icon} />
@@ -72,10 +72,10 @@ export const ResearcherModelView: React.FC<ResearcherModelViewProps> = ({ warnin
       <div className={`${CARD_CLASS} p-5 md:p-6 space-y-3`}>
         <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[rgba(31,74,52,0.08)]">
           <div>
-            <h3 className="text-[16px] font-semibold text-[#17271D]">Forecast vs observed rainfall · Kinigi</h3>
+            <h3 className="text-[16px] font-semibold text-[#17271D]">Forecast rain vs measured rain · Kinigi</h3>
             <p className="text-[12px] text-[#5B665E] tabular-nums">
-              {FORECAST_VS_OBSERVED[0].date} – {FORECAST_VS_OBSERVED[FORECAST_VS_OBSERVED.length - 1].date} · forecast total{' '}
-              {skill.forecastTotal} mm, observed {skill.observedTotal} mm
+              {FORECAST_VS_OBSERVED[0].date} – {FORECAST_VS_OBSERVED[FORECAST_VS_OBSERVED.length - 1].date} · forecast{' '}
+              {skill.forecastTotal} mm, measured {skill.observedTotal} mm
             </p>
           </div>
           <NeutralChip tone="outline">Simulated results</NeutralChip>
@@ -86,7 +86,7 @@ export const ResearcherModelView: React.FC<ResearcherModelViewProps> = ({ warnin
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Accuracy by horizon */}
         <div className={`${CARD_CLASS} p-5 md:p-6 lg:col-span-5 space-y-4`}>
-          <h3 className="text-[16px] font-semibold text-[#17271D] pb-3 border-b border-[rgba(31,74,52,0.08)]">Accuracy by horizon</h3>
+          <h3 className="text-[16px] font-semibold text-[#17271D] pb-3 border-b border-[rgba(31,74,52,0.08)]">How far ahead is it reliable?</h3>
           {horizons.map((h) => (
             <div key={h.horizon} className="space-y-1">
               <div className="flex items-center justify-between text-[12.5px]">
@@ -111,8 +111,8 @@ export const ResearcherModelView: React.FC<ResearcherModelViewProps> = ({ warnin
         {/* Warning hit rate */}
         <div className={`${CARD_CLASS} p-5 md:p-6 lg:col-span-7 space-y-3`}>
           <div className="pb-3 border-b border-[rgba(31,74,52,0.08)]">
-            <h3 className="text-[16px] font-semibold text-[#17271D]">Warning hit rate</h3>
-            <p className="text-[12px] text-[#5B665E]">A warning is confirmed when farmers' field reports show the hazard happened.</p>
+            <h3 className="text-[16px] font-semibold text-[#17271D]">Did the warnings work?</h3>
+            <p className="text-[12px] text-[#5B665E]">Confirmed = farmers' reports show the hazard happened. Seen = farmers who acknowledged it.</p>
           </div>
           <div className="divide-y divide-[rgba(31,74,52,0.06)]">
             {warnings.map((w) => (
@@ -125,6 +125,7 @@ export const ResearcherModelView: React.FC<ResearcherModelViewProps> = ({ warnin
                     </span>
                     <span className="block text-[#5B665E]">
                       {w.affectedArea} · {w.status === 'Active' ? 'Active' : `Ended ${w.endedDate || ''}`}
+                      {w.totalSent ? ` · seen by ${w.acknowledgedPct ?? 0}% of ${w.totalSent.toLocaleString()} farmers` : ''}
                     </span>
                   </div>
                 </div>
@@ -142,9 +143,9 @@ export const ResearcherModelView: React.FC<ResearcherModelViewProps> = ({ warnin
       <div className={`${CARD_CLASS} p-5 md:p-6 space-y-3`}>
         <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[rgba(31,74,52,0.08)]">
           <div>
-            <h3 className="text-[16px] font-semibold text-[#17271D]">Report-based validation</h3>
+            <h3 className="text-[16px] font-semibold text-[#17271D]">Do farmers' reports agree with the forecast?</h3>
             <p className="text-[12px] text-[#5B665E]">
-              Rainfall and flood reports that reached an officer, checked against the forecast for that day and sector.
+              Rain and flood reports that reached an officer, checked against the forecast for that day and sector.
             </p>
           </div>
           <span className="text-[13px] font-semibold text-[#17271D] tabular-nums">
@@ -156,9 +157,9 @@ export const ResearcherModelView: React.FC<ResearcherModelViewProps> = ({ warnin
             <thead>
               <tr className="border-b border-[rgba(31,74,52,0.08)] text-[12px] text-[#5B665E]">
                 <th className="py-2.5 pr-3 font-semibold">Sector</th>
-                <th className="py-2.5 px-3 font-semibold text-right">Reports used</th>
-                <th className="py-2.5 px-3 font-semibold text-right">Matched</th>
-                <th className="py-2.5 pl-3 font-semibold">Match rate</th>
+                <th className="py-2.5 px-3 font-semibold text-right">Reports</th>
+                <th className="py-2.5 px-3 font-semibold text-right">Agree</th>
+                <th className="py-2.5 pl-3 font-semibold">Share that agree</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(31,74,52,0.06)]">
