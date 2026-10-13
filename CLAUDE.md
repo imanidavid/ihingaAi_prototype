@@ -317,7 +317,7 @@ the group of their sector). The dashboard answers "which members need me today?"
 one row per group with members who have not acknowledged each active warning (Remind, or "Told in
 person" — stored in `CoopMember.toldInPerson`, counted by `memberAcknowledged`, shown "told by
 leader"), and the officer's active advice and plan-ahead items due within `PASS_ON_WINDOW_DAYS`
-(collapsed, "Send to members"). Then My groups and one line for the last message and next meeting.
+(collapsed, "Send to members"). Then My groups (with each group's climate risk from `computeSectorClimateRisk`; warning names open the warning) and one line for the last message and next meeting. The leader's menu has no Risk forecast or Early warnings pages (the dashboard covers group risk).
 A farmer acknowledges once; the officer sees totals, the leader sees names. `COOPERATIVE_DATA.actions`
 is gone.
 
