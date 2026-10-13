@@ -1,20 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import {
-  BookOpen,
-  CalendarDays,
-  Eye,
-  Headphones,
-  Info,
-  PlayCircle,
-  Plus,
-  Send,
-  SprayCan,
-} from 'lucide-react';
-import { CoopGroupRecord, CoopMember, EquipmentBooking, TrainingMaterial } from '../types';
+import { CalendarDays, Eye, Plus, Send, SprayCan } from 'lucide-react';
+import { CoopGroupRecord, CoopMember, EquipmentBooking, TrainingMaterial, TrainingShare } from '../types';
 import {
   COOP_EQUIPMENT,
   NOW_DATE,
-  TRAINING_MATERIALS,
   bookedForLabel,
   formatDayShort,
   parseDMY,
@@ -32,10 +21,9 @@ import {
   SegmentedTabs,
 } from './coop/CoopUi';
 import { BookEquipmentModal } from './coop/BookEquipmentModal';
+import { FORMAT_ICON, LessonBody, MaterialThumb } from './TrainingUi';
 
 type TrainingTab = 'materials' | 'equipment';
-
-const FORMAT_ICON = { Audio: Headphones, Video: PlayCircle, Guide: BookOpen };
 
 interface CooperativeTrainingViewProps {
   bookings: EquipmentBooking[];
@@ -43,6 +31,9 @@ interface CooperativeTrainingViewProps {
   groupRecords: CoopGroupRecord[];
   onBook: (booking: EquipmentBooking) => void;
   onShareMaterial: (material: TrainingMaterial) => void;
+  /** Lessons written by the agricultural officer, and the ones already shared. */
+  materials: TrainingMaterial[];
+  shares: TrainingShare[];
 }
 
 export const CooperativeTrainingView: React.FC<CooperativeTrainingViewProps> = ({
@@ -51,7 +42,13 @@ export const CooperativeTrainingView: React.FC<CooperativeTrainingViewProps> = (
   groupRecords,
   onBook,
   onShareMaterial,
+  materials,
+  shares,
 }) => {
+  const lastShare = (id: string) =>
+    shares
+      .filter((s) => s.materialId === id)
+      .sort((a, b) => parseDMY(b.sharedOn).getTime() - parseDMY(a.sharedOn).getTime())[0];
   const [tab, setTab] = useState<TrainingTab>('materials');
   const [preview, setPreview] = useState<TrainingMaterial | null>(null);
   const [bookFor, setBookFor] = useState<string | null>(null);
@@ -77,7 +74,7 @@ export const CooperativeTrainingView: React.FC<CooperativeTrainingViewProps> = (
     <div className="space-y-6">
       <PageHeader
         title="Training"
-        subtitle="Learning materials and the cooperative's shared sprayers"
+        subtitle="Lessons from your agricultural officer to share with members, and the cooperative's shared sprayers"
         actions={
           tab === 'equipment' ? (
             <button type="button" onClick={() => setBookFor('')} className={PRIMARY_BUTTON}>
@@ -92,19 +89,17 @@ export const CooperativeTrainingView: React.FC<CooperativeTrainingViewProps> = (
         value={tab}
         onChange={setTab}
         tabs={[
-          { id: 'materials', label: 'Materials', count: TRAINING_MATERIALS.length },
+          { id: 'materials', label: 'Lessons', count: materials.length },
           { id: 'equipment', label: 'Shared equipment', count: COOP_EQUIPMENT.length },
         ]}
       />
 
       {tab === 'materials' && (
         <div className="space-y-4">
-          <p className="flex items-center gap-1.5 text-[12.5px] text-[#5B665E]">
-            <Info className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-            Sample materials for the prototype
-          </p>
+          {materials.length === 0 && <EmptyState icon={Eye} text="No lessons yet. Your agricultural officer adds them." />}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-            {TRAINING_MATERIALS.map((m) => {
+            {materials.map((m) => {
+              const shared = lastShare(m.id);
               const Icon = FORMAT_ICON[m.format];
               return (
                 <div key={m.id} className={`${CARD_CLASS} p-3 flex flex-col gap-3`}>
@@ -121,6 +116,12 @@ export const CooperativeTrainingView: React.FC<CooperativeTrainingViewProps> = (
                     </div>
                     <h3 className="text-[14px] font-semibold text-[#17271D] leading-snug">{m.title}</h3>
                     <p className="text-[12.5px] text-[#5B665E] leading-snug">{m.summary}</p>
+                    {shared && (
+                      <p className="text-[11.5px] text-[#1F4A34] font-medium">
+                        Shared with {shared.audience === 'all' ? 'all members' : shared.audience.map((id) => groupRecords.find((g) => g.id === id)?.name).filter(Boolean).join(', ')} ·{' '}
+                        {formatDayShort(shared.sharedOn)}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 px-1 pb-1">
                     <button type="button" onClick={() => setPreview(m)} className={`${SECONDARY_BUTTON} flex-1`}>
@@ -214,17 +215,7 @@ export const CooperativeTrainingView: React.FC<CooperativeTrainingViewProps> = (
           </>
         }
       >
-        {preview && (
-          <>
-            <MaterialThumb material={preview} large />
-            <p className="text-[13px] text-[#17271D] leading-relaxed">{preview.summary}</p>
-            <p className="flex items-start gap-2 text-[12.5px] text-[#5B665E]">
-              <Info className="w-4 h-4 text-[#1F4A34] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
-              Sample material. The {preview.format === 'Guide' ? 'guide' : preview.format.toLowerCase() + ' file'} is
-              added when the cooperative records it.
-            </p>
-          </>
-        )}
+        {preview && <LessonBody material={preview} />}
       </CoopModal>
 
       <BookEquipmentModal
@@ -244,24 +235,3 @@ export const CooperativeTrainingView: React.FC<CooperativeTrainingViewProps> = (
 };
 
 /** Photo from the media manifest, with a tint + icon fallback until the file exists. */
-const MaterialThumb: React.FC<{ material: TrainingMaterial; large?: boolean }> = ({ material, large }) => {
-  const [failed, setFailed] = useState(false);
-  const Icon = FORMAT_ICON[material.format];
-  return (
-    <div className={`relative w-full ${large ? 'aspect-[16/9]' : 'aspect-[16/10]'} rounded-[12px] overflow-hidden bg-[#E4ECDB]`}>
-      {!failed && (
-        <img
-          src={material.thumbnail}
-          alt={material.title}
-          onError={() => setFailed(true)}
-          className="w-full h-full object-cover"
-        />
-      )}
-      {failed && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Icon className="w-8 h-8 text-[#1F4A34]" strokeWidth={1.5} />
-        </div>
-      )}
-    </div>
-  );
-};

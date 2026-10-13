@@ -12,6 +12,7 @@ import {
   PlanAheadItem,
   CropPlanting,
   CoopJoinRequest,
+  TrainingShare,
   UserProfileSettings,
   ReportItem,
   AppRole,
@@ -73,6 +74,7 @@ import { CooperativeDashboardView } from './components/CooperativeDashboardView'
 import { CooperativeMessagesView } from './components/CooperativeMessagesView';
 import { CooperativeMembersView } from './components/CooperativeMembersView';
 import { CooperativeMeetingsView } from './components/CooperativeMeetingsView';
+import { OfficerTrainingView } from './components/officer/OfficerTrainingView';
 import { CooperativeTrainingView } from './components/CooperativeTrainingView';
 import { ScheduleMeetingModal } from './components/coop/ScheduleMeetingModal';
 import { MessageComposerModal } from './components/MessageComposerModal';
@@ -128,6 +130,10 @@ import {
   INITIAL_PLAN_AHEAD_ITEMS,
   INITIAL_CROP_PLANTINGS,
   INITIAL_COOP_JOIN_REQUESTS,
+  INITIAL_TRAINING_MATERIALS,
+  INITIAL_TRAINING_SHARES,
+  trainingShareText,
+  lessonsForGroup,
   PASS_ON_WINDOW_DAYS,
   computeCropPhase,
   computeCropRiskMatrix,
@@ -186,6 +192,8 @@ export default function App() {
     en?: string;
     rw?: string;
     member?: CoopMember;
+    /** Set when the leader shares a lesson; sending records the share. */
+    lessonId?: string;
   }>({});
   const [isScheduleMeetingOpen, setIsScheduleMeetingOpen] = useState(false);
 
@@ -456,6 +464,9 @@ export default function App() {
   const [equipmentBookings, setEquipmentBookings] = useState<EquipmentBooking[]>(INITIAL_EQUIPMENT_BOOKINGS);
   // Farmers asking to join a cooperative (sign-up or Settings); the cooperative leader accepts them
   const [coopJoinRequests, setCoopJoinRequests] = useState<CoopJoinRequest[]>(INITIAL_COOP_JOIN_REQUESTS);
+  // Lessons the officer writes (sidebar Training) and the ones the cooperative leader shared
+  const [trainingMaterials, setTrainingMaterials] = useState<TrainingMaterial[]>(INITIAL_TRAINING_MATERIALS);
+  const [trainingShares, setTrainingShares] = useState<TrainingShare[]>(INITIAL_TRAINING_SHARES);
 
   // Every shared store field, kept the same in all open tabs (officer in one tab, farmer in another)
   const storeSnapshot = useMemo(
@@ -492,8 +503,10 @@ export default function App() {
       planAheadItems,
       cropPlantings,
       coopJoinRequests,
+      trainingMaterials,
+      trainingShares,
     }),
-    [warningRecords, reports, thresholdRules, userSettings, messages, accounts, accessRequests, generatedReports, savedItemIds, readNotificationIds, coopMembers, coopGroupRecords, meetings, equipmentBookings, rolePermissions, auditEvents, loginAttempts, securitySettings, dataSources, processingRuns, processingSettings, messageTemplates, voiceSettings, rainForecasts, stationReadings, cropAdvisories, warningDeliveries, riskTypes, sectorRegister, planAheadItems, cropPlantings, coopJoinRequests]
+    [warningRecords, reports, thresholdRules, userSettings, messages, accounts, accessRequests, generatedReports, savedItemIds, readNotificationIds, coopMembers, coopGroupRecords, meetings, equipmentBookings, rolePermissions, auditEvents, loginAttempts, securitySettings, dataSources, processingRuns, processingSettings, messageTemplates, voiceSettings, rainForecasts, stationReadings, cropAdvisories, warningDeliveries, riskTypes, sectorRegister, planAheadItems, cropPlantings, coopJoinRequests, trainingMaterials, trainingShares]
   );
   useTabSync(storeSnapshot, (state) => {
     if ('warnings' in state) setWarnings(state.warnings as typeof warningRecords);
@@ -528,6 +541,8 @@ export default function App() {
     if ('planAheadItems' in state) setPlanAheadItems(state.planAheadItems as typeof planAheadItems);
     if ('cropPlantings' in state) setCropPlantings(state.cropPlantings as typeof cropPlantings);
     if ('coopJoinRequests' in state) setCoopJoinRequests(state.coopJoinRequests as typeof coopJoinRequests);
+    if ('trainingMaterials' in state) setTrainingMaterials(state.trainingMaterials as typeof trainingMaterials);
+    if ('trainingShares' in state) setTrainingShares(state.trainingShares as typeof trainingShares);
   });
 
   // Groups with members, warnings, acknowledgement and member reports — computed once, used everywhere
@@ -662,6 +677,14 @@ export default function App() {
     () => findMemberByName(coopMembers, userSettings.fullName),
     [coopMembers, userSettings.fullName]
   );
+  // Lessons the farmer's cooperative group received from their leader
+  const farmerLessons = useMemo(
+    () => lessonsForGroup(trainingShares, trainingMaterials, farmerMember?.groupId),
+    [trainingShares, trainingMaterials, farmerMember]
+  );
+  // Lesson to open when the farmer taps it in the bell
+  const [openLessonId, setOpenLessonId] = useState<string | undefined>(undefined);
+
   // Cooperative events shared to the farmer's crop calendar: upcoming meetings for their group
   const farmerMeetings = useMemo(
     () =>
@@ -741,6 +764,19 @@ export default function App() {
         }),
 
       // 4. Upcoming cooperative meetings for the farmer's group
+      ...farmerLessons.map(({ material, share }) => {
+        const notifId = `lesson-${share.id}`;
+        return {
+          id: notifId,
+          type: 'lesson' as const,
+          title: `New lesson: ${material.title}`,
+          subtitle: `From your cooperative · ${material.format} · ${material.length}`,
+          time: formatDayShort(share.sharedOn),
+          isRead: readNotificationIds.includes(notifId),
+          targetId: material.id,
+          targetData: material,
+        };
+      }),
       ...farmerMeetings.map((m) => {
         const notifId = `meeting-${m.id}`;
         return {
@@ -755,7 +791,7 @@ export default function App() {
         };
       }),
     ];
-  }, [farmerActiveAlerts, farmerMyReports, messages, farmerMember, farmerMeetings, coopGroupRecords, readNotificationIds]);
+  }, [farmerActiveAlerts, farmerMyReports, messages, farmerMember, farmerMeetings, farmerLessons, coopGroupRecords, readNotificationIds]);
 
   // Officer notifications: reports awaiting review + active officer warnings
   const officerNotifications: NotificationItem[] = useMemo(() => {
@@ -876,6 +912,10 @@ export default function App() {
       handleSelectObservation(item.targetData);
     } else if (item.type === 'message') {
       setDrawerContent({ type: 'coop_message', data: item.targetData });
+    } else if (item.type === 'lesson') {
+      setOpenLessonId(item.targetId);
+      setCurrentView('recommendations');
+      setPreviewMode('desktop');
     } else if (item.type === 'meeting') {
       // Meetings live on the farmer's crop calendar under "Cooperative events"
       setCurrentView('calendar');
@@ -1416,7 +1456,7 @@ export default function App() {
     showToast(`${eq?.name} booked · ${formatDayShort(booking.date)} ${booking.slot}`);
   };
 
-  const openComposer = (prefill: { group?: string; en?: string; rw?: string; member?: CoopMember }) => {
+  const openComposer = (prefill: { group?: string; en?: string; rw?: string; member?: CoopMember; lessonId?: string }) => {
     setMessageComposerPrefill(prefill);
     setIsMessageComposerOpen(true);
   };
@@ -1557,6 +1597,22 @@ export default function App() {
     showToast(`${crop} planting date saved`);
   };
 
+  // Training lessons (officer)
+  const handleSaveLesson = (lesson: TrainingMaterial) => {
+    const isEdit = trainingMaterials.some((m) => m.id === lesson.id);
+    setTrainingMaterials((prev) => (isEdit ? prev.map((m) => (m.id === lesson.id ? lesson : m)) : [lesson, ...prev]));
+    logAudit(isEdit ? 'Edited lesson' : 'Added lesson', lesson.title);
+    showToast(isEdit ? 'Lesson saved' : 'Lesson added. Cooperative leaders can share it now');
+  };
+
+  const handleRemoveLesson = (id: string) => {
+    const lesson = trainingMaterials.find((m) => m.id === id);
+    setTrainingMaterials((prev) => prev.filter((m) => m.id !== id));
+    setTrainingShares((prev) => prev.filter((s) => s.materialId !== id));
+    logAudit('Removed lesson', lesson?.title || id);
+    showToast('Lesson removed');
+  };
+
   // Plan-ahead items (officer)
   const handleSavePlanItem = (item: PlanAheadItem) => {
     const isEdit = planAheadItems.some((p) => p.id === item.id);
@@ -1647,6 +1703,8 @@ export default function App() {
     setPlanAheadItems(INITIAL_PLAN_AHEAD_ITEMS);
     setCropPlantings(INITIAL_CROP_PLANTINGS);
     setCoopJoinRequests(INITIAL_COOP_JOIN_REQUESTS);
+    setTrainingMaterials(INITIAL_TRAINING_MATERIALS);
+    setTrainingShares(INITIAL_TRAINING_SHARES);
     setUserSettings(INITIAL_USER_SETTINGS);
     setAccounts(INITIAL_USER_ACCOUNTS);
     setAccessRequests(INITIAL_ACCESS_REQUESTS);
@@ -2109,15 +2167,28 @@ export default function App() {
               />
             )}
 
-            {currentView === 'training' && (
+            {currentView === 'training' && role === 'officer' && (
+              <OfficerTrainingView
+                materials={trainingMaterials}
+                shares={trainingShares}
+                authorName={reportNameOf(accounts.find((a) => a.id === currentAccountId)?.fullName || 'Claudine Mukamana')}
+                onSave={handleSaveLesson}
+                onRemove={handleRemoveLesson}
+              />
+            )}
+
+            {currentView === 'training' && role !== 'officer' && (
               <CooperativeTrainingView
                 bookings={equipmentBookings}
                 members={coopMembers}
                 groupRecords={coopGroupRecords}
                 onBook={handleBookEquipment}
-                onShareMaterial={(material: TrainingMaterial) =>
-                  openComposer({ group: 'All groups', en: material.shareMessageEn, rw: material.shareMessageRw })
-                }
+                materials={trainingMaterials}
+                shares={trainingShares}
+                onShareMaterial={(material: TrainingMaterial) => {
+                  const text = trainingShareText(material);
+                  openComposer({ group: 'All groups', en: text.en, rw: text.rw, lessonId: material.id });
+                }}
               />
             )}
 
@@ -2137,6 +2208,9 @@ export default function App() {
               <RecommendationsView
                 advisories={farmerAdvisories}
                 planItems={farmerPlanItems}
+                lessons={farmerLessons.map((l) => l.material)}
+                key={openLessonId}
+                initialLessonId={openLessonId}
                 settings={userSettings}
                 onOpenSettingsNotifications={() => setCurrentView('settings')}
                 onSelectAdvisory={handleSelectAdvisory}
@@ -2247,6 +2321,19 @@ export default function App() {
         onClose={() => setIsMessageComposerOpen(false)}
         onSendMessage={(newMsg) => {
           setMessages((prev) => [newMsg, ...prev]);
+          // Sharing a lesson: the groups that got the message can open it in Recommendations
+          const lessonId = messageComposerPrefill.lessonId;
+          if (lessonId && !messageComposerPrefill.member) {
+            const audience = newMsg.groups.includes('All groups')
+              ? ('all' as const)
+              : coopGroupRecords.filter((g) => newMsg.groups.includes(g.name)).map((g) => g.id);
+            setTrainingShares((prev) => [
+              { id: `share-demo-${Date.now()}`, materialId: lessonId, audience, sharedOn: NOW.dateFormatted },
+              ...prev,
+            ]);
+            const title = trainingMaterials.find((m) => m.id === lessonId)?.title || lessonId;
+            logAudit('Shared lesson', `${title} · ${newMsg.groups.join(', ')}`);
+          }
           logAudit('Sent message', `${newMsg.groups.join(', ')} · ${newMsg.recipientCount}`);
           const split = newMsg.channelSplit || { sms: 67, voice: 6, inApp: 9 };
           setToastMessage(

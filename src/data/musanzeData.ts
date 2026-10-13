@@ -22,6 +22,7 @@ import {
   CropWindow,
   CropPlanting,
   CoopJoinRequest,
+  TrainingShare,
   EquipmentBooking,
   RegisteredFarmer,
   TrainingMaterial,
@@ -3001,9 +3002,13 @@ export const COOP_CROP_WINDOWS: CropWindow[] = [
 ];
 
 // =========================================================================
-// TRAINING MATERIALS (sample materials for the prototype)
+// TRAINING (store fields `trainingMaterials`, `trainingShares`) — lessons are written by the
+// agricultural officer (sidebar Training); the cooperative leader shares them with groups and the
+// farmer opens them from the bell or Recommendations. Audio and video files are planned media.
 // =========================================================================
-export const TRAINING_MATERIALS: TrainingMaterial[] = [
+export const TRAINING_FORMATS: TrainingMaterial['format'][] = ['Guide', 'Audio', 'Video'];
+
+export const INITIAL_TRAINING_MATERIALS: TrainingMaterial[] = [
   {
     id: 'tm-late-blight',
     title: 'Recognising late blight early',
@@ -3011,9 +3016,10 @@ export const TRAINING_MATERIALS: TrainingMaterial[] = [
     language: 'Kinyarwanda',
     length: '4 min',
     summary: 'How to spot the first dark spots on potato leaves and what to do the same day.',
+    content:
+      'Walk your rows in the morning after rain.\nLook under the lower leaves for dark, wet-looking spots.\nA white ring around a spot means blight is growing.\nRemove and bury sick leaves the same day.\nTell your group lead and your officer.',
     thumbnail: '/media/training-late-blight.jpg',
-    shareMessageEn: 'Training: listen to "Recognising late blight early" (4 min, Kinyarwanda) in the IHINGA AI app.',
-    shareMessageRw: 'Amahugurwa: umva "Kumenya hakiri kare indwara y\'imvura mu birayi" (iminota 4) muri IHINGA AI.',
+    authorName: 'Claudine M.',
   },
   {
     id: 'tm-bean-staking',
@@ -3022,9 +3028,10 @@ export const TRAINING_MATERIALS: TrainingMaterial[] = [
     language: 'Kinyarwanda',
     length: '6 min',
     summary: 'Setting strong stakes so beans stay up in heavy rain and wind.',
+    content:
+      'Use stakes about 2 m long.\nPush each stake 30 cm into the soil.\nTie two stakes together at the top in windy places.\nGuide the bean stem around the stake.\nCheck the stakes again after each storm.',
     thumbnail: '/media/training-bean-staking.jpg',
-    shareMessageEn: 'Training: watch "Staking climbing beans" (6 min, Kinyarwanda) in the IHINGA AI app.',
-    shareMessageRw: 'Amahugurwa: reba "Gushingirira ibishyimbo bishingirirwa" (iminota 6) muri IHINGA AI.',
+    authorName: 'Claudine M.',
   },
   {
     id: 'tm-drainage',
@@ -3033,9 +3040,10 @@ export const TRAINING_MATERIALS: TrainingMaterial[] = [
     language: 'English',
     length: '3 pages',
     summary: 'Step-by-step guide to keep water moving off terraces before a downpour.',
+    content:
+      'Find where water stands after rain.\nDig the channel along the terrace edge, 15 cm deep.\nRemove mud and stones from the channel.\nMake the end of the channel lead to a safe outlet.\nClear it again before every heavy rain.',
     thumbnail: '/media/training-drainage.jpg',
-    shareMessageEn: 'Training: read "Clearing drainage channels on terraces" (3 pages) in the IHINGA AI app.',
-    shareMessageRw: 'Amahugurwa: soma "Gusukura imiferege y\'amazi ku materasi" (impapuro 3) muri IHINGA AI.',
+    authorName: 'Claudine M.',
   },
   {
     id: 'tm-fungicide-safety',
@@ -3044,11 +3052,46 @@ export const TRAINING_MATERIALS: TrainingMaterial[] = [
     language: 'Kinyarwanda',
     length: '5 min',
     summary: 'Protective clothing, mixing, and cleaning the sprayer after use.',
+    content:
+      'Wear boots, gloves and long sleeves.\nMix only the amount on the label.\nSpray on a dry, calm afternoon.\nWash the sprayer away from water sources.\nWash your hands before eating.',
     thumbnail: '/media/training-fungicide-safety.jpg',
-    shareMessageEn: 'Training: listen to "Safe use of fungicides" (5 min, Kinyarwanda) in the IHINGA AI app.',
-    shareMessageRw: 'Amahugurwa: umva "Gukoresha neza imiti yica udukoko" (iminota 5) muri IHINGA AI.',
+    authorName: 'Claudine M.',
   },
 ];
+
+/** Seed: the late blight lesson was shared with Kinigi growers the day before NOW. */
+export const INITIAL_TRAINING_SHARES: TrainingShare[] = [
+  { id: 'share-1', materialId: 'tm-late-blight', audience: ['grp-kinigi'], sharedOn: '27/09/2026' },
+];
+
+/** The message the leader sends when sharing a lesson. */
+export function trainingShareText(m: TrainingMaterial): { en: string; rw: string } {
+  const verb = m.format === 'Audio' ? 'Listen to' : m.format === 'Video' ? 'Watch' : 'Read';
+  const verbRw = m.format === 'Audio' ? 'Umva' : m.format === 'Video' ? 'Reba' : 'Soma';
+  return {
+    en: `Training: ${verb.toLowerCase()} "${m.title}" (${m.length}) in IHINGA AI → Recommendations.`,
+    rw: `Amahugurwa: ${verbRw.toLowerCase()} "${m.title}" (${m.length}) muri IHINGA AI.`,
+  };
+}
+
+/** Lessons shared with a group (or all), newest share first, each lesson once. */
+export function lessonsForGroup(
+  shares: TrainingShare[],
+  materials: TrainingMaterial[],
+  groupId: string | undefined
+): { material: TrainingMaterial; share: TrainingShare }[] {
+  if (!groupId) return [];
+  const seen = new Set<string>();
+  return [...shares]
+    .sort((a, b) => parseDMY(b.sharedOn).getTime() - parseDMY(a.sharedOn).getTime())
+    .filter((s) => s.audience === 'all' || s.audience.includes(groupId))
+    .flatMap((share) => {
+      const material = materials.find((m) => m.id === share.materialId);
+      if (!material || seen.has(material.id)) return [];
+      seen.add(material.id);
+      return [{ material, share }];
+    });
+}
 
 // =========================================================================
 // COOPERATIVE MESSAGES — who receives what
