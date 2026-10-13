@@ -544,6 +544,60 @@ export function computeCropRiskMatrix(
   });
 }
 
+/** The four hazard cards on Risk forecast for one sector, computed from its forecast and the officer's rules. */
+export interface HazardCard {
+  id: 'rain' | 'dry' | 'temp' | 'total';
+  label: string;
+  value: string;
+  subtext: string;
+  level?: RiskLevel;
+}
+export function computeHazardCards(
+  sector: string,
+  rules: ThresholdRuleItem[],
+  forecasts: SectorRainForecast[],
+  windowDays: number
+): HazardCard[] {
+  const f = forecasts.find((x) => x.sector === sector);
+  const days = forecastDays(forecasts, sector).slice(0, windowDays);
+  if (!f || days.length === 0) return [];
+  const label = (i: number) => {
+    const start = parseDMY(f.startDate);
+    return formatDayShort(formatDMY(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)));
+  };
+  const rain = days.map((d) => d.rainfallMm);
+  const peak = Math.max(...rain);
+  const peakIdx = rain.indexOf(peak);
+  const thresholds = rainThresholds(rules);
+  const dryRule = ruleValue(rules, 'rule-dry');
+  const dryRun = longestRun(rain.map((mm) => mm < DRY_DAY_MM));
+  const tempRule = ruleValue(rules, 'rule-temp');
+  const highs = f.dailyTempMaxC;
+  const normal = highs.length ? highs.reduce((x, y) => x + y, 0) / highs.length : 0;
+  const hottest = Math.max(...days.map((d) => d.temp));
+  const hottestIdx = days.findIndex((d) => d.temp === hottest);
+  const above = Math.round((hottest - normal) * 10) / 10;
+  const total = rain.reduce((x, y) => x + y, 0);
+  return [
+    { id: 'rain', label: 'Excess rain', value: `${peak} mm`, subtext: `Wettest day ${label(peakIdx)}`, level: riskForRain(peak, thresholds) },
+    {
+      id: 'dry',
+      label: 'Dry spell',
+      value: `${dryRun.length} ${dryRun.length === 1 ? 'day' : 'days'}`,
+      subtext: `Longest run under ${DRY_DAY_MM} mm`,
+      level: dryRule && dryRun.length >= dryRule.value ? dryRule.level : 'Low',
+    },
+    {
+      id: 'temp',
+      label: 'Temperature',
+      value: `${hottest}°C`,
+      subtext: `Hottest day ${label(hottestIdx)} · ${above > 0 ? `+${above}` : above}°C vs average`,
+      level: tempRule && above >= tempRule.value ? tempRule.level : 'Low',
+    },
+    { id: 'total', label: 'Rain total', value: `${total} mm`, subtext: `${rain.filter((mm) => mm >= DRY_DAY_MM).length} rainy days of ${days.length}` },
+  ];
+}
+
 /** Chip text for a cell: "Watch (lodging)" or "Low". */
 export function cropRiskChipText(cell: CropRiskCell): string {
   return cell.cause ? `${cell.level} (${cell.cause})` : cell.level;

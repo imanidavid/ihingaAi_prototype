@@ -2120,7 +2120,8 @@ export default function App() {
                 activeWarnings={officerActiveWarnings}
                 forecastRisk={sectorForecastRisk}
                 userSector={role === 'farmer' ? farmerSector : undefined}
-                forecastSeries={farmerForecast}
+                rainForecasts={rainForecasts}
+                thresholdRules={thresholdRules}
                 cropRisk={role === 'farmer' ? farmerCropRisk : districtCropRisk}
                 advisories={role === 'farmer' ? farmerAdvisories : cropAdvisories}
               />

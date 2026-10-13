@@ -44,7 +44,7 @@ Found during Task 6 (08/10/2026):
 Farmer dashboard — sources still missing (08/10/2026):
 - [x] ~~Map: soil saturation (78%) and the other 29 districts are seeded values.~~ The map now shows only Musanze's 15 sectors, all computed (09/10/2026). `RWANDA_DISTRICTS` remains only for the sign-up district list.
 - [ ] Map: the sector boundaries are the 2012 geoBoundaries release (Open Data Rwanda); only the Musanze sector names are used, simplified to ~20 m.
-- [ ] Risk forecast page: the four horizon cards (excess rain, dry spell, temperature, season onset) and the season chart's monthly totals still come from `FORECAST_HORIZONS`; only the 10-day and month charts read `rainForecasts`.
+- [x] ~~Risk forecast horizon cards typed.~~ Cards are computed per sector by `computeHazardCards` (13/10/2026). The season chart's monthly totals still come from `FORECAST_HORIZONS`.
 - [ ] Dry spell, temperature and late blight rules now have numbers and drive the crop risk matrix, but not the sector forecast risk (only rain does). Humidity per forecast day is the same template for every sector, and the temperature "normal" is the sector's 30-day average high (simulated).
 - [x] ~~Forecast temperature per day reused the seeded template series.~~ `rainForecasts` now holds day high/low per sector and the forecast upload can replace them (10/10/2026). Humidity per forecast day is still the seeded template (not shown on the farmer card).
 - [ ] Mobile frames (M1/M2) still show the old rain-only "Rainfall Outlook" card with its "vs normal" figures; move them to the weather forecast card layout in Task 9.
