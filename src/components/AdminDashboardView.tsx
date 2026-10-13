@@ -20,6 +20,7 @@ import {
   ROLE_ORDER,
   officerHeroImg,
   stampSortKey,
+  PROCESSING_LABELS,
 } from '../data/musanzeData';
 import { CARD_CLASS, EmptyState, IconCircle, NeutralChip, PRIMARY_BUTTON, SECONDARY_BUTTON } from './coop/CoopUi';
 import { RejectRequestModal } from './admin/RejectRequestModal';
@@ -86,9 +87,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     },
     {
       icon: Database,
-      label: 'Data sources healthy',
+      label: 'Data sources up to date',
       value: `${healthy} of ${dataSources.length}`,
-      caption: dataSources.filter((d) => d.status !== 'Healthy').map((d) => `${d.name}: ${d.status.toLowerCase()}`).join(' · ') || 'All feeds on time',
+      caption: dataSources.filter((d) => d.status !== 'Healthy').map((d) => `${d.name}: ${PROCESSING_LABELS.sourceStatus[d.status].toLowerCase()}`).join(' · ') || 'All data on time',
     },
     {
       icon: Workflow,
@@ -201,7 +202,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <h3 className="text-[16px] font-semibold text-[#17271D]">Data source health</h3>
             <span className="flex items-center gap-1 text-[12px] text-[#5B665E]">
               <Info className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-              Simulated feeds
+              Simulated data
             </span>
           </div>
           <div className="divide-y divide-[rgba(31,74,52,0.06)]">
@@ -215,7 +216,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                 </div>
                 <NeutralChip tone={d.status === 'Healthy' ? 'tint' : 'outline'}>
                   {d.status === 'Healthy' ? <Check className="w-3 h-3" strokeWidth={2} /> : <Clock className="w-3 h-3" strokeWidth={1.5} />}
-                  {d.status}
+                  {PROCESSING_LABELS.sourceStatus[d.status]}
                 </NeutralChip>
               </div>
             ))}

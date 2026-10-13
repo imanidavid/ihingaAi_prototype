@@ -335,6 +335,13 @@ Risk forecast (13/10/2026): the four cards (excess rain, dry spell, temperature,
 Farmers see their sector; officers and researchers pick a sector (highest risk first). The chart
 caption is the computed forecast skill (`computeForecastSkill`, simulated gauge data).
 
+Admin data (13/10/2026): Data sources shows the forecast model first (`FORECAST_MODEL`: learned
+from Meteo Rwanda station rain and temperature, MINAGRI crop data, satellite rain and crop
+greenness; simulated, years illustrative, with a note that naming the data owners is not an
+endorsement), then one "Data coming in" list (late sources first). Admin pages use plain words:
+`PROCESSING_LABELS` maps the stored technical values (gap method, outlier threshold,
+interpolation, aggregation, run trigger and result, source status) to everyday labels.
+
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 
 ## Cross-role flows (the demo — must always work)

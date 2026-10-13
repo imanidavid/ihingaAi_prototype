@@ -733,7 +733,7 @@ export interface AuditEvent {
 export interface DataSourceStatus {
   id: string;
   name: string;
-  kind: 'Station network' | 'Satellite' | 'Forecast model' | 'File upload';
+  kind: 'Station network' | 'Satellite' | 'Crop data' | 'File upload';
   status: 'Healthy' | 'Delayed' | 'Error';
   /** 'DD/MM HH:MM' */
   lastSync: string;

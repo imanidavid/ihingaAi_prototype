@@ -1549,12 +1549,12 @@ export default function App() {
     setDataSources((prev) =>
       prev.map((d) =>
         d.id === sourceId
-          ? { ...d, status: 'Healthy' as const, lastSync: NOW_STAMP.slice(0, 5) + NOW_STAMP.slice(10), recordsToday: d.expectedToday, note: 'Synced just now' }
+          ? { ...d, status: 'Healthy' as const, lastSync: NOW_STAMP.slice(0, 5) + NOW_STAMP.slice(10), recordsToday: d.expectedToday, note: 'Checked just now' }
           : d
       )
     );
     logAudit('Refreshed data source', source?.name || sourceId);
-    showToast(`${source?.name} synced`);
+    showToast(`${source?.name}: up to date`);
   };
 
   const handleAddSource = (source: DataSourceStatus) => {
@@ -1928,6 +1928,9 @@ export default function App() {
                 permissions={rolePermissions[role]}
                 onRefresh={handleRefreshSource}
                 onAddSource={handleAddSource}
+                lastRun={processingRuns[processingRuns.length - 1]}
+                sectorsForecast={rainForecasts.length}
+                onOpenProcessing={() => setCurrentView('processing')}
               />
             )}
 

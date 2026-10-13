@@ -15,7 +15,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import { DataSourceStatus, PermissionId } from '../types';
-import { NOW, sourceCompleteness } from '../data/musanzeData';
+import { FORECAST_MODEL, NOW, PROCESSING_LABELS, PROCESSING_SCHEDULE, sourceCompleteness } from '../data/musanzeData';
+import { ProcessingRun } from '../types';
 import { PillSelect } from './PillSelect';
 import {
   CARD_CLASS,
@@ -32,7 +33,7 @@ import {
 const KIND_ICON: Record<DataSourceStatus['kind'], React.ComponentType<{ className?: string; strokeWidth?: number }>> = {
   'Station network': CloudRain,
   Satellite: Satellite,
-  'Forecast model': Database,
+  'Crop data': Database,
   'File upload': FileSpreadsheet,
 };
 
@@ -45,7 +46,7 @@ const StatusChip: React.FC<{ status: DataSourceStatus['status'] }> = ({ status }
     ) : (
       <XCircle className="w-3 h-3" strokeWidth={1.5} />
     )}
-    {status}
+    {PROCESSING_LABELS.sourceStatus[status]}
   </NeutralChip>
 );
 
@@ -54,6 +55,10 @@ interface AdminDataSourcesViewProps {
   permissions: PermissionId[];
   onRefresh: (sourceId: string) => void;
   onAddSource: (source: DataSourceStatus) => void;
+  /** Latest processing run (= latest forecast update) and how many sectors have a forecast. */
+  lastRun?: ProcessingRun;
+  sectorsForecast: number;
+  onOpenProcessing: () => void;
 }
 
 export const AdminDataSourcesView: React.FC<AdminDataSourcesViewProps> = ({
@@ -61,11 +66,16 @@ export const AdminDataSourcesView: React.FC<AdminDataSourcesViewProps> = ({
   permissions,
   onRefresh,
   onAddSource,
+  lastRun,
+  sectorsForecast,
+  onOpenProcessing,
 }) => {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const canManage = permissions.includes('manage_data_sources');
-  const alerts = dataSources.filter((d) => d.status !== 'Healthy' || sourceCompleteness(d) < 100);
-  const healthy = dataSources.filter((d) => d.status === 'Healthy').length;
+  // Late or incomplete sources first
+  const needsAttention = (d: DataSourceStatus) => d.status !== 'Healthy' || sourceCompleteness(d) < 100;
+  const sorted = [...dataSources].sort((a, b) => Number(needsAttention(b)) - Number(needsAttention(a)));
+  const lateCount = dataSources.filter(needsAttention).length;
 
   if (!canManage) {
     return (
@@ -82,101 +92,103 @@ export const AdminDataSourcesView: React.FC<AdminDataSourcesViewProps> = ({
     <div className="space-y-6">
       <PageHeader
         title="Data sources"
-        subtitle={`${healthy} of ${dataSources.length} feeds healthy · all feeds are simulated in the prototype · officers upload station readings and rain forecasts`}
+        subtitle={`Where the forecast comes from · ${lateCount === 0 ? 'all data up to date' : `${lateCount} ${lateCount === 1 ? 'source needs' : 'sources need'} attention`} · simulated in the prototype`}
         actions={
           <button type="button" onClick={() => setIsWizardOpen(true)} className={PRIMARY_BUTTON}>
             <Plug className="w-3.5 h-3.5" />
-            <span>Connect a source</span>
+            <span>Add a source</span>
           </button>
         }
       />
 
-      {/* Missing-data alerts */}
-      <div className={`${CARD_CLASS} p-5 space-y-3`}>
-        <h3 className="text-[16px] font-semibold text-[#17271D]">Missing-data alerts</h3>
-        {alerts.length === 0 ? (
-          <EmptyState icon={Check} text="Every feed is on time and complete today." />
-        ) : (
-          alerts.map((d) => (
-            <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-white border border-[#17271D]/30">
-              <div className="flex items-start gap-2.5">
-                <AlertCircle className="w-4 h-4 text-[#17271D] mt-0.5" strokeWidth={1.5} />
-                <div className="text-[12.5px]">
-                  <span className="block font-semibold text-[#17271D]">
-                    {d.name}: {d.recordsToday} of {d.expectedToday} records today ({sourceCompleteness(d)}%)
-                  </span>
-                  <span className="block text-[#5B665E] tabular-nums">
-                    Last sync {d.lastSync} · {d.note}
-                  </span>
-                </div>
-              </div>
-              {d.kind === 'File upload' ? (
-                <NeutralChip tone="outline">
-                  <UserRound className="w-3 h-3" strokeWidth={1.5} />
-                  Uploaded by the agricultural officer
-                </NeutralChip>
-              ) : (
-                <button type="button" onClick={() => onRefresh(d.id)} className={SECONDARY_BUTTON}>
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Sync now</span>
-                </button>
-              )}
+      {/* The forecast model */}
+      <div className={`${CARD_CLASS} p-5 md:p-6 space-y-4`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <IconCircle icon={Database} />
+            <div>
+              <h3 className="text-[16px] font-semibold text-[#17271D] leading-tight">{FORECAST_MODEL.name}</h3>
+              <span className="text-[12px] text-[#5B665E]">Makes the rain and temperature forecast for every sector · simulated</span>
             </div>
-          ))
-        )}
+          </div>
+          <button type="button" onClick={onOpenProcessing} className={SECONDARY_BUTTON}>
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Updates and history</span>
+          </button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[12px]">
+          <div className="p-3 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.06)]">
+            <span className="block text-[#5B665E]">Last forecast update</span>
+            <span className="block text-[14px] font-semibold text-[#17271D] tabular-nums">{lastRun ? lastRun.startedAt : '—'}</span>
+          </div>
+          <div className="p-3 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.06)]">
+            <span className="block text-[#5B665E]">Next update</span>
+            <span className="block text-[14px] font-semibold text-[#17271D] tabular-nums">{PROCESSING_SCHEDULE.nextAt}</span>
+          </div>
+          <div className="p-3 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.06)]">
+            <span className="block text-[#5B665E]">Sectors with a forecast</span>
+            <span className="block text-[14px] font-semibold text-[#17271D] tabular-nums">{sectorsForecast} of 15</span>
+          </div>
+        </div>
+        <div>
+          <span className="block text-[12px] font-semibold text-[#17271D] mb-1.5">Learned from</span>
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {FORECAST_MODEL.trainedOn.map((t) => (
+              <li key={t.what} className="p-3 rounded-xl bg-white border border-[rgba(31,74,52,0.08)] text-[12.5px]">
+                <span className="block font-semibold text-[#17271D]">{t.source}</span>
+                <span className="block text-[#5B665E]">
+                  {t.what} · {t.years}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 flex items-start gap-1.5 text-[11.5px] text-[#5B665E]">
+            <Info className="w-3.5 h-3.5 text-[#1F4A34] mt-0.5 flex-shrink-0" strokeWidth={1.5} />
+            Prototype: the model and its data are simulated, and the years are illustrative. Naming the data owners does not mean they endorse IHINGA AI.
+          </p>
+        </div>
       </div>
 
-      {/* Source cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {dataSources.map((d) => {
-          const pct = sourceCompleteness(d);
-          return (
-            <div key={d.id} className={`${CARD_CLASS} p-5 flex flex-col gap-4`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
+      {/* The data the model reads every update (late ones first) */}
+      <div className={`${CARD_CLASS} p-5 md:p-6`}>
+        <h3 className="text-[16px] font-semibold text-[#17271D] pb-3 border-b border-[rgba(31,74,52,0.08)]">Data coming in</h3>
+        <div className="divide-y divide-[rgba(31,74,52,0.06)]">
+          {sorted.map((d) => {
+            const pct = sourceCompleteness(d);
+            const late = needsAttention(d);
+            return (
+              <div key={d.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
                   <IconCircle icon={KIND_ICON[d.kind]} />
-                  <div>
-                    <h3 className="text-[15px] font-semibold text-[#17271D] leading-tight">{d.name}</h3>
-                    <span className="text-[12px] text-[#5B665E]">{d.kind} · Simulated feed</span>
+                  <div className="min-w-0 text-[12.5px]">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-[14px] font-semibold text-[#17271D]">{d.name}</span>
+                      <StatusChip status={d.status} />
+                    </span>
+                    <span className="block text-[#5B665E] mt-0.5">
+                      {d.note} · updates: {d.schedule}
+                    </span>
+                    <span className={`block tabular-nums mt-0.5 ${late ? 'text-[#17271D] font-medium' : 'text-[#5B665E]'}`}>
+                      {late && <AlertCircle className="inline w-3.5 h-3.5 mr-1 -mt-0.5" strokeWidth={1.5} />}
+                      Received today: {d.recordsToday} of {d.expectedToday} ({pct}%) · last update {d.lastSync}
+                    </span>
                   </div>
                 </div>
-                <StatusChip status={d.status} />
+                {d.kind === 'File upload' ? (
+                  <NeutralChip tone="outline">
+                    <UserRound className="w-3 h-3" strokeWidth={1.5} />
+                    Sent by the agricultural officer
+                  </NeutralChip>
+                ) : (
+                  <button type="button" onClick={() => onRefresh(d.id)} className={SECONDARY_BUTTON}>
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Check now</span>
+                  </button>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-3 text-[12px]">
-                <div className="p-3 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.06)]">
-                  <span className="block text-[#5B665E]">Last sync</span>
-                  <span className="block text-[14px] font-semibold text-[#17271D] tabular-nums">{d.lastSync}</span>
-                </div>
-                <div className="p-3 rounded-xl bg-[#F4F6EF] border border-[rgba(31,74,52,0.06)]">
-                  <span className="block text-[#5B665E]">Records today</span>
-                  <span className="block text-[14px] font-semibold text-[#17271D] tabular-nums">
-                    {d.recordsToday} of {d.expectedToday}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-[12px]">
-                  <span className="text-[#5B665E]">Completeness</span>
-                  <span className="font-semibold text-[#17271D] tabular-nums">{pct}%</span>
-                </div>
-                <div className="w-full h-2 bg-[#F4F6EF] rounded-full overflow-hidden border border-[rgba(31,74,52,0.08)]">
-                  <div className="h-full bg-[#3E8E55] rounded-full" style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-              <div className="text-[12px] text-[#5B665E] space-y-0.5">
-                <span className="block">Refresh: {d.schedule}</span>
-                <span className="block break-all">Source: {d.endpoint}</span>
-                <span className="block">{d.note}</span>
-              </div>
-              {d.kind !== 'File upload' && (
-                <button type="button" onClick={() => onRefresh(d.id)} className={SECONDARY_BUTTON}>
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Sync now</span>
-                </button>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       <ConnectionWizard
@@ -193,8 +205,8 @@ export const AdminDataSourcesView: React.FC<AdminDataSourcesViewProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-const WIZARD_STEPS = ['Type', 'Address', 'Sign-in', 'Schedule', 'Test'] as const;
-const KINDS: DataSourceStatus['kind'][] = ['Station network', 'Satellite', 'Forecast model', 'File upload'];
+const WIZARD_STEPS = ['Type', 'Web address', 'Sign-in', 'How often', 'Test'] as const;
+const KINDS: DataSourceStatus['kind'][] = ['Station network', 'Satellite', 'Crop data', 'File upload'];
 const SCHEDULES = ['Every 15 minutes', 'Every hour', 'Every 6 hours', 'Daily at 12:00', 'Weekly on Sunday'];
 
 const ConnectionWizard: React.FC<{
@@ -304,7 +316,7 @@ const ConnectionWizard: React.FC<{
       )}
       {step === 1 && (
         <label className="block">
-          <span className="block text-[12px] font-semibold text-[#17271D] mb-1.5">Address of the feed</span>
+          <span className="block text-[12px] font-semibold text-[#17271D] mb-1.5">Web address of the data</span>
           <input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="e.g. gauges.ihinga.demo/cyuve" className={TEXT_INPUT} />
           <span className="block mt-1 text-[12px] text-[#5B665E]">In the prototype no real connection is made.</span>
         </label>
@@ -332,7 +344,7 @@ const ConnectionWizard: React.FC<{
           </>
         ))}
       {step === 3 && (
-        <PillSelect label="Refresh schedule" value={schedule} onChange={setSchedule} options={SCHEDULES.map((s) => ({ value: s, label: s }))} />
+        <PillSelect label="How often to check" value={schedule} onChange={setSchedule} options={SCHEDULES.map((s) => ({ value: s, label: s }))} />
       )}
       {step === 4 && (
         <div className="space-y-3">

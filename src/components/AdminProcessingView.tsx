@@ -8,6 +8,7 @@ import {
   RAINFALL_NORMAL_MM_PER_DAY,
   sourceCompleteness,
   stampSortKey,
+  PROCESSING_LABELS,
 } from '../data/musanzeData';
 import { PillSelect } from './PillSelect';
 import {
@@ -54,7 +55,6 @@ export const AdminProcessingView: React.FC<AdminProcessingViewProps> = ({
   const recordsToday = dataSources.reduce((s, d) => s + d.recordsToday, 0);
   const expectedToday = dataSources.reduce((s, d) => s + d.expectedToday, 0);
   const missing = Math.max(0, expectedToday - recordsToday);
-  const avgCompleteness = Math.round(dataSources.reduce((s, d) => s + sourceCompleteness(d), 0) / Math.max(1, dataSources.length));
   const outliersForThreshold = settings.outlierThresholdSd <= 2 ? 3 : settings.outlierThresholdSd >= 4 ? 0 : 1;
 
   useEffect(() => {
@@ -85,7 +85,7 @@ export const AdminProcessingView: React.FC<AdminProcessingViewProps> = ({
     <div className="space-y-6">
       <PageHeader
         title="Data processing"
-        subtitle={`${PROCESSING_SCHEDULE.every} · last run ${last ? last.startedAt : '—'} · next ${PROCESSING_SCHEDULE.nextAt}`}
+        subtitle={`${PROCESSING_SCHEDULE.every} the system checks new data and updates the forecast · last update ${last ? last.startedAt : '—'} · next ${PROCESSING_SCHEDULE.nextAt}`}
         actions={
           <>
             <button
@@ -95,7 +95,7 @@ export const AdminProcessingView: React.FC<AdminProcessingViewProps> = ({
               className={SECONDARY_BUTTON}
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reprocess</span>
+              <span>Redo today</span>
             </button>
             <button
               type="button"
@@ -104,7 +104,7 @@ export const AdminProcessingView: React.FC<AdminProcessingViewProps> = ({
               className={PRIMARY_BUTTON}
             >
               <Play className="w-3.5 h-3.5" />
-              <span>Run now</span>
+              <span>Update now</span>
             </button>
           </>
         }
@@ -113,13 +113,13 @@ export const AdminProcessingView: React.FC<AdminProcessingViewProps> = ({
       {/* Pipeline */}
       <div className={`${CARD_CLASS} p-5 md:p-6 space-y-4`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-[16px] font-semibold text-[#17271D]">Pipeline</h3>
+          <h3 className="text-[16px] font-semibold text-[#17271D]">Steps of each update</h3>
           <span className="text-[12px] text-[#5B665E]">
             {running
-              ? `${running.trigger === 'Reprocess' ? 'Reprocessing' : 'Running'} · step ${Math.min(running.stage + 1, PROCESSING_STAGES.length)} of ${PROCESSING_STAGES.length}`
+              ? `${running.trigger === 'Reprocess' ? 'Redoing' : 'Updating'} · step ${Math.min(running.stage + 1, PROCESSING_STAGES.length)} of ${PROCESSING_STAGES.length}`
               : last
-              ? `Last run ${last.status.toLowerCase()} at ${last.startedAt.slice(11)}`
-              : 'Not run yet'}
+              ? `Last update ${PROCESSING_LABELS.status[last.status].toLowerCase()} at ${last.startedAt.slice(11)}`
+              : 'Not updated yet'}
           </span>
         </div>
         {running && (
@@ -152,7 +152,7 @@ export const AdminProcessingView: React.FC<AdminProcessingViewProps> = ({
                 </div>
                 <span className="block text-[13px] font-semibold text-[#17271D]">{st.label}</span>
                 <span className="block text-[11.5px] text-[#5B665E] leading-snug">
-                  {st.id === 'aggregate' ? `${st.detail} (${settings.aggregation.toLowerCase()} view)` : st.id === 'normals' ? `Normal used on rainfall charts: ${RAINFALL_NORMAL_MM_PER_DAY} mm/day` : st.detail}
+                  {st.id === 'aggregate' ? `${st.detail} (shown per ${PROCESSING_LABELS.aggregation[settings.aggregation].toLowerCase()})` : st.id === 'normals' ? `Normal rain used on charts: ${RAINFALL_NORMAL_MM_PER_DAY} mm a day` : st.detail}
                 </span>
               </div>
             );
@@ -161,12 +161,15 @@ export const AdminProcessingView: React.FC<AdminProcessingViewProps> = ({
       </div>
 
       {/* Quality metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Records received today', value: `${recordsToday} of ${expectedToday}`, caption: `${dataSources.length} sources` },
-          { label: 'Average completeness', value: `${avgCompleteness}%`, caption: missing > 0 ? `${missing} records missing` : 'Nothing missing' },
-          { label: 'Gaps filled, last run', value: `${last ? last.gapsFilled : 0}`, caption: settings.gapMethod },
-          { label: 'Outliers flagged, last run', value: `${last ? last.outliersFlagged : 0}`, caption: `Threshold ${settings.outlierThresholdSd} SD` },
+          {
+            label: 'Readings received today',
+            value: `${recordsToday} of ${expectedToday}`,
+            caption: missing > 0 ? `${missing} still missing (${Math.round((recordsToday / Math.max(1, expectedToday)) * 100)}% in) · from ${dataSources.length} sources` : `Nothing missing · from ${dataSources.length} sources`,
+          },
+          { label: 'Missing readings filled in', value: `${last ? last.gapsFilled : 0}`, caption: `Last update · ${PROCESSING_LABELS.gapMethod[settings.gapMethod].toLowerCase()}` },
+          { label: 'Odd readings set aside', value: `${last ? last.outliersFlagged : 0}`, caption: `Last update · far from nearby stations (${PROCESSING_LABELS.outlier[settings.outlierThresholdSd].toLowerCase()})` },
         ].map((k) => (
           <div key={k.label} className={`${CARD_CLASS} p-5 flex items-start gap-3`}>
             <IconCircle icon={Workflow} />
@@ -182,28 +185,28 @@ export const AdminProcessingView: React.FC<AdminProcessingViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Run history */}
         <div className={`${CARD_CLASS} p-5 md:p-6 lg:col-span-7`}>
-          <h3 className="text-[16px] font-semibold text-[#17271D] pb-3 border-b border-[rgba(31,74,52,0.08)]">Run history</h3>
+          <h3 className="text-[16px] font-semibold text-[#17271D] pb-3 border-b border-[rgba(31,74,52,0.08)]">Past updates</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[12.5px] border-collapse tabular-nums">
               <thead>
                 <tr className="border-b border-[rgba(31,74,52,0.08)] text-[12px] text-[#5B665E]">
-                  <th className="py-2.5 pr-3 font-semibold">Started</th>
-                  <th className="py-2.5 px-3 font-semibold">Trigger</th>
+                  <th className="py-2.5 pr-3 font-semibold">When</th>
+                  <th className="py-2.5 px-3 font-semibold">Started by</th>
                   <th className="py-2.5 px-3 font-semibold">Result</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Records</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Gaps</th>
-                  <th className="py-2.5 pl-3 font-semibold text-right">Outliers</th>
+                  <th className="py-2.5 px-3 font-semibold text-right">Readings</th>
+                  <th className="py-2.5 px-3 font-semibold text-right">Filled in</th>
+                  <th className="py-2.5 pl-3 font-semibold text-right">Set aside</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[rgba(31,74,52,0.06)]">
                 {sortedRuns.map((r) => (
                   <tr key={r.id}>
                     <td className="py-2.5 pr-3 text-[#17271D] whitespace-nowrap">{r.startedAt}</td>
-                    <td className="py-2.5 px-3 text-[#5B665E]">{r.trigger}</td>
+                    <td className="py-2.5 px-3 text-[#5B665E]">{PROCESSING_LABELS.trigger[r.trigger]}</td>
                     <td className="py-2.5 px-3">
                       <NeutralChip tone={r.status === 'Completed' ? 'tint' : 'outline'}>
                         <Check className="w-3 h-3" strokeWidth={2} />
-                        {r.status}
+                        {PROCESSING_LABELS.status[r.status]}
                       </NeutralChip>
                     </td>
                     <td className="py-2.5 px-3 text-right text-[#17271D]">{r.recordsIn}</td>
@@ -220,35 +223,35 @@ export const AdminProcessingView: React.FC<AdminProcessingViewProps> = ({
         <div className={`${CARD_CLASS} p-5 md:p-6 lg:col-span-5 space-y-4`}>
           <div className="flex items-center gap-2 pb-3 border-b border-[rgba(31,74,52,0.08)]">
             <Settings2 className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
-            <h3 className="text-[16px] font-semibold text-[#17271D]">Processing settings</h3>
+            <h3 className="text-[16px] font-semibold text-[#17271D]">How data is checked</h3>
           </div>
           <PillSelect
-            label="Gap filling"
+            label="When a reading is missing"
             value={draft.gapMethod}
             onChange={(v) => setDraft((d) => ({ ...d, gapMethod: v as ProcessingSettings['gapMethod'] }))}
-            options={['Linear between neighbours', 'Nearest station', 'Climatology for the day'].map((v) => ({ value: v, label: v }))}
+            options={(Object.keys(PROCESSING_LABELS.gapMethod) as ProcessingSettings['gapMethod'][]).map((v) => ({ value: v, label: PROCESSING_LABELS.gapMethod[v] }))}
           />
           <PillSelect
-            label="Outlier threshold"
+            label="How strict with odd readings"
             value={String(draft.outlierThresholdSd)}
             onChange={(v) => setDraft((d) => ({ ...d, outlierThresholdSd: Number(v) }))}
-            options={[2, 3, 4].map((n) => ({ value: String(n), label: `${n} standard deviations`, hint: n === 2 ? 'Flags more values' : n === 4 ? 'Flags fewer values' : undefined }))}
+            options={[2, 3, 4].map((n) => ({ value: String(n), label: PROCESSING_LABELS.outlier[n] }))}
           />
           <PillSelect
-            label="Spatial interpolation"
+            label="Sectors without a station"
             value={draft.interpolation}
             onChange={(v) => setDraft((d) => ({ ...d, interpolation: v as ProcessingSettings['interpolation'] }))}
-            options={['Inverse distance', 'Nearest station', 'Kriging (simulated)'].map((v) => ({ value: v, label: v }))}
+            options={(Object.keys(PROCESSING_LABELS.interpolation) as ProcessingSettings['interpolation'][]).map((v) => ({ value: v, label: PROCESSING_LABELS.interpolation[v] }))}
           />
           <PillSelect
-            label="Aggregation shown"
+            label="Show totals per"
             value={draft.aggregation}
             onChange={(v) => setDraft((d) => ({ ...d, aggregation: v as ProcessingSettings['aggregation'] }))}
-            options={['Daily', 'Dekadal', 'Monthly'].map((v) => ({ value: v, label: v, hint: v === 'Dekadal' ? '10-day periods' : undefined }))}
+            options={(Object.keys(PROCESSING_LABELS.aggregation) as ProcessingSettings['aggregation'][]).map((v) => ({ value: v, label: PROCESSING_LABELS.aggregation[v] }))}
           />
           <p className="flex items-start gap-1.5 text-[12px] text-[#5B665E]">
             <Info className="w-3.5 h-3.5 text-[#1F4A34] mt-0.5" strokeWidth={1.5} />
-            Settings apply from the next run. Processing is simulated in the prototype.
+            Changes apply from the next update. Simulated in the prototype.
           </p>
           <div className="flex justify-end gap-2">
             <button type="button" disabled={!changed} onClick={() => setDraft(settings)} className={SECONDARY_BUTTON}>
@@ -264,9 +267,9 @@ export const AdminProcessingView: React.FC<AdminProcessingViewProps> = ({
       <ConfirmModal
         isOpen={confirmReprocess}
         icon={RotateCcw}
-        title="Reprocess today's data?"
-        body="All of today's records go through every step again with the current settings. The forecast updates when it finishes."
-        confirmLabel="Reprocess"
+        title="Redo today's update?"
+        body="All of today's readings go through every step again with the current settings. The forecast updates when it finishes."
+        confirmLabel="Redo today"
         onClose={() => setConfirmReprocess(false)}
         onConfirm={() => {
           setConfirmReprocess(false);
