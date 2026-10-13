@@ -362,7 +362,7 @@ export interface UserProfileSettings {
 
 export interface NotificationItem {
   id: string;
-  type: 'warning' | 'feedback' | 'report_to_review' | 'message' | 'meeting' | 'access_request';
+  type: 'warning' | 'feedback' | 'report_to_review' | 'message' | 'meeting' | 'access_request' | 'lesson';
   title: string;
   subtitle: string;
   time: string;
@@ -440,10 +440,21 @@ export interface TrainingMaterial {
   language: 'Kinyarwanda' | 'English';
   length: string;
   summary: string;
+  /** The lesson itself: short steps a farmer reads (or the script of the audio / video). One step per line. */
+  content: string;
   /** Planned file path from docs/media-manifest.md; the UI shows an icon fallback until it exists. */
-  thumbnail: string;
-  shareMessageEn: string;
-  shareMessageRw: string;
+  thumbnail?: string;
+  /** Officer who wrote it. */
+  authorName?: string;
+}
+
+/** A lesson the cooperative leader shared with members (store field `trainingShares`). */
+export interface TrainingShare {
+  id: string;
+  materialId: string;
+  audience: CoopAudience;
+  /** DD/MM/YYYY */
+  sharedOn: string;
 }
 
 export interface CoopDirectoryEntry {

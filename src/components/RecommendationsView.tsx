@@ -11,7 +11,8 @@ import {
   Leaf,
   Check,
 } from 'lucide-react';
-import { CropAdvisory, PlanAheadCategory, PlanAheadItem, UserProfileSettings } from '../types';
+import { CropAdvisory, PlanAheadCategory, PlanAheadItem, TrainingMaterial, UserProfileSettings } from '../types';
+import { FORMAT_ICON, LessonModal } from './TrainingUi';
 import { formatPlanDue, PLAN_ALL_CROPS } from '../data/musanzeData';
 
 interface RecommendationsViewProps {
@@ -24,12 +25,18 @@ interface RecommendationsViewProps {
   advisories: CropAdvisory[];
   /** Officer's plan-ahead items for the crops this farmer grows. */
   planItems: PlanAheadItem[];
+  /** Lessons the farmer's cooperative shared with their group (newest first). */
+  lessons: TrainingMaterial[];
+  /** Lesson to open straight away (from the bell). */
+  initialLessonId?: string;
 }
 
 export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
   settings,
   advisories: CROP_ADVISORIES,
   planItems: PLAN_AHEAD_ITEMS,
+  lessons,
+  initialLessonId,
   onOpenSettingsNotifications,
   onSelectAdvisory,
   savedItemIds,
@@ -38,6 +45,7 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
   const [selectedCrop, setSelectedCrop] = useState<string>('All');
   const [activeTab, setActiveTab] = useState<'for_you' | 'saved'>('for_you');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [openLesson, setOpenLesson] = useState<TrainingMaterial | null>(() => lessons.find((l) => l.id === initialLessonId) || null);
 
   const handleDownloadPdf = () => {
     setToastMessage('PDF downloaded');
@@ -399,8 +407,45 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({
               </div>
             )}
           </section>
+
+          {/* SECTION 3 — lessons shared by the farmer's cooperative */}
+          {lessons.length > 0 && (
+            <section className="space-y-4">
+              <div>
+                <h2 className="text-[17px] font-semibold text-[#17271D]">Learn</h2>
+                <p className="text-[12px] text-[#5B665E]">Short lessons your cooperative shared with you</p>
+              </div>
+              <div className="bg-[#FBFCF8] rounded-[16px] border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] divide-y divide-[rgba(31,74,52,0.06)] overflow-hidden">
+                {lessons.map((l) => {
+                  const Icon = FORMAT_ICON[l.format];
+                  return (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => setOpenLesson(l)}
+                      className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-[rgba(31,74,52,0.02)] cursor-pointer group"
+                    >
+                      <span className="w-9 h-9 rounded-full bg-[#E4ECDB] border border-[rgba(31,74,52,0.12)] flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[11px] text-[#5B665E]">
+                          {l.format} · {l.language} · {l.length}
+                        </span>
+                        <span className="block text-[14px] font-semibold text-[#17271D] group-hover:text-[#1F4A34]">{l.title}</span>
+                        <span className="block text-[12px] text-[#5B665E]">{l.summary}</span>
+                      </span>
+                      <ArrowRight className="w-4 h-4 text-[#1F4A34] flex-shrink-0" strokeWidth={1.5} />
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </div>
       )}
+
+      <LessonModal material={openLesson} onClose={() => setOpenLesson(null)} />
 
       {/* ========================================================================= */}
       {/* TAB: SAVED */}

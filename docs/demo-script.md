@@ -35,4 +35,7 @@ Roles can be shown in one tab (floating switcher) or in several tabs side by sid
 11. As Cooperative leader: Needs you today → Review → accept Vestine (Kinigi growers, suggested) and
     Pacifique (choose Muhoza growers) → 188 members. Muhoza growers → Told in person → tick 2 →
     Late Blight acknowledged 28 → 30 of 51, shown "Yes · told by leader" in Members.
-12. [Reset demo] restores everything in every role.
+12. As Officer: Training → Add lesson "Storing seed potatoes" (Guide, 2 pages, three steps). As
+    Cooperative leader: Training → Share it → Kinigi growers → Send. As Farmer: bell "New lesson"
+    → Recommendations opens it; Learn shows it above "Recognising late blight early".
+13. [Reset demo] restores everything in every role.

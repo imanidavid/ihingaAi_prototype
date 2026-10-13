@@ -82,3 +82,7 @@ Cooperative (13/10/2026):
 - [ ] A farmer who switches cooperative in Settings keeps their old member record until the old leader removes them.
 - [ ] The cooperative has groups for Kinigi, Busogo and Muhoza only; a farmer from another sector (e.g. Nyange) must be placed by hand or the leader creates a group.
 - [ ] Join requests only reach Aline's cooperative; other cooperatives in `COOPERATIVE_OPTIONS` have no leader account in the demo.
+
+Training (13/10/2026):
+- [ ] Lessons are not shown in the mobile frames (M1/M2) yet; the desktop farmer sees them in Recommendations and the bell.
+- [ ] Audio and video lessons have no recording; the steps are shown as the script (planned media in the manifest for the four seeded lessons only).

@@ -69,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'warnings', label: 'Warnings', icon: AlertTriangle },
     { id: 'observations', label: 'Observations', icon: Eye },
     { id: 'weather_data', label: 'Weather data', icon: CloudUpload },
+    { id: 'training', label: 'Training', icon: GraduationCap },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];

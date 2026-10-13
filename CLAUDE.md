@@ -34,7 +34,7 @@ module, no context and no reducer; state is passed down as props. Fields:
 `auditEvents` · `loginAttempts` · `securitySettings` · `dataSources` · `processingRuns` ·
 `processingSettings` · `messageTemplates` · `voiceSettings` · `rainForecasts` ·
 `stationReadings` · `cropAdvisories` · `warningDeliveries` · `riskTypes` · `sectorRegister` ·
-`planAheadItems` · `cropPlantings` · `coopJoinRequests`
+`planAheadItems` · `cropPlantings` · `coopJoinRequests` · `trainingMaterials` · `trainingShares`
 
 Derived once in `App.tsx` and passed down: `coopGroups` (`computeCoopGroups`), `coopSummary`
 (`computeCoopSummary`), `sectorForecastRisk` (`computeSectorForecastRisk`), `affectedSectors`,
@@ -126,7 +126,7 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
     keep it at ≥ 96px.
 14. **Reset demo** (`handleResetDemo`, `App.tsx`) must restore every store field to its
     initial value, including anything created during the demo. It currently resets all
-    thirty-two fields; add every new field you introduce (also to `storeSnapshot`, which syncs open tabs).
+    thirty-four fields; add every new field you introduce (also to `storeSnapshot`, which syncs open tabs).
 15. **Keep it simple — never overwhelm users.** One clear component per question; never show the
     same data twice (e.g. a chart and day cards, a map and per-type bars). Fold extra detail into
     that one component (filter chips, tap for detail) instead of adding sections. Every
@@ -320,6 +320,15 @@ leader"), and the officer's active advice and plan-ahead items due within `PASS_
 (collapsed, "Send to members"). Then My groups and one line for the last message and next meeting.
 A farmer acknowledges once; the officer sees totals, the leader sees names. `COOPERATIVE_DATA.actions`
 is gone.
+
+Training (13/10/2026): the agricultural officer writes lessons (sidebar Training →
+`OfficerTrainingView`: title, format Guide · Audio · Video, language, length, one-line summary,
+steps one per line) in `trainingMaterials`. The cooperative leader shares a lesson from Training →
+Lessons; it opens the message composer (`trainingShareText`) and sending records a
+`trainingShares` entry for the chosen groups. A farmer whose group received a lesson gets a bell
+item ("New lesson") and a "Learn" row in Recommendations (`lessonsForGroup`); `LessonModal`
+shows the steps. Audio and video files are planned media; until then the steps are their script.
+`TRAINING_MATERIALS` is gone.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 
