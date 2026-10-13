@@ -80,8 +80,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'meetings', label: 'Meetings', icon: CalendarDays },
     { id: 'training', label: 'Training', icon: GraduationCap },
-    { id: 'forecast', label: 'Risk forecast', icon: CloudRain },
-    { id: 'warnings', label: 'Early warnings', icon: AlertTriangle },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

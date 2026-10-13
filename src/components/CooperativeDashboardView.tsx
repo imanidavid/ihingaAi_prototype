@@ -10,6 +10,7 @@ import {
   CoopMessage,
   CropAdvisory,
   PlanAheadItem,
+  RiskLevel,
 } from '../types';
 import {
   COOPERATIVE_DATA,
@@ -32,6 +33,10 @@ interface CooperativeDashboardViewProps {
   onShowToast: (msg: string) => void;
   onScheduleMeeting: () => void;
   onNavigateView: (view: NavTarget) => void;
+  /** Open a warning (what, where, when, message text, officer advice) before reminding members. */
+  onOpenWarning: (warningId: string) => void;
+  /** Each group's climate risk (its sector's forecast and active weather warnings). */
+  groupRisk: Record<string, RiskLevel>;
   messages: CoopMessage[];
   /** Groups computed from the store (members, warnings, acknowledgement, reports). */
   groups: CoopGroup[];
@@ -80,6 +85,8 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
   onSelectGroup,
   onScheduleMeeting,
   onNavigateView,
+  onOpenWarning,
+  groupRisk,
   messages,
   groups,
   groupRecords,
@@ -256,10 +263,15 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
               <span className="font-semibold">{group.name}</span> · not acknowledged yet
               <span className="block text-[12px] text-[#5B665E]">
                 {byWarning.map(({ warning, members: missing }) => (
-                  <span key={warning.id} className="inline-flex items-center gap-1 mr-3 tabular-nums">
+                  <button
+                    key={warning.id}
+                    type="button"
+                    onClick={() => onOpenWarning(warning.id)}
+                    className="inline-flex items-center gap-1 mr-3 tabular-nums hover:text-[#1F4A34] hover:underline cursor-pointer"
+                  >
                     <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: RISK_LEVEL_COLORS[warning.level] }} />
                     {warning.title}: {missing.length} of {group.membersCount}
-                  </span>
+                  </button>
                 ))}
               </span>
             </NeedRow>
@@ -342,6 +354,7 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
                 <thead>
                   <tr className="border-b border-[rgba(31,74,52,0.08)] text-[#5B665E] text-[11px] font-semibold">
                     <th className="py-2.5 pr-3 font-semibold">Group</th>
+                    <th className="py-2.5 px-3 font-semibold">Risk</th>
                     <th className="py-2.5 px-3 font-semibold text-center">Members</th>
                     <th className="py-2.5 px-3 font-semibold">Active warnings</th>
                     <th className="py-2.5 px-3 font-semibold">Acknowledged</th>
@@ -366,6 +379,14 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
                         </span>
                       </td>
 
+                      {/* Climate risk of the group's sector */}
+                      <td className="py-3.5 px-3">
+                        <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-[#17271D]">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: RISK_LEVEL_COLORS[groupRisk[group.id] || 'Low'] }} />
+                          {groupRisk[group.id] || 'Low'}
+                        </span>
+                      </td>
+
                       {/* Members Count */}
                       <td className="py-3.5 px-3 text-center text-[#17271D] font-medium">
                         <span className="px-2 py-0.5 rounded-full bg-[#F4F6EF] border border-[rgba(31,74,52,0.08)]">
@@ -380,9 +401,15 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
                             <span className="text-[11px] text-[#5B665E]">None</span>
                           )}
                           {group.warnings.map((w) => (
-                            <span
+                            <button
+                              type="button"
                               key={w.id}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold text-[#17271D] border"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenWarning(w.id);
+                              }}
+                              title="Open warning"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold text-[#17271D] border cursor-pointer hover:opacity-80"
                               style={{
                                 backgroundColor: `${RISK_LEVEL_COLORS[w.level]}1F`,
                                 borderColor: `${RISK_LEVEL_COLORS[w.level]}4D`,
@@ -394,7 +421,7 @@ export const CooperativeDashboardView: React.FC<CooperativeDashboardViewProps> =
                               />
                               <span>{w.title}</span>
                               <span className="font-normal text-[#5B665E]">· {w.level}</span>
-                            </span>
+                            </button>
                           ))}
                         </div>
                       </td>

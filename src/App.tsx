@@ -1220,7 +1220,29 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Settings show the signed-in person: the farmer's profile, or (other roles) their own account
+  const signedInAccount = accounts.find((a) => a.id === currentAccountId);
+  const settingsForSignedIn =
+    role === 'farmer' || !signedInAccount ? userSettings : userSettingsFromAccount(signedInAccount);
+
   const handleSaveSettings = (newSettings: UserProfileSettings) => {
+    if (role !== 'farmer') {
+      setAccounts((prev) =>
+        prev.map((a) =>
+          a.id === currentAccountId
+            ? {
+                ...a,
+                fullName: newSettings.fullName,
+                email: newSettings.email || a.email,
+                preferredLanguage: newSettings.preferredLanguage === 'English' ? 'en' : 'rw',
+              }
+            : a
+        )
+      );
+      logAudit('Updated own profile', newSettings.fullName);
+      setHasUnsavedSettings(false);
+      return;
+    }
     // Choosing a different cooperative asks that cooperative to accept the farmer
     if (role === 'farmer' && newSettings.cooperative !== userSettings.cooperative) {
       requestToJoinCooperative({
@@ -1996,6 +2018,13 @@ export default function App() {
                     setTimeout(() => setToastMessage(null), 3000);
                   }}
                   onNavigateView={setCurrentView}
+                  onOpenWarning={(id) => {
+                    const w = warnings.find((x) => x.id === id);
+                    if (w) setDrawerContent({ type: 'alert', data: w });
+                  }}
+                  groupRisk={Object.fromEntries(
+                    coopGroups.map((g) => [g.id, computeSectorClimateRisk(g.sector, warnings, sectorForecastRisk)])
+                  )}
                   messages={messages}
                   groupRecords={coopGroupRecords}
                   members={coopMembers}
@@ -2221,8 +2250,9 @@ export default function App() {
 
             {currentView === 'settings' && (
               <SettingsView
+                key={currentAccountId}
                 role={role}
-                settings={userSettings}
+                settings={settingsForSignedIn}
                 onSaveSettings={handleSaveSettings}
                 onUnsavedStateChange={setHasUnsavedSettings}
               />
