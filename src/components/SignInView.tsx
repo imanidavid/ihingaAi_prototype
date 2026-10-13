@@ -14,6 +14,7 @@ import {
   FlaskConical,
 } from 'lucide-react';
 import heroImg from '../assets/images/musanze_terraced_hero_1790594273190.jpg';
+import { VIDEO_URL } from './landing/LandingPage';
 import { AppRole, UserAccount, AccessRequest } from '../types';
 import {
   SIGN_IN_TRANSLATIONS,
@@ -243,13 +244,19 @@ export const SignInView: React.FC<SignInViewProps> = ({
       <div className="lg:w-[45%] bg-[#1F4A34] text-white flex flex-col justify-between p-8 md:p-12 lg:p-16 relative overflow-hidden flex-shrink-0">
         {/* Background photo of Musanze volcanic terraces fading into rich green */}
         <div className="absolute inset-0 z-0">
-          <img
-            src={heroImg}
-            alt="Musanze District volcanic terraces"
-            className="w-full h-full object-cover object-center opacity-30 mix-blend-luminosity scale-105"
+          {/* The landing page's hero video, with a forest-green accent matching the dashboards */}
+          <video
+            src={VIDEO_URL}
+            poster={heroImg}
+            autoPlay
+            loop
+            muted
+            playsInline
+            aria-hidden="true"
+            className="w-full h-full object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#1F4A34] via-[#1F4A34]/90 to-transparent" />
-          <div className="absolute inset-0 bg-radial from-transparent to-[#1F4A34]/70" />
+          <div className="absolute inset-0 bg-[#1F4A34]/45 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1F4A34] via-[#1F4A34]/55 to-[#1F4A34]/35" />
         </div>
 
         {/* Brand Header */}
