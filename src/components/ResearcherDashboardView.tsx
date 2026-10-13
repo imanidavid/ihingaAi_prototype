@@ -1,73 +1,95 @@
 import React, { useMemo } from 'react';
-import {
-  ArrowRight,
-  Check,
-  CloudRain,
-  Database,
-  FileText,
-  FlaskConical,
-  Info,
-  LineChart,
-  ShieldCheck,
-  Table2,
-  Target,
-  X,
-} from 'lucide-react';
-import { DataSourceStatus, NavView, ReportItem, RiskLevel, UserAccount, WarningItem } from '../types';
+import { ArrowRight, Check, Download, FlaskConical, LineChart, Lock, ShieldCheck, Table2, Target, Users } from 'lucide-react';
+import { NavView, PermissionId, ReportItem, SectorRainForecast, UserAccount, WarningItem } from '../types';
 import {
   FORECAST_VS_OBSERVED,
-  anonymisedReportId,
-  computeDistrictClimateRisk,
   computeForecastSkill,
   computeReportValidation,
   computeWarningHitRate,
+  forecastsToCsv,
   heroImg,
-  stampSortKey,
-  reportTypeLabel,
 } from '../data/musanzeData';
-import { MUSANZE_SECTORS } from '../data/rwandaAdminData';
-import { CARD_CLASS, EmptyState, IconCircle, NeutralChip } from './coop/CoopUi';
-import { ForecastObservedChart } from './research/ForecastObservedChart';
+import { CARD_CLASS, IconCircle, PRIMARY_BUTTON, SECONDARY_BUTTON } from './coop/CoopUi';
 
 interface ResearcherDashboardViewProps {
+  /** Warnings with delivery totals (sent / acknowledged). */
   warnings: WarningItem[];
   reports: ReportItem[];
-  dataSources: DataSourceStatus[];
+  rainForecasts: SectorRainForecast[];
+  permissions: PermissionId[];
   currentAccount?: UserAccount;
   onNavigateView: (view: NavView) => void;
-  forecastRisk: Record<string, RiskLevel>;
+  onExport: (what: string) => void;
 }
 
-/** 'DD/MM HH:MM' (2026) -> sortable */
-const reportKey = (d: string) => stampSortKey(`${d.slice(0, 5)}/2026 ${d.slice(6, 11) || '00:00'}`);
-
+/**
+ * Research desk: one question — is the system working? Four answers (forecast, warnings, farmers
+ * reached, farmer reports), each opening its detail page, and the data to download.
+ */
 export const ResearcherDashboardView: React.FC<ResearcherDashboardViewProps> = ({
   warnings,
   reports,
-  dataSources,
+  rainForecasts,
+  permissions,
   currentAccount,
   onNavigateView,
-  forecastRisk,
+  onExport,
 }) => {
   const firstName = currentAccount?.fullName.split(' ')[0];
   const skill = useMemo(() => computeForecastSkill(FORECAST_VS_OBSERVED), []);
   const hitRate = useMemo(() => computeWarningHitRate(warnings), [warnings]);
   const validation = useMemo(() => computeReportValidation(reports), [reports]);
-  const districtRisk = computeDistrictClimateRisk([...MUSANZE_SECTORS], warnings, forecastRisk);
-  const healthy = dataSources.filter((d) => d.status === 'Healthy').length;
-  const latest = [...validation.reports].sort((a, b) => reportKey(b.date) - reportKey(a.date)).slice(0, 5);
+  const active = warnings.filter((w) => w.status === 'Active');
+  const sent = active.reduce((s, w) => s + (w.totalSent || 0), 0);
+  const acknowledged = active.reduce((s, w) => s + (w.totalAcknowledged || 0), 0);
+  const reachedPct = sent > 0 ? Math.round((acknowledged / sent) * 100) : 0;
+  const canExport = permissions.includes('export_data');
 
-  const kpis = [
-    { icon: Target, label: 'Rain forecast hits, 10 days', value: `${skill.pct}%`, caption: `${skill.hits} of ${skill.days} days within 3 mm or 20%` },
-    { icon: ShieldCheck, label: 'Warnings confirmed', value: `${hitRate.confirmed} of ${hitRate.total}`, caption: `${hitRate.pct}% confirmed by field reports` },
-    { icon: Check, label: 'Reports matching forecast', value: `${validation.pct}%`, caption: `${validation.matched} of ${validation.used} weather reports` },
-    { icon: Database, label: 'Data sources healthy', value: `${healthy} of ${dataSources.length}`, caption: `District risk now: ${districtRisk}` },
+  const answers = [
+    {
+      icon: Target,
+      label: 'Rain forecast was right',
+      value: `${skill.hits} of ${skill.days} days`,
+      caption: 'Within 3 mm or 20% of the rain gauge',
+      view: 'model_performance' as NavView,
+    },
+    {
+      icon: ShieldCheck,
+      label: 'Warnings that really happened',
+      value: `${hitRate.confirmed} of ${hitRate.total}`,
+      caption: "Farmers' reports confirmed the hazard",
+      view: 'model_performance' as NavView,
+    },
+    {
+      icon: Users,
+      label: 'Farmers who saw the warnings',
+      value: `${reachedPct}%`,
+      caption: `${acknowledged.toLocaleString()} of ${sent.toLocaleString()} farmers acknowledged the active warnings`,
+      view: 'model_performance' as NavView,
+    },
+    {
+      icon: Check,
+      label: 'Farmer reports that agree',
+      value: `${validation.matched} of ${validation.used}`,
+      caption: 'Rain and flood reports that match the forecast',
+      view: 'field_data' as NavView,
+    },
   ];
+
+  const downloadForecasts = () => {
+    const blob = new Blob([forecastsToCsv(rainForecasts)], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ihinga-forecast-musanze.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    onExport(`Forecast data CSV · ${rainForecasts.length} sectors`);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Hero */}
-      <div className="relative w-full rounded-[16px] overflow-hidden shadow-[0_2px_12px_rgba(31,74,52,0.08)] bg-gradient-to-r from-[#1F4A34] to-[#2C6343] min-h-[190px] flex items-center">
+      <div className="relative w-full rounded-[16px] overflow-hidden shadow-[0_2px_12px_rgba(31,74,52,0.08)] bg-gradient-to-r from-[#1F4A34] to-[#2C6343] min-h-[170px] flex items-center">
         <div className="absolute right-0 top-0 bottom-0 w-[40%] pointer-events-none select-none overflow-hidden">
           <img src={heroImg} alt="Terraced fields in Musanze" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#1F4A34] via-[#1F4A34]/60 to-transparent" />
@@ -75,135 +97,74 @@ export const ResearcherDashboardView: React.FC<ResearcherDashboardViewProps> = (
         <div className="relative z-10 p-6 md:p-8 max-w-2xl text-white">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-[12px] font-medium mb-2.5">
             <FlaskConical className="w-3.5 h-3.5 text-[#E4ECDB]" strokeWidth={1.5} />
-            <span>Research desk · prototype results, simulated data</span>
+            <span>Research desk · prototype results from simulated data</span>
           </div>
-          <h1 className="text-[28px] font-normal leading-tight">
-            Good afternoon{firstName ? `, ${firstName}` : ''}. The rain forecast hit {skill.hits} of the last {skill.days} days.
+          <h1 className="text-[26px] font-normal leading-tight">
+            Good afternoon{firstName ? `, ${firstName}` : ''}. Is IHINGA AI getting it right?
           </h1>
-          <div className="flex flex-wrap items-center gap-2.5 mt-5">
-            <button
-              type="button"
-              onClick={() => onNavigateView('model_performance')}
-              className="px-4 py-1.5 rounded-full bg-white text-[#17271D] text-[12px] font-semibold hover:bg-[#F4F6EF] cursor-pointer flex items-center gap-1.5"
-            >
-              <LineChart className="w-3.5 h-3.5 text-[#1F4A34]" />
-              <span>Model performance</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateView('field_data')}
-              className="px-4 py-1.5 rounded-full bg-transparent text-white border border-white/40 text-[12px] font-medium hover:bg-white/10 cursor-pointer"
-            >
-              Field data
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateView('forecast')}
-              className="px-4 py-1.5 rounded-full bg-transparent text-white border border-white/40 text-[12px] font-medium hover:bg-white/10 cursor-pointer"
-            >
-              Risk forecast
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* Four answers, each opens its detail page */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map((k) => (
-          <div key={k.label} className={`${CARD_CLASS} p-5 flex items-start gap-3`}>
+        {answers.map((k) => (
+          <button
+            key={k.label}
+            type="button"
+            onClick={() => onNavigateView(k.view)}
+            className={`${CARD_CLASS} p-5 flex items-start gap-3 text-left hover:bg-white transition-colors cursor-pointer`}
+          >
             <IconCircle icon={k.icon} />
-            <div className="min-w-0">
-              <span className="block text-[12px] text-[#5B665E]">{k.label}</span>
+            <span className="min-w-0">
+              <span className="block text-[12.5px] text-[#5B665E]">{k.label}</span>
               <span className="block text-[22px] font-semibold text-[#17271D] tabular-nums leading-tight mt-0.5">{k.value}</span>
               <span className="block text-[12px] text-[#5B665E] mt-0.5">{k.caption}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Forecast vs observed */}
-        <div className={`${CARD_CLASS} p-5 md:p-6 lg:col-span-8 space-y-3`}>
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[rgba(31,74,52,0.08)]">
-            <div>
-              <h3 className="text-[16px] font-semibold text-[#17271D]">Forecast vs observed rain · Kinigi</h3>
-              <p className="text-[12px] text-[#5B665E] tabular-nums">
-                Last {FORECAST_VS_OBSERVED.length} days · forecast {skill.forecastTotal} mm, observed {skill.observedTotal} mm
-              </p>
-            </div>
-            <NeutralChip tone="outline">Simulated results</NeutralChip>
-          </div>
-          <ForecastObservedChart data={FORECAST_VS_OBSERVED} compact />
-        </div>
-
-        {/* Latest validated reports (anonymised) */}
-        <div className={`${CARD_CLASS} p-5 lg:col-span-4 space-y-3`}>
-          <div className="flex items-center justify-between pb-3 border-b border-[rgba(31,74,52,0.08)]">
-            <div>
-              <h3 className="text-[16px] font-semibold text-[#17271D]">Latest field checks</h3>
-              <p className="text-[12px] text-[#5B665E]">Anonymised · no farmer names</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigateView('field_data')}
-              aria-label="Open field data"
-              className="w-8 h-8 rounded-full bg-[#1F4A34] text-white flex items-center justify-center hover:bg-[#2C6343] cursor-pointer"
-            >
-              <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
-            </button>
-          </div>
-          {latest.length === 0 ? (
-            <EmptyState icon={Table2} text="No weather reports yet." />
-          ) : (
-            <div className="divide-y divide-[rgba(31,74,52,0.06)]">
-              {latest.map((r) => (
-                <div key={r.id} className="py-2.5 flex items-start justify-between gap-2 text-[12.5px]">
-                  <div>
-                    <span className="block font-semibold text-[#17271D] tabular-nums">
-                      {anonymisedReportId(r.id)} · {r.sector}
-                    </span>
-                    <span className="block text-[#5B665E] tabular-nums">
-                      {reportTypeLabel(r)} · {r.date}
-                    </span>
-                  </div>
-                  <NeutralChip tone={r.isConsistent ? 'tint' : 'outline'}>
-                    {r.isConsistent ? <Check className="w-3 h-3" strokeWidth={2} /> : <X className="w-3 h-3" strokeWidth={2} />}
-                    {r.isConsistent ? 'Matches' : 'Differs'}
-                  </NeutralChip>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Shortcuts */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[
-          { icon: CloudRain, title: 'Risk forecast', text: 'Sector risk, rainfall and crop risk for Musanze.', view: 'forecast' as NavView },
-          { icon: Table2, title: 'Field data', text: `${reports.length} field reports, anonymised, ready to export.`, view: 'field_data' as NavView },
-          { icon: FileText, title: 'Reports', text: 'Build, preview and export research reports.', view: 'reports' as NavView },
-        ].map((s) => (
-          <button
-            key={s.title}
-            type="button"
-            onClick={() => onNavigateView(s.view)}
-            className={`${CARD_CLASS} p-5 text-left flex items-start gap-3 hover:bg-white transition-colors cursor-pointer`}
-          >
-            <IconCircle icon={s.icon} />
-            <div className="flex-1">
-              <span className="block text-[14px] font-semibold text-[#17271D]">{s.title}</span>
-              <span className="block text-[12.5px] text-[#5B665E]">{s.text}</span>
-            </div>
-            <ArrowRight className="w-4 h-4 text-[#1F4A34] mt-1" strokeWidth={1.5} />
+            </span>
           </button>
         ))}
       </div>
 
-      <p className="flex items-center gap-1.5 text-[12px] text-[#5B665E]">
-        <Info className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-        All model results on this desk are prototype results from simulated data.
-      </p>
+      {/* Data to download */}
+      <div className={`${CARD_CLASS} p-5 md:p-6`}>
+        <h3 className="text-[16px] font-semibold text-[#17271D] pb-3 border-b border-[rgba(31,74,52,0.08)]">Data for your research</h3>
+        <div className="divide-y divide-[rgba(31,74,52,0.06)]">
+          <div className="py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <IconCircle icon={LineChart} />
+              <div className="text-[12.5px]">
+                <span className="block text-[14px] font-semibold text-[#17271D]">Forecast data</span>
+                <span className="block text-[#5B665E]">
+                  Rain and day high / low for {rainForecasts.length} sectors, {rainForecasts[0]?.dailyMm.length || 0} days · CSV
+                </span>
+              </div>
+            </div>
+            {canExport ? (
+              <button type="button" onClick={downloadForecasts} className={PRIMARY_BUTTON}>
+                <Download className="w-3.5 h-3.5" />
+                <span>Download</span>
+              </button>
+            ) : (
+              <span className="flex items-center gap-1.5 text-[12px] text-[#5B665E]">
+                <Lock className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Needs the “Export data” permission
+              </span>
+            )}
+          </div>
+          <div className="py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <IconCircle icon={Table2} />
+              <div className="text-[12.5px]">
+                <span className="block text-[14px] font-semibold text-[#17271D]">Farmer field reports</span>
+                <span className="block text-[#5B665E]">{reports.length} reports, no names or phone numbers · filter and download</span>
+              </div>
+            </div>
+            <button type="button" onClick={() => onNavigateView('field_data')} className={SECONDARY_BUTTON}>
+              <span>Open field data</span>
+              <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

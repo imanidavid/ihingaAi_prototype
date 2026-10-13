@@ -342,6 +342,13 @@ endorsement), then one "Data coming in" list (late sources first). Admin pages u
 `PROCESSING_LABELS` maps the stored technical values (gap method, outlier threshold,
 interpolation, aggregation, run trigger and result, source status) to everyday labels.
 
+Researcher (13/10/2026): the dashboard answers "is IHINGA AI getting it right?" with four cards
+(rain forecast right X of 10 days, warnings that really happened, farmers who saw the active
+warnings from delivery totals, farmer reports that agree) that open Model performance or Field
+data, and "Data for your research" (forecast CSV via `forecastsToCsv`, gated by `export_data`;
+link to field data). Model performance uses plain words ("Usual miss", "Too wet or too dry?",
+"Did the warnings work?" with % of farmers who saw each warning).
+
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 
 ## Cross-role flows (the demo — must always work)
