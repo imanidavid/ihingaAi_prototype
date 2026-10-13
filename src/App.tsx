@@ -287,6 +287,7 @@ export default function App() {
 
   const handleSignOut = () => {
     setIsAuthenticated(false);
+    setLandingScreen('landing');
     setIsTimeoutModalOpen(false);
     setDrawerContent(null);
     setIsReportModalOpen(false);

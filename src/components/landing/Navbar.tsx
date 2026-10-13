@@ -15,7 +15,7 @@ export function Navbar({
   isMobileMenuOpen,
   setIsMobileMenuOpen,
 }: NavbarProps) {
-  const navLinks = ['Intelligence', 'Micro-Insurance', 'Co-operatives', 'Methodology'];
+  const navLinks = ['Intelligence', 'Co-operatives', 'Methodology'];
 
   return (
     <nav
