@@ -1,13 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Download, Lock, Table2, X } from 'lucide-react';
 import { PermissionId, ReportItem } from '../types';
-import { anonymisedReportId } from '../data/musanzeData';
+import { REPORT_TYPES, anonymisedReportId, reportTypeLabel } from '../data/musanzeData';
 import { MUSANZE_SECTORS } from '../data/rwandaAdminData';
 import { PillSelect } from './PillSelect';
 import { CARD_CLASS, EmptyState, NeutralChip, PageHeader, PRIMARY_BUTTON } from './coop/CoopUi';
 
 const PAGE_SIZE = 10;
-const REPORT_TYPES = ['Rainfall', 'Flood / damage', 'Crop condition', 'Pest / disease'];
 
 interface ResearcherFieldDataViewProps {
   reports: ReportItem[];
@@ -151,7 +150,7 @@ export const ResearcherFieldDataView: React.FC<ResearcherFieldDataViewProps> = (
                   <tr key={r.id}>
                     <td className="py-2.5 pr-3 font-semibold text-[#17271D]">{r.id}</td>
                     <td className="py-2.5 px-3 text-[#17271D]">{r.sector}</td>
-                    <td className="py-2.5 px-3 text-[#17271D]">{r.type}</td>
+                    <td className="py-2.5 px-3 text-[#17271D]">{reportTypeLabel(r)}</td>
                     <td className="py-2.5 px-3 text-[#5B665E] whitespace-nowrap">{r.date}</td>
                     <td className="py-2.5 px-3 text-[#17271D]">{r.status}</td>
                     <td className="py-2.5 pl-3">

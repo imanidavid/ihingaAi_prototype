@@ -31,7 +31,8 @@ export const ReportObservationModal: React.FC<ReportObservationModalProps> = ({
   defaultSector,
   defaultCell,
 }) => {
-  const [reportType, setReportType] = useState<'rainfall' | 'crop condition' | 'pest' | 'damage'>('rainfall');
+  const [reportType, setReportType] = useState<'rainfall' | 'crop condition' | 'pest' | 'damage' | 'other'>('rainfall');
+  const [otherType, setOtherType] = useState('');
   const [district, setDistrict] = useState<string>('Musanze');
   const [sector, setSector] = useState<string>(defaultSector);
   const [cell, setCell] = useState<string>(defaultCell);
@@ -81,6 +82,10 @@ export const ReportObservationModal: React.FC<ReportObservationModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (reportType === 'other' && !otherType.trim()) {
+      setErrorMsg('Please say what you saw, for example "Hail".');
+      return;
+    }
     if (!description.trim()) {
       setErrorMsg('Please provide a brief description of what you observed.');
       return;
@@ -94,12 +99,14 @@ export const ReportObservationModal: React.FC<ReportObservationModalProps> = ({
       'crop condition': 'Crop condition',
       pest: 'Pest / disease',
       damage: 'Flood / damage',
+      other: 'Other',
     };
 
     const newReport: ObservationItem = {
       id: `obs-${Date.now()}`,
       farmer: '', // App stamps the signed-in farmer's name
       type: typeLabelMap[reportType] || 'Rainfall',
+      ...(reportType === 'other' ? { otherType: otherType.trim() } : {}),
       title: description.trim().length > 34 ? `${description.trim().slice(0, 34)}...` : description.trim(),
       sector: sector || defaultSector,
       cell: cell || defaultCell,
@@ -119,6 +126,7 @@ export const ReportObservationModal: React.FC<ReportObservationModalProps> = ({
     onSubmitSuccess(newReport);
     onClose();
     setDescription('');
+    setOtherType('');
     setPhotoPreview(null);
   };
 
@@ -163,18 +171,19 @@ export const ReportObservationModal: React.FC<ReportObservationModalProps> = ({
             <label className="block text-[13px] text-[#5B665E] mb-1.5">
               Report type
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="flex flex-wrap gap-2">
               {[
                 { id: 'rainfall', label: 'Rainfall' },
                 { id: 'crop condition', label: 'Crop condition' },
                 { id: 'pest', label: 'Pest / disease' },
                 { id: 'damage', label: 'Flood / damage' },
+                { id: 'other', label: 'Other' },
               ].map((type) => (
                 <button
                   type="button"
                   key={type.id}
                   onClick={() => setReportType(type.id as typeof reportType)}
-                  className={`py-2 px-2 text-[12px] font-medium rounded-full text-center transition-all cursor-pointer ${
+                  className={`py-2 px-3.5 text-[12px] font-medium rounded-full text-center transition-all cursor-pointer ${
                     reportType === type.id
                       ? 'bg-[#1F4A34] text-white shadow-xs'
                       : 'bg-[#F4F6EF] text-[#5B665E] hover:text-[#17271D] border border-[rgba(31,74,52,0.08)]'
@@ -184,6 +193,16 @@ export const ReportObservationModal: React.FC<ReportObservationModalProps> = ({
                 </button>
               ))}
             </div>
+            {reportType === 'other' && (
+              <input
+                value={otherType}
+                onChange={(e) => setOtherType(e.target.value)}
+                placeholder="What did you see? e.g. Hail, landslide"
+                aria-label="What did you see?"
+                maxLength={40}
+                className="mt-2 w-full h-11 px-4 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34]"
+              />
+            )}
           </div>
 
           {/* Location Section Header & Use My Location button */}

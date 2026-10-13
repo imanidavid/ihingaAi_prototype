@@ -130,6 +130,7 @@ import {
   computeCropRiskMatrix,
   planItemsForCrops,
   nowReportStamp,
+  reportTypeLabel,
   formatPlanDue,
   computeSectorForecastRisk,
   computeDistrictClimateRisk,
@@ -710,7 +711,7 @@ export default function App() {
           id: `review-${r.id}`,
           type: 'report_to_review' as const,
           title: `Report to review: ${r.title}`,
-          subtitle: `${r.farmer} · ${r.sector}, ${r.cell} · ${r.type}`,
+          subtitle: `${r.farmer} · ${r.sector}, ${r.cell} · ${reportTypeLabel(r)}`,
           time: r.date,
           isRead: readNotificationIds.includes(`review-${r.id}`),
           targetId: r.id,
@@ -816,7 +817,7 @@ export default function App() {
         setDrawerContent({ type: 'alert', data: item.targetData });
       }
     } else if (item.type === 'feedback' || item.type === 'report_to_review') {
-      setDrawerContent({ type: 'observation', data: item.targetData });
+      handleSelectObservation(item.targetData);
     } else if (item.type === 'message') {
       setDrawerContent({ type: 'coop_message', data: item.targetData });
     } else if (item.type === 'meeting') {
@@ -869,7 +870,16 @@ export default function App() {
     setDrawerContent({ type: 'advisory', data: advisory });
   };
 
+  // Report the officer should review: opens Observations → To review on that report
+  const [reviewReportId, setReviewReportId] = useState<string | undefined>(undefined);
+
   const handleSelectObservation = (report: ReportItem) => {
+    // The officer verifies reports on the Observations page, so open it there instead of a read-only drawer
+    if (role === 'officer' && report.status === 'Under review') {
+      setReviewReportId(report.id);
+      setCurrentView('observations');
+      return;
+    }
     setDrawerContent({ type: 'observation', data: report });
     setReadNotificationIds((prev) =>
       prev.includes(`feedback-${report.id}`) ? prev : [...prev, `feedback-${report.id}`]
@@ -2027,6 +2037,8 @@ export default function App() {
             {currentView === 'observations' &&
               (role === 'officer' ? (
                 <OfficerObservationsView
+                  key={reviewReportId}
+                  initialReportId={reviewReportId}
                   reports={reports}
                   onOpenReport={(r) => logAudit('Opened farmer report', `${r.farmer} · ${r.title}`)}
                   onVerifyReport={handleOfficerVerifyReport}

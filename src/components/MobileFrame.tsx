@@ -42,6 +42,7 @@ import {
   PLAN_ALL_CROPS,
   RISK_LEVEL_WEIGHT,
   nowReportStamp,
+  REPORT_TYPES,
   RISK_LEVEL_COLORS,
   ALL_30_RWANDA_DISTRICTS,
   MUSANZE_SECTORS_CELLS,
@@ -125,7 +126,8 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
   // Mobile Bottom Sheet for Warning Detail inside phone
   const [selectedWarningForSheet, setSelectedWarningForSheet] = useState<AlertItem | null>(null);
   const [warningAcknowledged, setWarningAcknowledged] = useState(false);
-  const [reportType, setReportType] = useState<'Rainfall' | 'Crop condition' | 'Pest / disease' | 'Flood / damage'>('Rainfall');
+  const [reportType, setReportType] = useState<ObservationItem['type']>('Rainfall');
+  const [otherType, setOtherType] = useState('');
   const [district, setDistrict] = useState<string>('Musanze');
   const [sector, setSector] = useState<string>('Kinigi');
   const [cell, setCell] = useState<string>('Bisoke');
@@ -223,6 +225,7 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
       id: `obs-${Date.now()}`,
       farmer: '', // App stamps the signed-in farmer's name
       type: reportType,
+      ...(reportType === 'Other' ? { otherType: otherType.trim() || 'Other' } : {}),
       title: reportNotes.trim().length > 34 ? `${reportNotes.trim().slice(0, 34)}...` : reportNotes.trim(),
       sector: sector || 'Kinigi',
       cell: cell || 'Bisoke',
@@ -1338,7 +1341,7 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                         Observation type
                       </label>
                       <div className="grid grid-cols-2 gap-1.5">
-                        {(['Rainfall', 'Flood / damage', 'Crop condition', 'Pest / disease'] as const).map((t) => (
+                        {REPORT_TYPES.map((t) => (
                           <button
                             key={t}
                             type="button"
@@ -1353,6 +1356,16 @@ export const MobileFrame: React.FC<MobileFrameProps> = ({
                           </button>
                         ))}
                       </div>
+                      {reportType === 'Other' && (
+                        <input
+                          value={otherType}
+                          onChange={(e) => setOtherType(e.target.value)}
+                          placeholder="What did you see?"
+                          aria-label="What did you see?"
+                          maxLength={40}
+                          className="mt-1.5 w-full h-9 px-3 rounded-xl bg-white text-[#17271D] text-[11.5px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34]"
+                        />
+                      )}
                     </div>
 
                     {/* Location Section: District, Sector, Cell as dropdowns + [Use my location] button */}

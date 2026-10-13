@@ -418,6 +418,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
         'Flood / damage': reports.filter((r) => r.type === 'Flood / damage').length,
         'Crop condition': reports.filter((r) => r.type === 'Crop condition').length,
         'Pest / disease': reports.filter((r) => r.type === 'Pest / disease').length,
+        Other: reports.filter((r) => r.type === 'Other').length,
       };
       Object.entries(countsByType).forEach(([t, count]) => {
         lines.push(`"${t}","${count}"`);

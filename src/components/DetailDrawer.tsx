@@ -28,7 +28,7 @@ import {
   CoopGroup,
   CoopMessage,
 } from '../types';
-import { RISK_LEVEL_COLORS } from '../data/musanzeData';
+import { RISK_LEVEL_COLORS, reportTypeLabel } from '../data/musanzeData';
 
 export type DrawerContent =
   | { type: 'alert'; data: AlertItem }
@@ -433,7 +433,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                 {/* Type & Status Chips */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#F4F6EF] text-[#17271D] border border-[rgba(31,74,52,0.12)]">
-                    {observationData.type}
+                    {reportTypeLabel(observationData)}
                   </span>
                   {renderObservationStatusChip(observationData.status)}
                 </div>
@@ -736,7 +736,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                             </span>
                           </div>
                           <span className="text-[11.5px] text-[#5B665E] tabular-nums">
-                            {r.farmer} · {r.cell} · {r.type} · {r.date}
+                            {r.farmer} · {r.cell} · {reportTypeLabel(r)} · {r.date}
                           </span>
                         </div>
                       ))}

@@ -120,7 +120,7 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
     (`src/components/PillSelect.tsx`) for every new form. Date/time ranges use
     `DateTimeRangePicker` (Starts/Ends = date + half-hour pill, optional "Next 24/48/72 h" chips
     from NOW); store the two values (`startsAt`/`endsAt`, 'DD/MM/YYYY HH:MM') and build the text
-    with `formatTimeframe()` — never a typed range. 17 older native `<select>` elements
+    with `formatTimeframe()` — never a typed range. 13 older native `<select>` elements
     remain; replace them in the consistency pass (Task 9).
 13. **The floating demo control never covers content.** `<main>` carries `pb-32` (128px) —
     keep it at ≥ 96px.
@@ -205,8 +205,8 @@ Views per role come from `src/components/Sidebar.tsx`. Cooperative pages:
 
 ## Known code drift (fix deliberately, in its own task — don't "tidy" it mid-task)
 
-- **17 native `<select>`** elements: `SettingsView` 4, `SignUpWizard` 6,
-  `ReportObservationModal` 3, `MobileFrame` 3, `OfficerReportsView` 1 (breaks rule 12).
+- **13 native `<select>`** elements: `SignUpWizard` 6,
+  `ReportObservationModal` 3, `MobileFrame` 3, `OfficerReportsView` 1 (breaks rule 12). Settings uses `PillSelect` now.
 - **Rainfall normal contradicts the month total.** 13 mm/day × 30 = 390 mm, but the month
   card says 300 mm is "above normal", and the season chart's normal is 65 mm/month. The values
   now live in one place (`musanzeData.ts`), but the numbers themselves need a decision.
@@ -297,6 +297,16 @@ last `FIELD_REPORT_WINDOW_DAYS`, shown as the community observation map
 the map, tapping a sector shows its counts by type; covers Module 9 "community observation map" and
 "observation analytics"). Seed report
 photos are planned files in `public/media/` (media manifest); a missing photo shows no thumbnail.
+
+Report types (13/10/2026): Rainfall · Flood / damage · Crop condition · Pest / disease · Other
+(`REPORT_TYPES`). "Other" carries the farmer's own words in `otherType`; show any report's type
+with `reportTypeLabel()`. Officers verify reports on Observations → To review; opening a report
+under review from the bell goes there (`reviewReportId`), not to the read-only drawer.
+
+Settings (13/10/2026, kept short on purpose): Profile (name, phone, email, one language for the
+app and messages) · Farm (farmers only: sector, cell, farm size, cooperative, crops — any crop
+can be added beside `CROP_OPTIONS`) · Messages (channel, four plain on/off switches, stop SMS) ·
+Password (change, two-step note for officers and administrators, sign out other devices).
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 

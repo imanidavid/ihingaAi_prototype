@@ -23,6 +23,7 @@ import {
   computeOfficerAttention,
   reportsInLastDays,
   totalRegisteredFarmers,
+  reportTypeLabel,
 } from '../data/musanzeData';
 
 interface OfficerDashboardViewProps {
@@ -693,7 +694,7 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
                           <span>·</span>
                           <span>{r.cell}</span>
                           <span>·</span>
-                          <span>{r.type}</span>
+                          <span>{reportTypeLabel(r)}</span>
                         </div>
                       </div>
                     ))
