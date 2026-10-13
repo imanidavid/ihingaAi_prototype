@@ -11,10 +11,6 @@ import { PricingScreen } from './PricingScreen';
 import { FaqScreen } from './FaqScreen';
 import { FinalCtaBanner } from './FinalCtaBanner';
 import { Footer } from './Footer';
-import { RiskMapModal } from './RiskMapModal';
-import { HowItWorksModal } from './HowItWorksModal';
-import { InfoModal } from './InfoModal';
-import { ContactModal } from './ContactModal';
 import { Volume2, VolumeX, ChevronDown } from 'lucide-react';
 
 const VIDEO_URL =
@@ -30,10 +26,6 @@ interface LandingPageProps {
 /** The IHINGA AI landing page (ported from the landing project), shown before sign-in. */
 export function LandingPage({ onSignIn, onCreateAccount }: LandingPageProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isRiskMapOpen, setIsRiskMapOpen] = useState(false);
-  const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
-  const [activeSectionInfo, setActiveSectionInfo] = useState<string | null>(null);
-  const [isContactOpen, setIsContactOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -43,10 +35,6 @@ export function LandingPage({ onSignIn, onCreateAccount }: LandingPageProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsMobileMenuOpen(false);
-        setIsRiskMapOpen(false);
-        setIsHowItWorksOpen(false);
-        setActiveSectionInfo(null);
-        setIsContactOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -75,7 +63,7 @@ export function LandingPage({ onSignIn, onCreateAccount }: LandingPageProps) {
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     } else {
-      setIsHowItWorksOpen(true);
+      onSignIn();
     }
   };
 
@@ -85,21 +73,21 @@ export function LandingPage({ onSignIn, onCreateAccount }: LandingPageProps) {
     } else if (section === 'Intelligence') {
       const el = document.getElementById('core-capabilities-section');
       if (el) el.scrollIntoView({ behavior: 'smooth' });
-      else setActiveSectionInfo(section);
+      else onSignIn();
     } else if (section === 'Co-operatives' || section === 'Cooperatives' || section === 'Results') {
       const el = document.getElementById('results-screen');
       if (el) el.scrollIntoView({ behavior: 'smooth' });
-      else setActiveSectionInfo(section);
+      else onSignIn();
     } else if (section === 'Pricing') {
       const el = document.getElementById('pricing-screen');
       if (el) el.scrollIntoView({ behavior: 'smooth' });
-      else setActiveSectionInfo(section);
+      else onSignIn();
     } else if (section === 'FAQ') {
       const el = document.getElementById('faq-screen');
       if (el) el.scrollIntoView({ behavior: 'smooth' });
-      else setActiveSectionInfo(section);
+      else onSignIn();
     } else {
-      setActiveSectionInfo(section);
+      onSignIn();
     }
   };
 
@@ -151,7 +139,7 @@ export function LandingPage({ onSignIn, onCreateAccount }: LandingPageProps) {
         {/* Main Hero Centerpiece */}
         <main className="relative z-10 flex-1 flex flex-col items-center justify-center pt-24 pb-20">
           <Hero
-            onExploreRiskMap={() => setIsRiskMapOpen(true)}
+            onExploreRiskMap={onSignIn}
             onHowItWorks={scrollToHowItWorks}
           />
 
@@ -192,12 +180,12 @@ export function LandingPage({ onSignIn, onCreateAccount }: LandingPageProps) {
         onSelectTier={(action) => {
           if (action === 'join') handleOpenJoin();
           else if (action === 'portal') handleOpenPortal();
-          else if (action === 'contact') setIsContactOpen(true);
+          else if (action === 'contact') handleOpenJoin();
         }}
       />
 
       {/* SCREEN 7.5: FAQ (Questions, answered.) */}
-      <FaqScreen onContactClick={() => setIsContactOpen(true)} />
+      <FaqScreen onContactClick={handleOpenJoin} />
 
       {/* SCREEN 8: Final CTA Banner (Ready to see the season before it happens?) */}
       <FinalCtaBanner
@@ -210,8 +198,8 @@ export function LandingPage({ onSignIn, onCreateAccount }: LandingPageProps) {
         onOpenSection={handleOpenSection}
         onOpenPortal={handleOpenPortal}
         onOpenJoin={handleOpenJoin}
-        onOpenContact={() => setIsContactOpen(true)}
-        onOpenRiskMap={() => setIsRiskMapOpen(true)}
+        onOpenContact={handleOpenJoin}
+        onOpenRiskMap={handleOpenPortal}
       />
 
       {/* Floating Audio Ambient Toggle Control */}
@@ -226,29 +214,6 @@ export function LandingPage({ onSignIn, onCreateAccount }: LandingPageProps) {
         </button>
       </div>
 
-      {/* Interactive Modals */}
-      <RiskMapModal
-        isOpen={isRiskMapOpen}
-        onClose={() => setIsRiskMapOpen(false)}
-      />
-
-      <HowItWorksModal
-        isOpen={isHowItWorksOpen}
-        onClose={() => setIsHowItWorksOpen(false)}
-      />
-
-      <InfoModal
-        section={activeSectionInfo}
-        onClose={() => setActiveSectionInfo(null)}
-        onOpenPortal={() => {
-          setActiveSectionInfo(null);
-          handleOpenPortal();
-        }}
-      />
-      <ContactModal
-        isOpen={isContactOpen}
-        onClose={() => setIsContactOpen(false)}
-      />
     </div>
   );
 }

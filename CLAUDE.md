@@ -351,9 +351,9 @@ link to field data). Model performance uses plain words ("Usual miss", "Too wet 
 
 Landing (14/10/2026): the app opens signed out on the owner's landing page, ported as-is from the
 landing project into `src/components/landing/` (`LandingPage` + its sections, her design, video,
-motion and Instrument Serif headings — the one exception to Design System v3). Every sign-in /
-portal button opens `SignInView`; every join / start button opens sign-up (`landingScreen`,
-`initialMode`); sign-in has "Back to home". Only text changed: invented numbers replaced by
+motion and Instrument Serif headings — the one exception to Design System v3). Nothing else is attached: no pop-ups (risk map, info, how it works, contact were removed);
+section links scroll, every other button opens `SignInView` on sign-in or sign-up (`landingScreen`,
+`initialMode`); sign-in has "Back to home" and signing out returns to the landing page. Only text changed: invented numbers replaced by
 prototype facts or labelled illustrative, and official-endorsement wording removed.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.

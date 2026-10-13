@@ -19,7 +19,6 @@ export function MobileMenu({
 
   const links = [
     { title: 'Intelligence', type: 'section' },
-    { title: 'Micro-Insurance', type: 'section' },
     { title: 'Co-operatives', type: 'section' },
     { title: 'Methodology', type: 'section' },
     { title: 'Farmer Portal', type: 'portal' },
