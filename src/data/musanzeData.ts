@@ -21,6 +21,7 @@ import {
   CoopDirectoryEntry,
   CropWindow,
   CropPlanting,
+  CoopJoinRequest,
   EquipmentBooking,
   RegisteredFarmer,
   TrainingMaterial,
@@ -2719,7 +2720,7 @@ export function computeCoopGroups(
 
     const acknowledgement = active.map((w) => {
       const level = w.level ?? w.severity;
-      const acknowledgedCount = groupMembers.filter((m) => m.acknowledged[w.id]).length;
+      const acknowledgedCount = groupMembers.filter((m) => memberAcknowledged(m, w.id)).length;
       const inSector = w.sectorBreakdown?.find((b) => b.sector === g.sector);
       return {
         warningId: w.id,
@@ -2735,7 +2736,7 @@ export function computeCoopGroups(
     });
 
     const latest = acknowledgement[0];
-    const notAcknowledged = latest ? groupMembers.filter((m) => !m.acknowledged[latest.warningId]) : [];
+    const notAcknowledged = latest ? groupMembers.filter((m) => !memberAcknowledged(m, latest.warningId)) : [];
     const memberReports = memberReportsFor(groupMembers, reports);
 
     return {
@@ -3068,6 +3069,48 @@ export function messageReachesMember(
   });
 }
 
+// =========================================================================
+// JOIN REQUESTS (store field `coopJoinRequests`) — a farmer picks a cooperative at sign-up or in
+// Settings; the cooperative leader accepts and places them in a group (Dashboard → Needs you today).
+// =========================================================================
+export const INITIAL_COOP_JOIN_REQUESTS: CoopJoinRequest[] = [
+  {
+    id: 'join-1',
+    fullName: 'Vestine Mukandayisenga',
+    phone: '+250 788 000 081',
+    sector: 'Kinigi',
+    cell: 'Nyonirima',
+    crops: ['Climbing Beans'],
+    cooperative: 'Musanze Potato Growers Cooperative',
+    requestedOn: '27/09/2026',
+    status: 'pending',
+  },
+  {
+    id: 'join-2',
+    fullName: 'Pacifique Niyonzima',
+    phone: '+250 788 000 082',
+    sector: 'Nyange',
+    cell: 'Cyivugiza',
+    crops: ['Irish Potato'],
+    cooperative: 'Musanze Potato Growers Cooperative',
+    requestedOn: '28/09/2026',
+    status: 'pending',
+  },
+];
+
+/** Plan-ahead items due within this many days are shown to the cooperative leader to pass on. */
+export const PASS_ON_WINDOW_DAYS = 7;
+
+/** The group the app suggests for a new member: their sector's group, if the cooperative has one. */
+export function suggestGroupFor(request: Pick<CoopJoinRequest, 'sector'>, groups: CoopGroupRecord[]): string {
+  return groups.find((g) => g.sector === request.sector)?.id || '';
+}
+
+/** Did this member acknowledge the warning (themselves or told in person by the leader)? */
+export function memberAcknowledged(m: CoopMember, warningId: string): boolean {
+  return !!m.acknowledged[warningId] || !!m.toldInPerson?.includes(warningId);
+}
+
 export const COOPERATIVE_DATA: CoopData = {
   cooperativeName: 'Musanze Potato Growers Cooperative',
   leader: {
@@ -3076,28 +3119,6 @@ export const COOPERATIVE_DATA: CoopData = {
     phone: '+250 788 000 034',
     initials: 'AU',
   },
-  actions: [
-    {
-      id: 'act-1',
-      description: 'Plan one shared spraying schedule after Tuesday 14:00 for Kinigi plots',
-      buttonLabel: 'Message Kinigi growers',
-      targetGroup: 'Kinigi growers',
-      prefillMessageEn:
-        'Cooperative advisory: Please plan shared fungicide spraying for Kinigi plots after Tuesday 14:00 once downpour subsides. Check terrace drainage first.',
-      prefillMessageRw:
-        "Inama ya koperative: Muteganye gutera umuti w'ibirayi nyuma ya kuwa kabiri 14:00 imvura niba ihagaze. Banza usukure imiyoboro y'amazi.",
-    },
-    {
-      id: 'act-2',
-      description: 'Collect orders for blight-tolerant seed for Season B by 15/11',
-      buttonLabel: 'Message all members',
-      targetGroup: 'All groups',
-      prefillMessageEn:
-        'Musanze Potato Growers: Seed orders for late-blight tolerant varieties for Season B are open until 15/11 at the cooperative warehouse.',
-      prefillMessageRw:
-        "Koperative y'abahinzi b'ibirayi: Ibyifuzo by'imbuto yihanganira imvura n'imvura y'umwuka birakira kugeza 15/11 mu bubiko bwa koperative.",
-    },
-  ],
 };
 
 export const INITIAL_COOP_MESSAGES: CoopMessage[] = [

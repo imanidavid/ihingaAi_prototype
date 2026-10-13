@@ -34,7 +34,7 @@ module, no context and no reducer; state is passed down as props. Fields:
 `auditEvents` · `loginAttempts` · `securitySettings` · `dataSources` · `processingRuns` ·
 `processingSettings` · `messageTemplates` · `voiceSettings` · `rainForecasts` ·
 `stationReadings` · `cropAdvisories` · `warningDeliveries` · `riskTypes` · `sectorRegister` ·
-`planAheadItems` · `cropPlantings`
+`planAheadItems` · `cropPlantings` · `coopJoinRequests`
 
 Derived once in `App.tsx` and passed down: `coopGroups` (`computeCoopGroups`), `coopSummary`
 (`computeCoopSummary`), `sectorForecastRisk` (`computeSectorForecastRisk`), `affectedSectors`,
@@ -126,7 +126,7 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
     keep it at ≥ 96px.
 14. **Reset demo** (`handleResetDemo`, `App.tsx`) must restore every store field to its
     initial value, including anything created during the demo. It currently resets all
-    thirty-one fields; add every new field you introduce (also to `storeSnapshot`, which syncs open tabs).
+    thirty-two fields; add every new field you introduce (also to `storeSnapshot`, which syncs open tabs).
 15. **Keep it simple — never overwhelm users.** One clear component per question; never show the
     same data twice (e.g. a chart and day cards, a map and per-type bars). Fold extra detail into
     that one component (filter chips, tap for detail) instead of adding sections. Every
@@ -307,6 +307,19 @@ Settings (13/10/2026, kept short on purpose): Profile (name, phone, email, one l
 app and messages) · Farm (farmers only: sector, cell, farm size, cooperative, crops — any crop
 can be added beside `CROP_OPTIONS`) · Messages (channel, four plain on/off switches, stop SMS) ·
 Password (change, two-step note for officers and administrators, sign out other devices).
+
+Cooperative (13/10/2026): one registered cooperative with groups inside it (a group is a team
+such as "Kinigi growers", not a cooperative). Only the cooperative leader (board president or
+manager, Aline) uses the cooperative dashboard; group leads are farmers on the farmer dashboard.
+A farmer who picks a cooperative at sign-up or in Settings creates a join request
+(`coopJoinRequests`); the leader accepts it and places them in a group (`suggestGroupFor` picks
+the group of their sector). The dashboard answers "which members need me today?": join requests,
+one row per group with members who have not acknowledged each active warning (Remind, or "Told in
+person" — stored in `CoopMember.toldInPerson`, counted by `memberAcknowledged`, shown "told by
+leader"), and the officer's active advice and plan-ahead items due within `PASS_ON_WINDOW_DAYS`
+(collapsed, "Send to members"). Then My groups and one line for the last message and next meeting.
+A farmer acknowledges once; the officer sees totals, the leader sees names. `COOPERATIVE_DATA.actions`
+is gone.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 

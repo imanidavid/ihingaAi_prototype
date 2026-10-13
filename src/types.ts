@@ -387,6 +387,8 @@ export interface CoopMember {
   role: CoopMemberRole;
   crops: string[];
   acknowledged: Record<string, boolean>;
+  /** Warnings the cooperative leader marked as told in person (counted as acknowledged, shown "by leader"). */
+  toldInPerson?: string[];
   /** DD/MM/YYYY */
   lastActive: string;
   /**
@@ -395,6 +397,24 @@ export interface CoopMember {
    */
   activeFromWeek: 1 | 2 | 3 | 4 | null;
   isDemo?: boolean;
+}
+
+/** A farmer asking to join a cooperative (store field `coopJoinRequests`); the cooperative leader accepts it. */
+export interface CoopJoinRequest {
+  id: string;
+  /** The farmer's account, when they signed up in the app. */
+  accountId?: string;
+  fullName: string;
+  phone: string;
+  sector: string;
+  cell: string;
+  crops: string[];
+  cooperative: string;
+  /** DD/MM/YYYY */
+  requestedOn: string;
+  status: 'pending' | 'accepted' | 'declined';
+  /** Group the leader placed the farmer in. */
+  groupId?: string;
 }
 
 /** A registered Musanze farmer who is not (yet) a member — the "Add member" search pool. */
@@ -558,14 +578,6 @@ export interface CoopData {
     phone: string;
     initials: string;
   };
-  actions: {
-    id: string;
-    description: string;
-    buttonLabel: string;
-    targetGroup: string;
-    prefillMessageEn?: string;
-    prefillMessageRw?: string;
-  }[];
 }
 
 export type GeneratedReportType =

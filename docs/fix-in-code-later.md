@@ -76,3 +76,9 @@ Farmer observations (12/10/2026):
 Settings and report types (13/10/2026):
 - [ ] Settings for officer, cooperative leader, researcher and administrator still read the farmer's `userSettings` (Jean-Baptiste's details); give each role its own profile from `accounts`.
 - [ ] Added crops (e.g. Sorghum) have no crop growth model or risk-matrix profile, so Crop phases shows "No growth model" for them.
+
+Cooperative (13/10/2026):
+- [ ] "Told in person" counts in the cooperative's acknowledgement but not in the officer's delivery totals (`warningDeliveries`); decide whether the officer should see it too.
+- [ ] A farmer who switches cooperative in Settings keeps their old member record until the old leader removes them.
+- [ ] The cooperative has groups for Kinigi, Busogo and Muhoza only; a farmer from another sector (e.g. Nyange) must be placed by hand or the leader creates a group.
+- [ ] Join requests only reach Aline's cooperative; other cooperatives in `COOPERATIVE_OPTIONS` have no leader account in the demo.
