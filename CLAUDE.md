@@ -330,6 +330,11 @@ item ("New lesson") and a "Learn" row in Recommendations (`lessonsForGroup`); `L
 shows the steps. Audio and video files are planned media; until then the steps are their script.
 `TRAINING_MATERIALS` is gone.
 
+Risk forecast (13/10/2026): the four cards (excess rain, dry spell, temperature, rain total) are
+`computeHazardCards` for one sector over the 10- or 30-day window, using the officer's rules.
+Farmers see their sector; officers and researchers pick a sector (highest risk first). The chart
+caption is the computed forecast skill (`computeForecastSkill`, simulated gauge data).
+
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 
 ## Cross-role flows (the demo — must always work)

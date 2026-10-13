@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   CloudRain,
   Sun,
@@ -13,10 +13,15 @@ import {
   AlertTriangle,
   ArrowRight,
 } from 'lucide-react';
-import { WeatherForecastDay, CropAdvisory, AppRole, RiskLevel, OfficerActiveWarning } from '../types';
+import { CropAdvisory, AppRole, RiskLevel, OfficerActiveWarning, SectorRainForecast, ThresholdRuleItem } from '../types';
+import { PillSelect } from './PillSelect';
 import {
   FORECAST_HORIZONS,
   CROP_HAZARDS,
+  computeHazardCards,
+  computeForecastSkill,
+  FORECAST_VS_OBSERVED,
+  forecastDays,
   CROP_RISK_MODEL_LABEL,
   CropHazard,
   CropRiskMatrixRow,
@@ -42,8 +47,9 @@ interface RiskForecastViewProps {
   forecastRisk: Record<string, RiskLevel>;
   /** The signed-in farmer's sector ("Your sector" chip). */
   userSector?: string;
-  /** The farmer's sector forecast from the store (10-day and month charts). */
-  forecastSeries?: WeatherForecastDay[];
+  /** Every sector's forecast and the officer's rules (cards and charts are computed from them). */
+  rainForecasts: SectorRainForecast[];
+  thresholdRules: ThresholdRuleItem[];
   /** Crop risk matrix from the crop risk model (farmer: their sector and crops; others: the district). */
   cropRisk: CropRiskMatrixRow[];
   /** Officer advice the viewer can open from a matrix cell (farmer: only advice visible to them). */
@@ -58,11 +64,25 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
   activeWarnings,
   forecastRisk,
   userSector,
-  forecastSeries,
+  rainForecasts,
+  thresholdRules,
   cropRisk,
   advisories,
 }) => {
   const [horizon, setHorizon] = useState<HorizonType>('10d');
+  // Farmers see their own sector; others pick a sector (the highest-risk one first)
+  const defaultSector =
+    userSector ||
+    [...MUSANZE_RECORD.allSectors].sort(
+      (a, b) => RISK_LEVEL_WEIGHT[forecastRisk[b] || 'Low'] - RISK_LEVEL_WEIGHT[forecastRisk[a] || 'Low']
+    )[0];
+  const [chartSector, setChartSector] = useState(defaultSector);
+  const skill = useMemo(() => computeForecastSkill(FORECAST_VS_OBSERVED), []);
+  const forecastSeries = useMemo(() => forecastDays(rainForecasts, chartSector), [rainForecasts, chartSector]);
+  const hazardCards = useMemo(
+    () => computeHazardCards(chartSector, thresholdRules, rainForecasts, horizon === '10d' ? 10 : 30),
+    [chartSector, thresholdRules, rainForecasts, horizon]
+  );
   const [isLowRiskExpanded, setIsLowRiskExpanded] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
@@ -281,116 +301,38 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
       {/* ========================================================================= */}
       {/* BAND 1 — RISK TYPE CARDS (4 across, equal height, values on one line, no sparklines) */}
       {/* ========================================================================= */}
+      {!userSector && (
+        <div className="max-w-xs">
+          <PillSelect
+            label="Sector"
+            value={chartSector}
+            onChange={setChartSector}
+            options={MUSANZE_RECORD.allSectors.map((n) => ({ value: n, label: `${n} · ${forecastRisk[n] || 'Low'}` }))}
+          />
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
-        {/* Card 1: Excess rain */}
-        <div className="bg-[#FBFCF8] rounded-[16px] p-4 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-[#D9A032]/15 flex items-center justify-center">
-                  <CloudRain className="w-3.5 h-3.5 text-[#D9A032]" strokeWidth={1.5} />
+        {hazardCards.map((card) => {
+          const Icon = card.id === 'rain' ? CloudRain : card.id === 'dry' ? Sun : card.id === 'temp' ? Thermometer : Calendar;
+          return (
+            <div
+              key={card.id}
+              className="bg-[#FBFCF8] rounded-[16px] p-4 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)]"
+            >
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-[#E4ECDB] flex items-center justify-center">
+                    <Icon className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
+                  </div>
+                  <span className="text-[13px] font-medium text-[#17271D]">{card.label}</span>
                 </div>
-                <span className="text-[13px] font-medium text-[#17271D]">
-                  {currentHorizonPkg.cards.excessRain.label}
-                </span>
+                {card.level && getLevelChip(card.level)}
               </div>
-              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#D9A032]/20 text-[#9E6905]">
-                {currentHorizonPkg.cards.excessRain.badge}
-              </span>
+              <div className="text-[22px] font-semibold text-[#17271D] leading-tight mt-1 whitespace-nowrap tabular-nums">{card.value}</div>
+              <p className="text-[12px] text-[#5B665E] mt-1 leading-snug">{card.subtext}</p>
             </div>
-
-            <div className="text-[22px] font-semibold text-[#17271D] leading-tight mt-1 whitespace-nowrap">
-              {currentHorizonPkg.cards.excessRain.value}
-            </div>
-            <p className="text-[12px] text-[#5B665E] mt-1 leading-snug whitespace-nowrap">
-              {currentHorizonPkg.cards.excessRain.subtext}
-            </p>
-          </div>
-        </div>
-
-        {/* Card 2: Dry spell */}
-        <div className="bg-[#FBFCF8] rounded-[16px] p-4 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-[#E4ECDB] flex items-center justify-center">
-                  <Sun className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-                </div>
-                <span className="text-[13px] font-medium text-[#17271D]">
-                  {currentHorizonPkg.cards.drySpell.label}
-                </span>
-              </div>
-              {currentHorizonPkg.cards.drySpell.badge === 'Watch' ? (
-                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#D9A032]/20 text-[#9E6905]">
-                  Watch
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#3E8E55]/15 text-[#3E8E55]">
-                  Low
-                </span>
-              )}
-            </div>
-
-            <div className="text-[22px] font-semibold text-[#17271D] leading-tight mt-1 whitespace-nowrap">
-              {currentHorizonPkg.cards.drySpell.value}
-            </div>
-            <p className="text-[12px] text-[#5B665E] mt-1 leading-snug whitespace-nowrap">
-              {currentHorizonPkg.cards.drySpell.subtext}
-            </p>
-          </div>
-        </div>
-
-        {/* Card 3: Temperature */}
-        <div className="bg-[#FBFCF8] rounded-[16px] p-4 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-[#E4ECDB] flex items-center justify-center">
-                  <Thermometer className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-                </div>
-                <span className="text-[13px] font-medium text-[#17271D]">
-                  {currentHorizonPkg.cards.temperature.label}
-                </span>
-              </div>
-              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#3E8E55]/15 text-[#3E8E55]">
-                {currentHorizonPkg.cards.temperature.badge}
-              </span>
-            </div>
-
-            <div className="text-[22px] font-semibold text-[#17271D] leading-tight mt-1 whitespace-nowrap">
-              {currentHorizonPkg.cards.temperature.value}
-            </div>
-            <p className="text-[12px] text-[#5B665E] mt-1 leading-snug whitespace-nowrap">
-              {currentHorizonPkg.cards.temperature.subtext}
-            </p>
-          </div>
-        </div>
-
-        {/* Card 4: Season onset */}
-        <div className="bg-[#FBFCF8] rounded-[16px] p-4 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-[#E4ECDB] flex items-center justify-center">
-                  <Calendar className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-                </div>
-                <span className="text-[13px] font-medium text-[#17271D]">
-                  {currentHorizonPkg.cards.seasonOnset.label}
-                </span>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#E4ECDB] text-[#1F4A34] border border-[rgba(31,74,52,0.10)]">
-                Started
-              </span>
-            </div>
-
-            <div className="text-[22px] font-semibold text-[#17271D] leading-tight mt-1 whitespace-nowrap">
-              {currentHorizonPkg.cards.seasonOnset.value}
-            </div>
-            <p className="text-[12px] text-[#5B665E] mt-1 leading-snug whitespace-nowrap">
-              {currentHorizonPkg.cards.seasonOnset.subtext}
-            </p>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       {/* ========================================================================= */}
@@ -403,9 +345,7 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
             <h3 className="text-[16px] font-semibold text-[#17271D]">
               Rainfall forecast
             </h3>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#E4ECDB] text-[#1F4A34] border border-[rgba(31,74,52,0.12)]">
-              82% confidence
-            </span>
+            <span className="text-[12px] text-[#5B665E]">{chartSector}</span>
           </div>
 
           {/* Legend */}
@@ -605,7 +545,7 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
         {/* Caption below chart */}
         <div className="pt-3 border-t border-[rgba(31,74,52,0.06)] mt-2">
           <p className="text-[12px] text-[#5B665E]">
-            Last season, our 10-day rain forecasts were right 8 out of 10 times · Based on Meteo Rwanda station data and satellite rainfall.
+            Over the last {skill.days} days, the forecast was close to the rain gauge on {skill.hits} of {skill.days} days (Kinigi gauge, simulated data).
           </p>
         </div>
       </div>
@@ -617,7 +557,7 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-2 border-b border-[rgba(31,74,52,0.06)]">
           <div>
             <h3 className="text-[16px] font-semibold text-[#17271D]">
-              Sector Risk Ranking
+              Sector risk ranking
             </h3>
             <p className="text-[12px] text-[#5B665E]">
               Musanze administrative sectors sorted by current climate risk vulnerability
@@ -626,11 +566,11 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
           <div className="flex items-center gap-3 text-[11.5px] text-[#5B665E]">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D9A032]" />
-              <span>4 at Watch</span>
+              <span>{watchSectors.length} at Watch or above</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#3E8E55]" />
-              <span>11 at Low</span>
+              <span>{lowSectors.length} at Low</span>
             </span>
           </div>
         </div>
