@@ -23,6 +23,7 @@ import {
   COOP_MEMBER_ROLES,
   REGISTERED_MUSANZE_FARMERS,
   formatDaysAgo,
+  memberAcknowledged,
 } from '../data/musanzeData';
 import { maskPhone } from '../data/rwandaAdminData';
 import { PillSelect } from './PillSelect';
@@ -102,7 +103,7 @@ export const CooperativeMembersView: React.FC<CooperativeMembersViewProps> = ({
   const hasAcknowledgedLatest = (m: CoopMember): boolean | null => {
     const latest = latestWarningByGroup.get(m.groupId);
     if (!latest) return null;
-    return !!m.acknowledged[latest.id];
+    return memberAcknowledged(m, latest.id);
   };
 
   const filtered = useMemo(() => {
@@ -273,7 +274,12 @@ export const CooperativeMembersView: React.FC<CooperativeMembersViewProps> = ({
                           ) : ack ? (
                             <NeutralChip>
                               <Check className="w-3 h-3" strokeWidth={2} />
-                              Yes
+                              {(() => {
+                                const latest = latestWarningByGroup.get(m.groupId);
+                                return latest && !m.acknowledged[latest.id] && m.toldInPerson?.includes(latest.id)
+                                  ? 'Yes · told by leader'
+                                  : 'Yes';
+                              })()}
                             </NeutralChip>
                           ) : (
                             <NeutralChip tone="outline">No</NeutralChip>

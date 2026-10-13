@@ -11,6 +11,7 @@ import {
   CropAdvisory,
   PlanAheadItem,
   CropPlanting,
+  CoopJoinRequest,
   UserProfileSettings,
   ReportItem,
   AppRole,
@@ -126,6 +127,8 @@ import {
   INITIAL_CROP_ADVISORIES,
   INITIAL_PLAN_AHEAD_ITEMS,
   INITIAL_CROP_PLANTINGS,
+  INITIAL_COOP_JOIN_REQUESTS,
+  PASS_ON_WINDOW_DAYS,
   computeCropPhase,
   computeCropRiskMatrix,
   planItemsForCrops,
@@ -219,8 +222,37 @@ export default function App() {
     ]);
   };
 
+  /** A farmer who picks a cooperative asks to join it; the cooperative leader accepts them. */
+  const requestToJoinCooperative = (farmer: {
+    accountId?: string;
+    fullName: string;
+    phone: string;
+    sector: string;
+    cell: string;
+    crops: string[];
+    cooperative: string;
+  }) => {
+    if (!farmer.cooperative || farmer.cooperative === 'None / Individual') return;
+    setCoopJoinRequests((prev) =>
+      prev.some((r) => r.status === 'pending' && r.fullName === farmer.fullName && r.cooperative === farmer.cooperative)
+        ? prev
+        : [{ id: `join-demo-${Date.now()}`, ...farmer, requestedOn: NOW.dateFormatted, status: 'pending' }, ...prev]
+    );
+  };
+
   const handleAddNewAccount = (newAcc: UserAccount) => {
     setAccounts((prev) => [newAcc, ...prev.filter((a) => a.id !== newAcc.id)]);
+    if (newAcc.role === 'farmer' && newAcc.farmerDetails?.cooperative) {
+      requestToJoinCooperative({
+        accountId: newAcc.id,
+        fullName: newAcc.fullName,
+        phone: newAcc.phone,
+        sector: newAcc.farmerDetails.sector,
+        cell: newAcc.farmerDetails.cell,
+        crops: newAcc.farmerDetails.cropsGrown,
+        cooperative: newAcc.farmerDetails.cooperative,
+      });
+    }
   };
 
   const handleAddAccessRequest = (newAcc: UserAccount, newReq: AccessRequest) => {
@@ -422,6 +454,8 @@ export default function App() {
   const [coopGroupRecords, setCoopGroupRecords] = useState<CoopGroupRecord[]>(INITIAL_COOP_GROUPS);
   const [meetings, setMeetings] = useState<CoopMeeting[]>(INITIAL_COOP_MEETINGS);
   const [equipmentBookings, setEquipmentBookings] = useState<EquipmentBooking[]>(INITIAL_EQUIPMENT_BOOKINGS);
+  // Farmers asking to join a cooperative (sign-up or Settings); the cooperative leader accepts them
+  const [coopJoinRequests, setCoopJoinRequests] = useState<CoopJoinRequest[]>(INITIAL_COOP_JOIN_REQUESTS);
 
   // Every shared store field, kept the same in all open tabs (officer in one tab, farmer in another)
   const storeSnapshot = useMemo(
@@ -457,8 +491,9 @@ export default function App() {
       sectorRegister,
       planAheadItems,
       cropPlantings,
+      coopJoinRequests,
     }),
-    [warningRecords, reports, thresholdRules, userSettings, messages, accounts, accessRequests, generatedReports, savedItemIds, readNotificationIds, coopMembers, coopGroupRecords, meetings, equipmentBookings, rolePermissions, auditEvents, loginAttempts, securitySettings, dataSources, processingRuns, processingSettings, messageTemplates, voiceSettings, rainForecasts, stationReadings, cropAdvisories, warningDeliveries, riskTypes, sectorRegister, planAheadItems, cropPlantings]
+    [warningRecords, reports, thresholdRules, userSettings, messages, accounts, accessRequests, generatedReports, savedItemIds, readNotificationIds, coopMembers, coopGroupRecords, meetings, equipmentBookings, rolePermissions, auditEvents, loginAttempts, securitySettings, dataSources, processingRuns, processingSettings, messageTemplates, voiceSettings, rainForecasts, stationReadings, cropAdvisories, warningDeliveries, riskTypes, sectorRegister, planAheadItems, cropPlantings, coopJoinRequests]
   );
   useTabSync(storeSnapshot, (state) => {
     if ('warnings' in state) setWarnings(state.warnings as typeof warningRecords);
@@ -492,6 +527,7 @@ export default function App() {
     if ('sectorRegister' in state) setSectorRegister(state.sectorRegister as typeof sectorRegister);
     if ('planAheadItems' in state) setPlanAheadItems(state.planAheadItems as typeof planAheadItems);
     if ('cropPlantings' in state) setCropPlantings(state.cropPlantings as typeof cropPlantings);
+    if ('coopJoinRequests' in state) setCoopJoinRequests(state.coopJoinRequests as typeof coopJoinRequests);
   });
 
   // Groups with members, warnings, acknowledgement and member reports — computed once, used everywhere
@@ -581,6 +617,26 @@ export default function App() {
     () => planItemsForCrops(planAheadItems, userSettings.cropsGrown),
     [planAheadItems, userSettings.cropsGrown]
   );
+  // Cooperative leader: the officer's active advice and near plan-ahead items for the cooperative's sectors and crops
+  const coopSectors = useMemo(() => [...new Set(coopGroupRecords.map((g) => g.sector))], [coopGroupRecords]);
+  const coopCrops = useMemo(() => [...new Set(coopMembers.flatMap((m) => m.crops))], [coopMembers]);
+  const coopAdviceToPassOn = useMemo(() => {
+    const seen = new Set<string>();
+    return coopSectors
+      .flatMap((sector) => visibleAdvisories(cropAdvisories, warnings, sector, coopCrops))
+      .filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true)));
+  }, [coopSectors, coopCrops, cropAdvisories, warnings]);
+  const coopPlanToPassOn = useMemo(
+    () =>
+      planItemsForCrops(planAheadItems, coopCrops).filter((p) => {
+        // Only dated items in the coming week; seasons and past deadlines stay on the officer's list
+        if (p.due.kind === 'season') return false;
+        const days = (parseDMY(p.due.date, p.due.time || '23:59').getTime() - NOW_DATE.getTime()) / 86400000;
+        return days >= 0 && days <= PASS_ON_WINDOW_DAYS;
+      }),
+    [planAheadItems, coopCrops]
+  );
+
   // Crop phases: each crop the farmer grows, their planting date and the crop growth model's stage
   const farmerCropPhases = useMemo(
     () =>
@@ -1125,6 +1181,18 @@ export default function App() {
   };
 
   const handleSaveSettings = (newSettings: UserProfileSettings) => {
+    // Choosing a different cooperative asks that cooperative to accept the farmer
+    if (role === 'farmer' && newSettings.cooperative !== userSettings.cooperative) {
+      requestToJoinCooperative({
+        accountId: currentAccountId,
+        fullName: newSettings.fullName,
+        phone: newSettings.phone,
+        sector: newSettings.sector,
+        cell: newSettings.cell,
+        crops: newSettings.cropsGrown,
+        cooperative: newSettings.cooperative,
+      });
+    }
     setUserSettings(newSettings);
     setHasUnsavedSettings(false);
   };
@@ -1237,6 +1305,50 @@ export default function App() {
     };
     setCoopMembers((prev) => [...prev, member]);
     showToast(`${farmer.fullName} added to ${groupNameOf(groupId)}`);
+  };
+
+  // Join requests and "told in person" (cooperative leader)
+  const handleAcceptJoinRequest = (requestId: string, groupId: string) => {
+    const req = coopJoinRequests.find((r) => r.id === requestId);
+    if (!req) return;
+    const member: CoopMember = {
+      id: `mem-demo-${Date.now()}`,
+      fullName: req.fullName,
+      groupId,
+      sector: req.sector,
+      cell: req.cell,
+      phone: req.phone,
+      role: 'Member',
+      crops: req.crops,
+      acknowledged: {},
+      lastActive: NOW.dateFormatted,
+      activeFromWeek: 4,
+      isDemo: true,
+    };
+    setCoopMembers((prev) => [...prev, member]);
+    setCoopJoinRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: 'accepted', groupId } : r)));
+    logAudit('Accepted join request', `${req.fullName} · ${groupNameOf(groupId)}`);
+    showToast(`${req.fullName} joined ${groupNameOf(groupId)}`);
+  };
+
+  const handleDeclineJoinRequest = (requestId: string) => {
+    const req = coopJoinRequests.find((r) => r.id === requestId);
+    setCoopJoinRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: 'declined' } : r)));
+    if (req) logAudit('Declined join request', req.fullName);
+    showToast('Request declined');
+  };
+
+  const handleMarkToldInPerson = (memberIds: string[], warningId: string) => {
+    setCoopMembers((prev) =>
+      prev.map((m) =>
+        memberIds.includes(m.id) && !m.toldInPerson?.includes(warningId)
+          ? { ...m, toldInPerson: [...(m.toldInPerson || []), warningId] }
+          : m
+      )
+    );
+    const title = warnings.find((w) => w.id === warningId)?.title || warningId;
+    logAudit('Marked told in person', `${memberIds.length} members · ${title}`);
+    showToast(`${memberIds.length} ${memberIds.length === 1 ? 'member' : 'members'} marked as told in person`);
   };
 
   const handleChangeCoopRole = (memberId: string, role: CoopMemberRole) => {
@@ -1534,6 +1646,7 @@ export default function App() {
     setCropAdvisories(INITIAL_CROP_ADVISORIES);
     setPlanAheadItems(INITIAL_PLAN_AHEAD_ITEMS);
     setCropPlantings(INITIAL_CROP_PLANTINGS);
+    setCoopJoinRequests(INITIAL_COOP_JOIN_REQUESTS);
     setUserSettings(INITIAL_USER_SETTINGS);
     setAccounts(INITIAL_USER_ACCOUNTS);
     setAccessRequests(INITIAL_ACCESS_REQUESTS);
@@ -1820,14 +1933,21 @@ export default function App() {
                   onSelectGroup={(group) => {
                     setDrawerContent({ type: 'coop_group', data: group });
                   }}
-                  onSelectMessage={(msg) => {
-                    setDrawerContent({ type: 'coop_message', data: msg });
-                  }}
                   onShowToast={(msg) => {
                     setToastMessage(msg);
                     setTimeout(() => setToastMessage(null), 3000);
                   }}
+                  onNavigateView={setCurrentView}
                   messages={messages}
+                  groupRecords={coopGroupRecords}
+                  members={coopMembers}
+                  joinRequests={coopJoinRequests}
+                  onAcceptJoin={handleAcceptJoinRequest}
+                  onDeclineJoin={handleDeclineJoinRequest}
+                  onMarkToldInPerson={handleMarkToldInPerson}
+                  adviceToPassOn={coopAdviceToPassOn}
+                  planToPassOn={coopPlanToPassOn}
+                  nextMeeting={sortMeetings(meetings).find((m) => parseDMY(m.date, m.time).getTime() > NOW_DATE.getTime())}
                 />
               ) : (
                 <div className="space-y-6">

@@ -32,4 +32,7 @@ Roles can be shown in one tab (floating switcher) or in several tabs side by sid
 10. As Farmer: Crop calendar → Crop phases shows Irish Potato "Early growth · day 23", harvest
     Thu 24/12 – Fri 08/01. Change date → 01/08/2026 → "Tuber filling · day 58", harvest moves to
     19/11 – 04/12; the dashboard's Seasonal calendar footer follows.
-11. [Reset demo] restores everything in every role.
+11. As Cooperative leader: Needs you today → Review → accept Vestine (Kinigi growers, suggested) and
+    Pacifique (choose Muhoza growers) → 188 members. Muhoza growers → Told in person → tick 2 →
+    Late Blight acknowledged 28 → 30 of 51, shown "Yes · told by leader" in Members.
+12. [Reset demo] restores everything in every role.

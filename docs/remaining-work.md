@@ -24,6 +24,7 @@ Review target date: ~28/10/2026. Each task: follow the `ihinga-new-page` skill, 
 - [x] Farmer observations computed (Module 9): my reports by signed-in name, reports this season, verified, used in forecasts (report validation), reports near you in the last 7 days by sector and type; external seed photos replaced by planned media files — 12/10/2026
 - [x] Community observation map (Module 9): "Reports near you" is one map of the 15 sectors shaded by 7-day report count, type chips re-count it, tap a sector for its counts by type (replaces the per-type bars) — 13/10/2026
 - [x] Farmer settings simplified (Profile · Farm · Messages · Password, PillSelect, any crop can be added); custom "Other" report type; officer opens reports to review on the review page — 13/10/2026
+- [x] Cooperative dashboard "Needs you today" (Module 11): join requests from sign-up and Settings accepted into a group, per-group not-acknowledged with Remind / Told in person, officer advice and plan-ahead to pass on; typed actions, coordination note and duplicate message list removed — 13/10/2026
 - [ ] Task 7 — Crop calendar gaps (Module 8)
 - [ ] Task 8 — Fix-in-code-later list (`docs/fix-in-code-later.md`)
 - [ ] Task 9 — Consistency pass across all roles + mobile (design self-check on every page)
