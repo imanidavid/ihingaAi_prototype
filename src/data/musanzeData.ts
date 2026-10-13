@@ -1941,7 +1941,12 @@ export const INITIAL_WARNING_DELIVERIES: WarningSectorDelivery[] = [
 export const FIELD_REPORT_WINDOW_DAYS = 7;
 
 /** The four report types farmers choose from, in display order. */
-export const REPORT_TYPES: ReportItem['type'][] = ['Rainfall', 'Flood / damage', 'Crop condition', 'Pest / disease'];
+export const REPORT_TYPES: ReportItem['type'][] = ['Rainfall', 'Flood / damage', 'Crop condition', 'Pest / disease', 'Other'];
+
+/** A report's type as people read it: the farmer's own words for 'Other' reports. */
+export function reportTypeLabel(r: Pick<ReportItem, 'type' | 'otherType'>): string {
+  return r.type === 'Other' && r.otherType ? r.otherType : r.type;
+}
 
 /** Start of the current season (first day of land preparation in the season calendar). */
 export const SEASON_START_DATE = MUSANZE_SEASON_CALENDAR.phases[0].start;

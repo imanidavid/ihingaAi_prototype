@@ -23,6 +23,7 @@ import {
   computeWarningHitRate,
   heroImg,
   stampSortKey,
+  reportTypeLabel,
 } from '../data/musanzeData';
 import { MUSANZE_SECTORS } from '../data/rwandaAdminData';
 import { CARD_CLASS, EmptyState, IconCircle, NeutralChip } from './coop/CoopUi';
@@ -162,7 +163,7 @@ export const ResearcherDashboardView: React.FC<ResearcherDashboardViewProps> = (
                       {anonymisedReportId(r.id)} · {r.sector}
                     </span>
                     <span className="block text-[#5B665E] tabular-nums">
-                      {r.type} · {r.date}
+                      {reportTypeLabel(r)} · {r.date}
                     </span>
                   </div>
                   <NeutralChip tone={r.isConsistent ? 'tint' : 'outline'}>

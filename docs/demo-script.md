@@ -5,7 +5,8 @@ Roles can be shown in one tab (floating switcher) or in several tabs side by sid
 1. Sign in as Officer (code 246810). Observations → verify Jean-Baptiste's "Steady overnight rain"
    with a message. Switch to Farmer: report shows Verified + message; "Verified by an officer" 2 → 3.
 2. As Farmer: Observations → [Retry now] on the "Not sent" report. As Officer: it appears in To review.
-   As Farmer: New observation → submit → it shows "Under review"; as Officer it is first in To review.
+   As Farmer: New observation → type Other, "Hail" → submit → it shows "Under review"; as Officer the
+   bell's "Report to review" opens it in Observations → To review, type Hail.
 3. As Officer: issue Excess rain · High · Muhoza. Muhoza and the district become High;
    Jean-Baptiste (Kinigi) stays Watch and does not receive it.
 4. As Cooperative leader: message Kinigi growers → Jean-Baptiste's bell shows it (Kinyarwanda first).

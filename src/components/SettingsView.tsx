@@ -1,23 +1,10 @@
 import React, { useState } from 'react';
-import {
-  Check,
-  Shield,
-  Smartphone,
-  Globe,
-  Lock,
-  RotateCcw,
-  AlertTriangle,
-  ChevronDown,
-  Info,
-  KeyRound,
-} from 'lucide-react';
+import { Check, KeyRound, Plus, Smartphone, X } from 'lucide-react';
 import { UserProfileSettings, AppRole } from '../types';
-import {
-  ALL_30_RWANDA_DISTRICTS,
-  MUSANZE_RECORD,
-  MUSANZE_SECTORS_CELLS,
-} from '../data/musanzeData';
-import { COOPERATIVE_OPTIONS } from '../data/rwandaAdminData';
+import { MUSANZE_RECORD, MUSANZE_SECTORS_CELLS, ROLE_LABELS } from '../data/musanzeData';
+import { COOPERATIVE_OPTIONS, CROP_OPTIONS, maskPhone } from '../data/rwandaAdminData';
+import { PillSelect } from './PillSelect';
+import { TEXT_INPUT, Toggle } from './coop/CoopUi';
 
 interface SettingsViewProps {
   settings: UserProfileSettings;
@@ -26,24 +13,65 @@ interface SettingsViewProps {
   role?: AppRole;
 }
 
-type SettingsTab = 'profile' | 'farm' | 'notifications' | 'security';
+type SettingsTab = 'profile' | 'farm' | 'messages' | 'password';
 
+const CARD = 'bg-[#FBFCF8] rounded-[16px] p-6 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)]';
+const LABEL = 'block text-[13px] text-[#5B665E] mb-1.5';
+
+/** Two or three choices as one pill row (language, channel). */
+const Segmented = <T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { id: T; label: string; disabled?: boolean }[];
+  onChange: (v: T) => void;
+}) => (
+  <div className="inline-flex flex-wrap bg-[#F4F6EF] p-1 rounded-full border border-[rgba(31,74,52,0.08)]">
+    {options.map((o) => (
+      <button
+        key={o.id}
+        type="button"
+        disabled={o.disabled}
+        aria-pressed={value === o.id}
+        onClick={() => onChange(o.id)}
+        className={`px-4 py-2 text-[12px] font-medium rounded-full transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+          value === o.id ? 'bg-[#1F4A34] text-white shadow-xs' : 'text-[#5B665E] hover:text-[#17271D]'
+        }`}
+      >
+        {o.label}
+      </button>
+    ))}
+  </div>
+);
+
+/**
+ * Settings, kept short on purpose: Profile (who you are, your language), Farm (where, how big,
+ * which crops — any crop can be added), Messages (how we reach you, what we send), Password.
+ */
 export const SettingsView: React.FC<SettingsViewProps> = ({
   settings: initialSettings,
   onSaveSettings,
   onUnsavedStateChange,
   role = 'farmer',
 }) => {
+  const isFarmer = role === 'farmer';
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [formData, setFormData] = useState<UserProfileSettings>(initialSettings);
   const [hasChanges, setHasChanges] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [newCrop, setNewCrop] = useState('');
 
-  // Password fields state (for security tab)
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
 
   const markChanged = (updated: UserProfileSettings) => {
     setFormData(updated);
@@ -64,77 +92,56 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     onSaveSettings(formData);
     setHasChanges(false);
     onUnsavedStateChange(false);
-    setToastMessage('Settings saved');
-    setTimeout(() => setToastMessage(null), 3000);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    showToast('Settings saved');
   };
 
-  // District change: Sector and Cell reset to "Select sector" / "Select cell"
-  const handleDistrictChange = (newDistrict: string) => {
-    const updated: UserProfileSettings = {
-      ...formData,
-      district: newDistrict,
-      sector: '',
-      cell: '',
-    };
-    markChanged(updated);
+  const setPasswordField = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setter(e.target.value);
+    setHasChanges(true);
+    onUnsavedStateChange(true);
   };
 
-  // Sector change: Cell resets
-  const handleSectorChange = (newSector: string) => {
-    const availableCells = MUSANZE_SECTORS_CELLS[newSector] || [];
-    const updated: UserProfileSettings = {
-      ...formData,
-      sector: newSector,
-      cell: availableCells.length > 0 ? availableCells[0] : '',
-    };
-    markChanged(updated);
+  const handleSectorChange = (sector: string) => {
+    const cells = MUSANZE_SECTORS_CELLS[sector] || [];
+    markChanged({ ...formData, sector, cell: cells[0] || '' });
   };
 
-  // Crop toggle
+  // Crops: the common Musanze crops plus anything the farmer adds
+  const cropChoices = [...CROP_OPTIONS, ...formData.cropsGrown.filter((c) => !CROP_OPTIONS.includes(c))];
   const toggleCrop = (crop: string) => {
-    const exists = formData.cropsGrown.includes(crop);
-    const updatedCrops = exists
-      ? formData.cropsGrown.filter((c) => c !== crop)
-      : [...formData.cropsGrown, crop];
-    markChanged({ ...formData, cropsGrown: updatedCrops });
+    const has = formData.cropsGrown.includes(crop);
+    markChanged({ ...formData, cropsGrown: has ? formData.cropsGrown.filter((c) => c !== crop) : [...formData.cropsGrown, crop] });
+  };
+  const addCrop = () => {
+    const name = newCrop.trim().replace(/\s+/g, ' ');
+    if (!name) return;
+    const existing = cropChoices.find((c) => c.toLowerCase() === name.toLowerCase());
+    const crop = existing || name.charAt(0).toUpperCase() + name.slice(1);
+    if (!formData.cropsGrown.includes(crop)) markChanged({ ...formData, cropsGrown: [...formData.cropsGrown, crop] });
+    setNewCrop('');
   };
 
-  // SMS stop flow
-  const handleConfirmStopSms = () => {
-    const updated: UserProfileSettings = {
-      ...formData,
-      isSmsStopped: true,
-      alertChannel: 'In-app only',
-    };
-    setShowSmsModal(false);
-    markChanged(updated);
-  };
-
-  const handleTurnBackOnSms = () => {
-    const updated: UserProfileSettings = {
-      ...formData,
-      isSmsStopped: false,
-      alertChannel: 'SMS',
-    };
-    markChanged(updated);
-  };
-
-  const availableCells = formData.sector
-    ? MUSANZE_SECTORS_CELLS[formData.sector] || ['Cell 1', 'Cell 2', 'Cell 3']
-    : [];
-
-  const allCropsOptions = [
-    'Irish Potato',
-    'Climbing Beans',
-    'Maize',
-    'Wheat',
-    'Sorghum',
-    'Vegetables',
+  // Same initials as the top bar ("Jean-Baptiste Ndayisaba" → JB)
+  const initials = formData.fullName
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join('');
+  const cells = formData.sector ? MUSANZE_SECTORS_CELLS[formData.sector] || [] : [];
+  const passwordsMismatch = confirmPassword !== '' && confirmPassword !== newPassword;
+  const tabs: { id: SettingsTab; label: string }[] = [
+    { id: 'profile', label: 'Profile' },
+    ...(isFarmer ? [{ id: 'farm' as const, label: 'Farm' }] : []),
+    { id: 'messages', label: 'Messages' },
+    { id: 'password', label: 'Password' },
   ];
 
   return (
     <div className="space-y-6 pb-24">
-      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-20 right-6 z-50 bg-[#1F4A34] text-white text-[13px] font-medium px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 animate-in fade-in">
           <Check className="w-4 h-4 text-[#E4ECDB]" strokeWidth={2} />
@@ -142,63 +149,40 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* Page Title & Subtitle */}
       <div>
         <h1 className="text-[24px] font-semibold text-[#17271D]">Settings</h1>
         <p className="text-[13px] text-[#5B665E] mt-1">
-          Manage your account, farm attributes, and notification preferences.
+          {isFarmer ? 'Your details, your farm and how we reach you.' : 'Your details and how we reach you.'}
         </p>
       </div>
 
-      {/* Profile Summary Card (Always visible above the tabs, full width) */}
-      <div className="bg-[#FBFCF8] rounded-[16px] p-5 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="w-14 h-14 rounded-full bg-[#1F4A34] text-white flex items-center justify-center text-[18px] font-semibold flex-shrink-0 shadow-xs">
-            JB
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-[18px] font-semibold text-[#17271D] leading-tight">
-                {formData.fullName}
-              </h2>
-              <span className="px-2.5 py-0.5 rounded-full bg-[#E4ECDB] text-[#1F4A34] text-[11px] font-semibold border border-[rgba(31,74,52,0.10)]">
-                Farmer
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 mt-1 text-[12px] text-[#5B665E]">
-              <span>+250 78• ••• •12</span>
-              <span className="px-2 py-0.2 rounded-full bg-[#E4ECDB] text-[#1F4A34] text-[10.5px] font-medium">
-                Verified
-              </span>
-              <span>·</span>
-              <span>{formData.cooperative}</span>
-            </div>
-          </div>
+      {/* Who is signed in */}
+      <div className={`${CARD} !p-5 flex items-center gap-4`}>
+        <div className="w-14 h-14 rounded-full bg-[#1F4A34] text-white flex items-center justify-center text-[18px] font-semibold flex-shrink-0">
+          {initials}
         </div>
-
-        <div className="text-[12px] text-[#5B665E] bg-[#F4F6EF] px-3.5 py-2 rounded-xl border border-[rgba(31,74,52,0.06)]">
-          <span>District zone: </span>
-          <span className="font-semibold text-[#17271D]">{formData.district}</span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-[18px] font-semibold text-[#17271D] leading-tight">{formData.fullName}</h2>
+            <span className="px-2.5 py-0.5 rounded-full bg-[#E4ECDB] text-[#1F4A34] text-[11px] font-semibold border border-[rgba(31,74,52,0.10)]">
+              {ROLE_LABELS[role]}
+            </span>
+          </div>
+          <p className="mt-1 text-[12px] text-[#5B665E]">
+            {maskPhone(formData.phone)}
+            {isFarmer && ` · ${formData.cooperative}`}
+          </p>
         </div>
       </div>
 
-      {/* Segmented Control: [Profile] [Farm] [Notifications] [Security] */}
       <div className="inline-flex bg-[#F4F6EF] p-1 rounded-full border border-[rgba(31,74,52,0.08)]">
-        {(
-          [
-            { id: 'profile', label: 'Profile' },
-            { id: 'farm', label: 'Farm' },
-            { id: 'notifications', label: 'Notifications' },
-            { id: 'security', label: 'Security' },
-          ] as { id: SettingsTab; label: string }[]
-        ).map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
+            type="button"
             onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-1.5 text-[12px] font-medium rounded-full transition-all cursor-pointer ${
-              activeTab === tab.id
-                ? 'bg-[#3E8E55] text-white shadow-xs'
-                : 'text-[#5B665E] hover:text-[#17271D]'
+              activeTab === tab.id ? 'bg-[#3E8E55] text-white shadow-xs' : 'text-[#5B665E] hover:text-[#17271D]'
             }`}
           >
             {tab.label}
@@ -206,642 +190,287 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         ))}
       </div>
 
-      {/* ========================================================================= */}
-      {/* TAB 1: PROFILE */}
-      {/* ========================================================================= */}
+      {/* PROFILE */}
       {activeTab === 'profile' && (
-        <div className="bg-[#FBFCF8] rounded-[16px] p-6 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)]">
-          <h3 className="text-[16px] font-semibold text-[#17271D] mb-4 pb-2 border-b border-[rgba(31,74,52,0.06)]">
-            Personal Information
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Full Name */}
-            <div>
-              <label className="block text-[13px] text-[#5B665E] mb-1.5">
-                Full name
-              </label>
-              <input
-                type="text"
-                value={formData.fullName}
-                onChange={(e) => markChanged({ ...formData, fullName: e.target.value })}
-                className="w-full h-11 px-4 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34]"
-              />
-            </div>
-
-            {/* Phone */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[13px] text-[#5B665E]">
-                  Phone number
-                </label>
-                <button
-                  type="button"
-                  onClick={() => alert('To update your phone number, an SMS verification code will be sent.')}
-                  className="text-[11px] text-[#1F4A34] hover:underline cursor-pointer"
-                >
-                  Change
-                </button>
-              </div>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={formData.phone}
-                  onChange={(e) => markChanged({ ...formData, phone: e.target.value })}
-                  className="w-full h-11 pl-4 pr-24 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-full bg-[#E4ECDB] text-[#1F4A34] text-[10.5px] font-medium">
-                  Verified
-                </span>
-              </div>
-            </div>
-
-            {/* Email (optional) */}
-            <div>
-              <label className="block text-[13px] text-[#5B665E] mb-1.5">
-                Email address (optional)
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => markChanged({ ...formData, email: e.target.value })}
-                placeholder="e.g. j.ndayisaba@coop.rw"
-                className="w-full h-11 px-4 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34]"
-              />
-            </div>
-
-            {/* Preferred Language */}
-            <div>
-              <label className="block text-[13px] text-[#5B665E] mb-1.5">
-                Preferred language
-              </label>
-              <div className="inline-flex bg-[#F4F6EF] p-1 rounded-full border border-[rgba(31,74,52,0.08)]">
-                {(['Kinyarwanda', 'English'] as const).map((lang) => (
-                  <button
-                    key={lang}
-                    type="button"
-                    onClick={() => markChanged({ ...formData, preferredLanguage: lang })}
-                    className={`px-4 py-2 text-[12px] font-medium rounded-full transition-all cursor-pointer ${
-                      formData.preferredLanguage === lang
-                        ? 'bg-[#1F4A34] text-white shadow-xs'
-                        : 'text-[#5B665E] hover:text-[#17271D]'
-                    }`}
-                  >
-                    {lang}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 2: FARM */}
-      {/* ========================================================================= */}
-      {activeTab === 'farm' && (
-        <div className="bg-[#FBFCF8] rounded-[16px] p-6 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)]">
-          <h3 className="text-[16px] font-semibold text-[#17271D] mb-4 pb-2 border-b border-[rgba(31,74,52,0.06)]">
-            Farm Characteristics & Location
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* District Dropdown (All 30 Rwanda Districts) */}
-            <div>
-              <label className="block text-[13px] text-[#5B665E] mb-1.5">
-                District
-              </label>
-              <div className="relative">
-                <select
-                  value={formData.district}
-                  onChange={(e) => handleDistrictChange(e.target.value)}
-                  className="w-full h-11 px-4 pr-10 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34] appearance-none"
-                >
-                  {ALL_30_RWANDA_DISTRICTS.map((dist) => (
-                    <option key={dist} value={dist}>
-                      {dist} District
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-[#5B665E] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-              <p className="text-[11px] text-[#5B665E] mt-1.5 flex items-center gap-1">
-                <Info className="w-3.5 h-3.5 text-[#5B665E]" />
-                <span>Your risk data will update to the new district.</span>
-              </p>
-            </div>
-
-            {/* Sector Dropdown (Lists all 15 Musanze sectors if Musanze selected) */}
-            <div>
-              <label className="block text-[13px] text-[#5B665E] mb-1.5">
-                Sector
-              </label>
-              <div className="relative">
-                <select
-                  value={formData.sector}
-                  onChange={(e) => handleSectorChange(e.target.value)}
-                  className="w-full h-11 px-4 pr-10 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34] appearance-none"
-                >
-                  <option value="">Select sector</option>
-                  {MUSANZE_RECORD.allSectors.map((sec) => (
-                    <option key={sec} value={sec}>
-                      {sec} Sector
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-[#5B665E] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-
-            {/* Cell Dropdown (depends on selected sector) */}
-            <div>
-              <label className="block text-[13px] text-[#5B665E] mb-1.5">
-                Cell
-              </label>
-              <div className="relative">
-                <select
-                  value={formData.cell}
-                  onChange={(e) => markChanged({ ...formData, cell: e.target.value })}
-                  disabled={!formData.sector}
-                  className="w-full h-11 px-4 pr-10 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34] appearance-none disabled:opacity-50"
-                >
-                  <option value="">Select cell</option>
-                  {availableCells.map((cell) => (
-                    <option key={cell} value={cell}>
-                      {cell} Cell
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-[#5B665E] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-
-            {/* Farm Size */}
-            <div>
-              <label className="block text-[13px] text-[#5B665E] mb-1.5">
-                Farm size
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0.1"
-                  value={formData.farmSizeHa}
-                  onChange={(e) =>
-                    markChanged({
-                      ...formData,
-                      farmSizeHa: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="w-full h-11 pl-4 pr-14 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34]"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[#5B665E]">
-                  ha
-                </span>
-              </div>
-            </div>
-
-            {/* Cooperative */}
-            <div className="md:col-span-2">
-              <label className="block text-[13px] text-[#5B665E] mb-1.5">
-                Agricultural cooperative
-              </label>
-              <div className="relative">
-                <select
-                  value={formData.cooperative}
-                  onChange={(e) => markChanged({ ...formData, cooperative: e.target.value })}
-                  className="w-full h-11 px-4 pr-10 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34] appearance-none"
-                >
-                  {COOPERATIVE_OPTIONS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-[#5B665E] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-
-            {/* Crops Grown: Selectable chips */}
-            <div className="md:col-span-2 pt-2">
-              <label className="block text-[13px] text-[#5B665E] mb-2">
-                Crops grown (select all that apply)
-              </label>
-              <div className="flex flex-wrap gap-2.5">
-                {allCropsOptions.map((crop) => {
-                  const isSelected = formData.cropsGrown.includes(crop);
-                  return (
-                    <button
-                      key={crop}
-                      type="button"
-                      onClick={() => toggleCrop(crop)}
-                      className={`px-4 py-2 rounded-full text-[12.5px] font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#E4ECDB] text-[#17271D] border border-[rgba(31,74,52,0.25)] font-semibold shadow-xs'
-                          : 'bg-white text-[#5B665E] border border-[rgba(31,74,52,0.12)] hover:text-[#17271D]'
-                      }`}
-                    >
-                      {isSelected && <Check className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={2} />}
-                      <span>{crop}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 3: NOTIFICATIONS */}
-      {/* ========================================================================= */}
-      {activeTab === 'notifications' && (
-        <div className="bg-[#FBFCF8] rounded-[16px] p-6 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] space-y-6">
-          <h3 className="text-[16px] font-semibold text-[#17271D] pb-2 border-b border-[rgba(31,74,52,0.06)]">
-            Notification Preferences
-          </h3>
-
-          {/* Watch-amber banner when SMS is stopped */}
-          {formData.isSmsStopped && (
-            <div className="p-4 rounded-xl bg-[#D9A032]/15 border border-[#D9A032]/35 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <AlertTriangle className="w-5 h-5 text-[#D9A032] flex-shrink-0" strokeWidth={1.5} />
-                <div>
-                  <span className="text-[13px] font-semibold text-[#17271D] block">
-                    SMS alerts are off
-                  </span>
-                  <span className="text-[12px] text-[#5B665E]">
-                    You will still receive warnings and advisories in the web desk.
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleTurnBackOnSms}
-                className="px-4 py-1.5 rounded-full bg-[#1F4A34] text-white text-[12px] font-medium hover:bg-[#2C6343] transition-colors shadow-xs cursor-pointer"
-              >
-                Turn back on
-              </button>
-            </div>
-          )}
-
-          {/* Primary Alert Channel Segmented Control */}
+        <div className={`${CARD} grid grid-cols-1 md:grid-cols-2 gap-5`}>
+          <label className="block">
+            <span className={LABEL}>Full name</span>
+            <input value={formData.fullName} onChange={(e) => markChanged({ ...formData, fullName: e.target.value })} className={TEXT_INPUT} />
+          </label>
           <div>
-            <label className="block text-[13px] text-[#5B665E] mb-2">
-              Primary delivery channel for early warnings
-            </label>
-            <div className="inline-flex bg-[#F4F6EF] p-1 rounded-full border border-[rgba(31,74,52,0.08)]">
-              {(
-                [
-                  { id: 'SMS', label: 'SMS', disabled: formData.isSmsStopped },
-                  { id: 'Voice call', label: 'Voice call', disabled: false },
-                  { id: 'In-app only', label: 'In-app only', disabled: false },
-                ] as const
-              ).map((ch) => (
-                <button
-                  key={ch.id}
-                  type="button"
-                  disabled={ch.disabled}
-                  onClick={() => markChanged({ ...formData, alertChannel: ch.id })}
-                  className={`px-4 py-2 text-[12px] font-medium rounded-full transition-all cursor-pointer ${
-                    ch.disabled
-                      ? 'opacity-40 cursor-not-allowed text-[#5B665E]'
-                      : formData.alertChannel === ch.id
-                      ? 'bg-[#1F4A34] text-white shadow-xs'
-                      : 'text-[#5B665E] hover:text-[#17271D]'
-                  }`}
-                >
-                  {ch.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Toggle Rows with one-line muted description */}
-          <div className="space-y-4 pt-2">
-            {[
-              {
-                key: 'notifyEarlyWarnings',
-                title: 'Early warnings (Watch and above)',
-                desc: 'Instant notifications when storm or flash flood danger occurs in Musanze.',
-                val: formData.notifyEarlyWarnings,
-              },
-              {
-                key: 'notifyCropAdvisories',
-                title: 'Crop advisories',
-                desc: 'Hyperlocal timing advice for fungicide spraying, staking, and furrow digging.',
-                val: formData.notifyCropAdvisories,
-              },
-              {
-                key: 'notifyCalendarReminders',
-                title: 'Crop calendar reminders',
-                desc: 'Key agronomic milestones for planting, weeding, and bulking periods.',
-                val: formData.notifyCalendarReminders,
-              },
-              {
-                key: 'notifyCoopMessages',
-                title: 'Cooperative messages',
-                desc: 'Official notices, collective purchase announcements, and collection dates.',
-                val: formData.notifyCoopMessages,
-              },
-            ].map((row) => (
-              <div
-                key={row.key}
-                className="flex items-center justify-between p-3.5 bg-[#F4F6EF]/50 rounded-xl border border-[rgba(31,74,52,0.06)]"
-              >
-                <div className="pr-4">
-                  <span className="text-[13px] font-medium text-[#17271D] block">
-                    {row.title}
-                  </span>
-                  <span className="text-[12px] text-[#5B665E]">
-                    {row.desc}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    markChanged({
-                      ...formData,
-                      [row.key]: !row.val,
-                    })
-                  }
-                  className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 cursor-pointer ${
-                    row.val ? 'bg-[#3E8E55]' : 'bg-[#5B665E]/30'
-                  }`}
-                >
-                  <span
-                    className={`inline-block w-4 h-4 rounded-full bg-white transition-transform transform ${
-                      row.val ? 'translate-x-6' : 'translate-x-1'
-                    } top-1`}
-                  />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* Message Language */}
-          <div className="pt-2 border-t border-[rgba(31,74,52,0.06)]">
-            <label className="block text-[13px] text-[#5B665E] mb-2">
-              Message language
-            </label>
-            <div className="inline-flex bg-[#F4F6EF] p-1 rounded-full border border-[rgba(31,74,52,0.08)]">
-              {(['Kinyarwanda', 'English'] as const).map((lang) => (
-                <button
-                  key={lang}
-                  type="button"
-                  onClick={() => markChanged({ ...formData, messageLanguage: lang })}
-                  className={`px-4 py-1.5 text-[12px] font-medium rounded-full transition-all cursor-pointer ${
-                    formData.messageLanguage === lang
-                      ? 'bg-[#1F4A34] text-white shadow-xs'
-                      : 'text-[#5B665E] hover:text-[#17271D]'
-                  }`}
-                >
-                  {lang}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Critical Red Link: Stop all SMS messages */}
-          {!formData.isSmsStopped && (
-            <div className="pt-3 border-t border-[rgba(31,74,52,0.06)]">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[13px] text-[#5B665E]">Phone number</span>
               <button
                 type="button"
-                onClick={() => setShowSmsModal(true)}
-                className="text-[13px] font-medium text-[#C93B3B] hover:underline cursor-pointer"
+                onClick={() => showToast('We will send a code to your new number')}
+                className="text-[12px] text-[#1F4A34] hover:underline cursor-pointer"
               >
-                Stop all SMS messages
+                Change
               </button>
             </div>
-          )}
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 4: SECURITY */}
-      {/* ========================================================================= */}
-      {activeTab === 'security' && (
-        <div className="bg-[#FBFCF8] rounded-[16px] p-6 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] space-y-6">
-          <h3 className="text-[16px] font-semibold text-[#17271D] pb-2 border-b border-[rgba(31,74,52,0.06)]">
-            Security & Authentication
-          </h3>
-
-          {/* Change Password */}
-          <div className="space-y-4 max-w-lg">
-            <h4 className="text-[14px] font-semibold text-[#17271D]">Change password</h4>
-            <div>
-              <label className="block text-[13px] text-[#5B665E] mb-1">
-                Current password
-              </label>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => {
-                  setCurrentPassword(e.target.value);
-                  setHasChanges(true);
-                  onUnsavedStateChange(true);
-                }}
-                className="w-full h-11 px-4 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[13px] text-[#5B665E] mb-1">
-                New password
-              </label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => {
-                  setNewPassword(e.target.value);
-                  setHasChanges(true);
-                  onUnsavedStateChange(true);
-                }}
-                className="w-full h-11 px-4 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34]"
-              />
-              {/* Strength indicator */}
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-[#F4F6EF] rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all ${
-                      newPassword.length > 8
-                        ? 'w-full bg-[#3E8E55]'
-                        : newPassword.length > 4
-                        ? 'w-2/3 bg-[#D9A032]'
-                        : newPassword.length > 0
-                        ? 'w-1/3 bg-[#C93B3B]'
-                        : 'w-0'
-                    }`}
-                  />
-                </div>
-                <span className="text-[11px] text-[#5B665E]">
-                  {newPassword.length > 8
-                    ? 'Strong'
-                    : newPassword.length > 4
-                    ? 'Medium'
-                    : 'Minimum 8 characters'}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[13px] text-[#5B665E] mb-1">
-                Confirm new password
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => {
-                  setConfirmPassword(e.target.value);
-                  setHasChanges(true);
-                  onUnsavedStateChange(true);
-                }}
-                className="w-full h-11 px-4 rounded-full bg-white text-[#17271D] text-[13px] border border-[rgba(31,74,52,0.16)] focus:outline-none focus:border-[#1F4A34]"
-              />
-            </div>
-          </div>
-
-          {/* Phone verification status row */}
-          <div className="pt-4 border-t border-[rgba(31,74,52,0.06)]">
-            <h4 className="text-[14px] font-semibold text-[#17271D] mb-2">
-              Phone verification status
-            </h4>
-            <div className="flex items-center justify-between p-3.5 bg-[#F4F6EF]/60 rounded-xl border border-[rgba(31,74,52,0.06)]">
-              <div className="flex items-center gap-3">
-                <Shield className="w-5 h-5 text-[#3E8E55]" strokeWidth={1.5} />
-                <div>
-                  <span className="text-[13px] font-semibold text-[#17271D] block">
-                    Phone number verified (+250 78• ••• •12)
-                  </span>
-                  <span className="text-[12px] text-[#5B665E]">
-                    Secures two-way agronomic reporting and verified advisory delivery.
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => alert('Verification SMS dispatched.')}
-                className="text-[12px] text-[#1F4A34] font-medium hover:underline cursor-pointer"
-              >
-                Re-verify
-              </button>
-            </div>
-          </div>
-
-          {/* Two-step verification row */}
-          <div className="pt-4 border-t border-[rgba(31,74,52,0.06)]">
-            <div className="flex items-center justify-between p-3.5 bg-[#F4F6EF]/60 rounded-xl border border-[rgba(31,74,52,0.06)]">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#E4ECDB] flex items-center justify-center text-[#1F4A34]">
-                  <KeyRound className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-semibold text-[#17271D]">
-                      Two-step verification: On
-                    </span>
-                    {role === 'officer' && (
-                      <span className="px-2 py-0.5 rounded-full bg-[#E4ECDB] text-[#1F4A34] text-[10.5px] font-semibold border border-[rgba(31,74,52,0.12)]">
-                        Required for officers
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[12px] text-[#5B665E]">
-                    {role === 'officer'
-                      ? 'Officers require two-step verification for administrative district access.'
-                      : 'Requires authentication code sent via SMS on login.'}
-                  </span>
-                </div>
-              </div>
-              <span className="text-[12px] font-semibold text-[#3E8E55] px-3 py-1 rounded-full bg-[#3E8E55]/15 border border-[#3E8E55]/20">
-                On
+            <div className="relative">
+              <input value={formData.phone} readOnly className={`${TEXT_INPUT} pr-24`} />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-full bg-[#E4ECDB] text-[#1F4A34] text-[11px] font-medium">
+                Verified
               </span>
             </div>
           </div>
+          <label className="block">
+            <span className={LABEL}>Email (optional)</span>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => markChanged({ ...formData, email: e.target.value })}
+              className={TEXT_INPUT}
+            />
+          </label>
+          <div>
+            <span className={LABEL}>Language</span>
+            {/* One language for the app and for SMS / voice messages */}
+            <Segmented
+              value={formData.preferredLanguage}
+              options={[
+                { id: 'Kinyarwanda', label: 'Kinyarwanda' },
+                { id: 'English', label: 'English' },
+              ]}
+              onChange={(lang) => markChanged({ ...formData, preferredLanguage: lang, messageLanguage: lang })}
+            />
+            <p className="text-[12px] text-[#5B665E] mt-1.5">Used in the app and in your messages.</p>
+          </div>
+        </div>
+      )}
 
-          {/* Active Sessions List (2 rows) + Sign out other devices button */}
-          <div className="pt-4 border-t border-[rgba(31,74,52,0.06)]">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h4 className="text-[14px] font-semibold text-[#17271D]">
-                  Active sessions
-                </h4>
-                <p className="text-[12px] text-[#5B665E]">
-                  Devices currently signed in to your farmer account.
-                </p>
-              </div>
+      {/* FARM (farmers only) */}
+      {activeTab === 'farm' && isFarmer && (
+        <div className={`${CARD} space-y-5`}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <PillSelect
+              label={`Sector (${formData.district || MUSANZE_RECORD.districtName})`}
+              value={formData.sector}
+              onChange={handleSectorChange}
+              placeholder="Choose sector"
+              options={MUSANZE_RECORD.allSectors.map((s) => ({ value: s, label: s }))}
+            />
+            <PillSelect
+              label="Cell"
+              value={formData.cell}
+              onChange={(cell) => markChanged({ ...formData, cell })}
+              placeholder="Choose cell"
+              disabled={!formData.sector}
+              options={cells.map((c) => ({ value: c, label: c }))}
+            />
+            <label className="block">
+              <span className={LABEL}>Farm size (hectares)</span>
+              <input
+                inputMode="decimal"
+                value={String(formData.farmSizeHa)}
+                onChange={(e) => markChanged({ ...formData, farmSizeHa: parseFloat(e.target.value.replace(',', '.')) || 0 })}
+                className={TEXT_INPUT}
+              />
+            </label>
+          </div>
+
+          <PillSelect
+            label="Cooperative"
+            value={formData.cooperative}
+            onChange={(cooperative) => markChanged({ ...formData, cooperative })}
+            options={COOPERATIVE_OPTIONS.map((c) => ({ value: c, label: c }))}
+          />
+
+          <div>
+            <span className={LABEL}>Crops you grow</span>
+            <div className="flex flex-wrap gap-2">
+              {cropChoices.map((crop) => {
+                const on = formData.cropsGrown.includes(crop);
+                return (
+                  <button
+                    key={crop}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggleCrop(crop)}
+                    className={`px-3.5 h-9 rounded-full text-[12.5px] border flex items-center gap-1.5 cursor-pointer transition-colors ${
+                      on
+                        ? 'bg-[#E4ECDB] text-[#17271D] border-[rgba(31,74,52,0.25)] font-semibold'
+                        : 'bg-white text-[#5B665E] border-[rgba(31,74,52,0.12)] hover:text-[#17271D]'
+                    }`}
+                  >
+                    {on && <Check className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={2} />}
+                    {crop}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Any other crop */}
+            <div className="mt-3 flex items-center gap-2 max-w-sm">
+              <input
+                value={newCrop}
+                onChange={(e) => setNewCrop(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addCrop();
+                  }
+                }}
+                placeholder="Another crop, e.g. Sorghum"
+                aria-label="Add another crop"
+                className={TEXT_INPUT}
+              />
               <button
                 type="button"
-                onClick={() => {
-                  setToastMessage('Signed out of 1 other device');
-                  setTimeout(() => setToastMessage(null), 2500);
-                }}
-                className="px-4 py-2 rounded-full bg-white text-[#1F4A34] border border-[rgba(31,74,52,0.20)] text-[12px] font-medium hover:bg-[#E4ECDB] transition-all cursor-pointer"
+                onClick={addCrop}
+                disabled={!newCrop.trim()}
+                className="h-11 px-4 rounded-full bg-white text-[#1F4A34] border border-[rgba(31,74,52,0.20)] text-[12.5px] font-medium hover:bg-[#E4ECDB] flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Sign out other devices
+                <Plus className="w-4 h-4" strokeWidth={2} />
+                Add
               </button>
-            </div>
-
-            <div className="space-y-2">
-              {/* Row 1 */}
-              <div className="p-3 bg-[#F4F6EF]/50 rounded-xl flex items-center justify-between border border-[rgba(31,74,52,0.06)]">
-                <div className="flex items-center gap-3">
-                  <Smartphone className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
-                  <div>
-                    <span className="text-[13px] font-medium text-[#17271D] block">
-                      Mobile App (Android) · Musanze
-                    </span>
-                    <span className="text-[11px] text-[#3E8E55] font-medium">
-                      Active now (this device)
-                    </span>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded-full bg-[#E4ECDB] text-[#1F4A34] text-[10px] font-medium">
-                  Current
-                </span>
-              </div>
-
-              {/* Row 2 */}
-              <div className="p-3 bg-[#F4F6EF]/50 rounded-xl flex items-center justify-between border border-[rgba(31,74,52,0.06)]">
-                <div className="flex items-center gap-3">
-                  <Globe className="w-4 h-4 text-[#5B665E]" strokeWidth={1.5} />
-                  <div>
-                    <span className="text-[13px] font-medium text-[#17271D] block">
-                      Web Desk (Chrome) · Kigali
-                    </span>
-                    <span className="text-[11px] text-[#5B665E]">
-                      Last active: 2 days ago
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[11px] text-[#5B665E]">Chrome 128</span>
-              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* STICKY BOTTOM BAR FOR UNSAVED CHANGES */}
-      {/* ========================================================================= */}
-      {hasChanges && (
-        <div className="fixed bottom-0 inset-x-0 bg-[#FBFCF8] border-t border-[rgba(31,74,52,0.15)] shadow-2xl p-4 z-30 animate-in slide-in-from-bottom-2">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <span className="text-[13px] font-medium text-[#17271D]">
-              You have unsaved changes
+      {/* MESSAGES */}
+      {activeTab === 'messages' && (
+        <div className={`${CARD} space-y-6`}>
+          {formData.isSmsStopped && (
+            <div className="p-4 rounded-xl bg-[#E4ECDB]/60 border border-[rgba(31,74,52,0.12)] flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className="text-[13px] font-semibold text-[#17271D] block">SMS is off</span>
+                <span className="text-[12px] text-[#5B665E]">You still see warnings and advice in the app.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => markChanged({ ...formData, isSmsStopped: false, alertChannel: 'SMS' })}
+                className="px-4 py-1.5 rounded-full bg-[#1F4A34] text-white text-[12px] font-medium hover:bg-[#2C6343] cursor-pointer"
+              >
+                Turn SMS back on
+              </button>
+            </div>
+          )}
+
+          <div>
+            <span className={LABEL}>How should we reach you?</span>
+            <Segmented
+              value={formData.alertChannel}
+              options={[
+                { id: 'SMS', label: 'SMS', disabled: formData.isSmsStopped },
+                { id: 'Voice call', label: 'Voice call' },
+                { id: 'In-app only', label: 'App only' },
+              ]}
+              onChange={(alertChannel) => markChanged({ ...formData, alertChannel })}
+            />
+          </div>
+
+          <div>
+            <span className={LABEL}>What should we send?</span>
+            <div className="divide-y divide-[rgba(31,74,52,0.06)] rounded-xl border border-[rgba(31,74,52,0.08)] bg-white">
+              {(
+                [
+                  { key: 'notifyEarlyWarnings', label: 'Weather warnings' },
+                  ...(isFarmer
+                    ? ([
+                        { key: 'notifyCropAdvisories', label: 'Crop advice' },
+                        { key: 'notifyCalendarReminders', label: 'Planting and harvest reminders' },
+                        { key: 'notifyCoopMessages', label: 'Cooperative messages' },
+                      ] as const)
+                    : []),
+                ] as const
+              ).map((row) => (
+                <div key={row.key} className="flex items-center justify-between px-4 py-3">
+                  <span className="text-[13px] text-[#17271D]">{row.label}</span>
+                  <Toggle
+                    label={row.label}
+                    checked={formData[row.key]}
+                    onChange={(v) => markChanged({ ...formData, [row.key]: v })}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {!formData.isSmsStopped && (
+            <button
+              type="button"
+              onClick={() => setShowSmsModal(true)}
+              className="text-[13px] font-medium text-[#5B665E] hover:text-[#17271D] hover:underline cursor-pointer"
+            >
+              Stop all SMS
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* PASSWORD */}
+      {activeTab === 'password' && (
+        <div className={`${CARD} space-y-6`}>
+          <div className="space-y-4 max-w-md">
+            <label className="block">
+              <span className={LABEL}>Current password</span>
+              <input type="password" value={currentPassword} onChange={setPasswordField(setCurrentPassword)} className={TEXT_INPUT} />
+            </label>
+            <label className="block">
+              <span className={LABEL}>New password</span>
+              <input type="password" value={newPassword} onChange={setPasswordField(setNewPassword)} className={TEXT_INPUT} />
+              {/* Strength: greens only (not a risk level) */}
+              <span className="mt-2 flex items-center gap-2">
+                <span className="flex-1 h-1.5 bg-[#F4F6EF] rounded-full overflow-hidden">
+                  <span
+                    className="block h-full bg-[#3E8E55] rounded-full transition-all"
+                    style={{ width: `${Math.min(100, (newPassword.length / 12) * 100)}%` }}
+                  />
+                </span>
+                <span className="text-[11.5px] text-[#5B665E]">
+                  {newPassword.length >= 12 ? 'Strong' : newPassword.length >= 8 ? 'Good' : 'At least 8 characters'}
+                </span>
+              </span>
+            </label>
+            <label className="block">
+              <span className={LABEL}>Confirm new password</span>
+              <input type="password" value={confirmPassword} onChange={setPasswordField(setConfirmPassword)} className={TEXT_INPUT} />
+              {passwordsMismatch && <span className="block mt-1.5 text-[12px] font-medium text-[#17271D]">Passwords do not match.</span>}
+            </label>
+          </div>
+
+          {(role === 'officer' || role === 'admin') && (
+            <div className="flex items-center gap-3 p-3.5 bg-[#F4F6EF]/60 rounded-xl border border-[rgba(31,74,52,0.06)]">
+              <KeyRound className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
+              <span className="text-[13px] text-[#17271D]">Two-step verification is on for your account.</span>
+            </div>
+          )}
+
+          <div className="pt-4 border-t border-[rgba(31,74,52,0.06)] flex flex-wrap items-center justify-between gap-3">
+            <span className="flex items-center gap-2 text-[13px] text-[#17271D]">
+              <Smartphone className="w-4 h-4 text-[#1F4A34]" strokeWidth={1.5} />
+              Signed in on this device and 1 other
             </span>
+            <button
+              type="button"
+              onClick={() => showToast('Signed out of other devices')}
+              className="px-4 py-2 rounded-full bg-white text-[#1F4A34] border border-[rgba(31,74,52,0.20)] text-[12px] font-medium hover:bg-[#E4ECDB] cursor-pointer"
+            >
+              Sign out other devices
+            </button>
+          </div>
+        </div>
+      )}
+
+      {hasChanges && (
+        <div className="fixed bottom-0 inset-x-0 bg-[#FBFCF8] border-t border-[rgba(31,74,52,0.15)] shadow-2xl p-4 z-30">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <span className="text-[13px] font-medium text-[#17271D]">You have unsaved changes</span>
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={handleCancelChanges}
-                className="px-5 py-2 rounded-full bg-white text-[#17271D] border border-[rgba(31,74,52,0.20)] text-[13px] font-medium hover:bg-[#F4F6EF] transition-all cursor-pointer"
+                className="px-5 py-2 rounded-full bg-white text-[#17271D] border border-[rgba(31,74,52,0.20)] text-[13px] font-medium hover:bg-[#F4F6EF] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSaveChanges}
-                className="px-6 py-2 rounded-full bg-[#1F4A34] text-white text-[13px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer"
+                disabled={passwordsMismatch}
+                className="px-6 py-2 rounded-full bg-[#1F4A34] text-white text-[13px] font-medium hover:bg-[#2C6343] shadow-xs cursor-pointer disabled:opacity-50"
               >
                 Save changes
               </button>
@@ -850,37 +479,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* STOP ALL SMS MESSAGES MODAL DIALOG */}
-      {/* ========================================================================= */}
       {showSmsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            onClick={() => setShowSmsModal(false)}
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs"
-          />
+          <div onClick={() => setShowSmsModal(false)} className="fixed inset-0 bg-black/40 backdrop-blur-xs" />
           <div className="relative bg-[#FBFCF8] rounded-[20px] max-w-md w-full p-6 shadow-2xl border border-[rgba(31,74,52,0.12)] z-10 space-y-4">
-            <h3 className="text-[18px] font-semibold text-[#17271D]">
-              Stop all SMS messages?
-            </h3>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-[18px] font-semibold text-[#17271D]">Stop all SMS?</h3>
+              <button type="button" aria-label="Close" onClick={() => setShowSmsModal(false)} className="p-1 rounded-full text-[#5B665E] hover:bg-[#E4ECDB] cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             <p className="text-[13px] text-[#5B665E] leading-relaxed">
-              You will no longer receive early warnings, advisories or calendar reminders by SMS. You can still see them in the app. You can turn SMS back on anytime in Settings.
+              You will not get warnings or advice by SMS. You can still see them in the app, and turn SMS back on here.
             </p>
-            <div className="pt-2 flex items-center justify-end gap-4 border-t border-[rgba(31,74,52,0.06)]">
+            <div className="pt-2 flex items-center justify-end gap-3 border-t border-[rgba(31,74,52,0.06)]">
               <button
                 type="button"
-                onClick={handleConfirmStopSms}
-                className="text-[13px] font-semibold text-[#C93B3B] hover:underline cursor-pointer"
+                onClick={() => {
+                  setShowSmsModal(false);
+                  markChanged({ ...formData, isSmsStopped: true, alertChannel: 'In-app only' });
+                }}
+                className="px-4 py-2 rounded-full text-[13px] font-medium text-[#17271D] border border-[rgba(31,74,52,0.20)] hover:bg-[#F4F6EF] cursor-pointer"
               >
-                Stop all SMS
+                Stop SMS
               </button>
               <button
                 type="button"
                 autoFocus
                 onClick={() => setShowSmsModal(false)}
-                className="px-5 py-2 rounded-full bg-[#1F4A34] text-white text-[13px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer"
+                className="px-5 py-2 rounded-full bg-[#1F4A34] text-white text-[13px] font-medium hover:bg-[#2C6343] shadow-xs cursor-pointer"
               >
-                Keep SMS alerts
+                Keep SMS
               </button>
             </div>
           </div>

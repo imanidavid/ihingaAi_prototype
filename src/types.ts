@@ -305,7 +305,9 @@ export interface ReportItem {
   sector: string;
   cell: string;
   location?: string;
-  type: 'Rainfall' | 'Flood / damage' | 'Crop condition' | 'Pest / disease';
+  type: 'Rainfall' | 'Flood / damage' | 'Crop condition' | 'Pest / disease' | 'Other';
+  /** What the farmer saw when the type is 'Other' (their own words, e.g. "Hail"). */
+  otherType?: string;
   date: string;
   status: ObservationStatus;
   statusCaption?: string;

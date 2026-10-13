@@ -21,6 +21,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { DistrictFieldReportItem, ObservationStatus } from '../types';
+import { REPORT_TYPES, reportTypeLabel } from '../data/musanzeData';
 
 interface OfficerObservationsViewProps {
   reports: DistrictFieldReportItem[];
@@ -30,6 +31,8 @@ interface OfficerObservationsViewProps {
   onShowToast: (message: string) => void;
   /** Called when the officer opens a farmer's report (data access tracking). */
   onOpenReport?: (report: DistrictFieldReportItem) => void;
+  /** Report to show first in To review (opened from the dashboard or the bell). */
+  initialReportId?: string;
 }
 
 const QUICK_FEEDBACK_TEMPLATES = [
@@ -45,13 +48,14 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
   onRejectReport,
   onShowToast,
   onOpenReport,
+  initialReportId,
 }) => {
   const [activeTab, setActiveTab] = useState<'review' | 'all' | 'insights'>('review');
 
   // Review Queue state
   const toReviewReports = reports.filter((r) => r.status === 'Under review');
   const [selectedReportId, setSelectedReportId] = useState<string>(
-    toReviewReports[0]?.id || ''
+    initialReportId && toReviewReports.some((r) => r.id === initialReportId) ? initialReportId : toReviewReports[0]?.id || ''
   );
   const [feedbackText, setFeedbackText] = useState('');
   const [useForForecastAccuracy, setUseForForecastAccuracy] = useState(true);
@@ -174,12 +178,7 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
 
   // Insights computations
   const totalReportsCount = reports.length;
-  const typesMap: Record<string, number> = {
-    Rainfall: 0,
-    'Flood / damage': 0,
-    'Crop condition': 0,
-    'Pest / disease': 0,
-  };
+  const typesMap: Record<string, number> = Object.fromEntries(REPORT_TYPES.map((t) => [t, 0]));
   const sectorsMap: Record<string, number> = {};
 
   reports.forEach((r) => {
@@ -305,7 +304,7 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
                                 {rep.title}
                               </h3>
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-white text-[#17271D] border border-[rgba(31,74,52,0.15)]">
-                                {rep.type}
+                                {reportTypeLabel(rep)}
                               </span>
                             </div>
 
@@ -384,7 +383,7 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
                       <div className="flex justify-between">
                         <span className="text-[#5B665E]">Type:</span>
                         <span className="font-medium text-[#17271D]">
-                          {activeReviewReport.type}
+                          {reportTypeLabel(activeReviewReport)}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -568,7 +567,7 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
                       <td className="py-3 px-3 text-[#17271D]">{rep.farmer}</td>
                       <td className="py-3 px-3 text-[#17271D]">{rep.sector}</td>
                       <td className="py-3 px-3 text-[#5B665E]">{rep.cell}</td>
-                      <td className="py-3 px-3 text-[#17271D]">{rep.type}</td>
+                      <td className="py-3 px-3 text-[#17271D]">{reportTypeLabel(rep)}</td>
                       <td className="py-3 px-3 text-[#5B665E] tabular-nums">{rep.date}</td>
                       <td className="py-3 px-4 text-right">
                         {renderStatusChip(rep.status)}
