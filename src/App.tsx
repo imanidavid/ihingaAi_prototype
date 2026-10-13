@@ -886,7 +886,14 @@ export default function App() {
   const handleSubmitObservation = (report: ReportItem) => {
     // A new report carries the signed-in person's name (how "My reports" finds it)
     const author = role === 'farmer' ? userSettings.fullName : accounts.find((a) => a.id === currentAccountId)?.fullName || userSettings.fullName;
-    const stamped = { ...report, farmer: report.farmer || reportNameOf(author) };
+    // A sent report goes straight to the officer's "To review" queue (status Under review)
+    const stamped: ReportItem = {
+      ...report,
+      farmer: report.farmer || reportNameOf(author),
+      ...(report.status === 'Submitted'
+        ? { status: 'Under review', statusCaption: 'Received by officer · Under review', timeline: retryTimeline(report.date) }
+        : {}),
+    };
     setReports((prev) => [stamped, ...prev]);
     setToastMessage('Observation sent');
     setTimeout(() => setToastMessage(null), 3000);
