@@ -22,6 +22,7 @@ Review target date: ~28/10/2026. Each task: follow the `ihinga-new-page` skill, 
 - [x] Crop risk matrix from the crop risk model (Module 5) and officer-written plan ahead (Modules 7, 8): every matrix cell computed from the forecast, the warning rules and active warnings (`computeCropRiskMatrix`, labelled simulated); officer Warnings → Plan ahead adds, edits and removes items (crop, category, title, reason, due date or season) in the new store field `planAheadItems`; farmers see only items for their crops — 12/10/2026
 - [x] Crop phases (Module 8): farmer-entered planting dates (`cropPlantings`) + crop growth model (simulated) compute stage, stage dates, % to harvest and harvest window from NOW; dashboard Seasonal calendar card computed from NOW — 12/10/2026
 - [x] Farmer observations computed (Module 9): my reports by signed-in name, reports this season, verified, used in forecasts (report validation), reports near you in the last 7 days by sector and type; external seed photos replaced by planned media files — 12/10/2026
+- [x] Community observation map (Module 9): "Reports near you" is one map of the 15 sectors shaded by 7-day report count, type chips re-count it, tap a sector for its counts by type (replaces the per-type bars) — 13/10/2026
 - [ ] Task 7 — Crop calendar gaps (Module 8)
 - [ ] Task 8 — Fix-in-code-later list (`docs/fix-in-code-later.md`)
 - [ ] Task 9 — Consistency pass across all roles + mobile (design self-check on every page)

@@ -127,6 +127,10 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
 14. **Reset demo** (`handleResetDemo`, `App.tsx`) must restore every store field to its
     initial value, including anything created during the demo. It currently resets all
     thirty-one fields; add every new field you introduce (also to `storeSnapshot`, which syncs open tabs).
+15. **Keep it simple — never overwhelm users.** One clear component per question; never show the
+    same data twice (e.g. a chart and day cards, a map and per-type bars). Fold extra detail into
+    that one component (filter chips, tap for detail) instead of adding sections. Every
+    requirement in `docs/requirements.md` must still be met.
 
 ## Roles (one shared store, desktop unless noted)
 
@@ -288,7 +292,10 @@ farmer's report name (`reportNameOf`); App stamps that name on every new report,
 mobile form never type a name. KPIs: reports this season (`reportsThisSeason`, from
 `SEASON_START_DATE`), verified, and "Used in forecasts" = `computeReportValidation` on the farmer's
 own reports (the same rule as the research page). "Reports near you" = the farmer's sector in the
-last `FIELD_REPORT_WINDOW_DAYS` (`reportsInLastDays`), one bar per `REPORT_TYPES`. Seed report
+last `FIELD_REPORT_WINDOW_DAYS`, shown as the community observation map
+(`CommunityObservationMap`: Musanze's sectors shaded in greens by report count, type chips re-count
+the map, tapping a sector shows its counts by type; covers Module 9 "community observation map" and
+"observation analytics"). Seed report
 photos are planned files in `public/media/` (media manifest); a missing photo shows no thumbnail.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.

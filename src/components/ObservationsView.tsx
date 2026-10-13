@@ -18,13 +18,12 @@ import {
 import { ObservationItem } from '../types';
 import {
   FIELD_REPORT_WINDOW_DAYS,
-  REPORT_TYPES,
   SEASON_START_DATE,
   computeReportValidation,
   formatDayShort,
-  reportsInLastDays,
   reportsThisSeason,
 } from '../data/musanzeData';
+import { CommunityObservationMap } from './CommunityObservationMap';
 
 interface ObservationsViewProps {
   reports: ObservationItem[];
@@ -53,12 +52,6 @@ export const ObservationsView: React.FC<ObservationsViewProps> = ({
   const verifiedCount = myReports.filter((r) => r.status === 'Verified').length;
   // Same rule the research page uses: sent rainfall and flood reports are checked against the forecast
   const validation = computeReportValidation(myReports);
-  const nearbyReports = reportsInLastDays(reports.filter((r) => r.sector === sector));
-  const nearbyByType = REPORT_TYPES.map((type) => ({
-    type,
-    count: nearbyReports.filter((r) => r.type === type).length,
-  }));
-  const nearbyTotal = nearbyReports.length || 1;
 
   const handleRetry = (id: string) => {
     if (onRetrySend) {
@@ -220,7 +213,7 @@ export const ObservationsView: React.FC<ObservationsViewProps> = ({
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         {/* Left: 2/3 width "My reports" list card */}
-        <div className="lg:col-span-8 bg-[#FBFCF8] rounded-[16px] p-5 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-[#FBFCF8] rounded-[16px] p-5 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-[rgba(31,74,52,0.06)]">
               <div>
@@ -322,48 +315,12 @@ export const ObservationsView: React.FC<ObservationsViewProps> = ({
           </div>
         </div>
 
-        {/* Right: 1/3 width "Reports near you · last 7 days" card */}
-        <div className="lg:col-span-4 bg-[#FBFCF8] rounded-[16px] p-5 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex flex-col justify-between">
-          <div>
-            <h3 className="text-[16px] font-semibold text-[#17271D]">
-              Reports near you · last {FIELD_REPORT_WINDOW_DAYS} days
-            </h3>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-[22px] font-semibold text-[#17271D]">
-                {nearbyReports.length} {nearbyReports.length === 1 ? 'report' : 'reports'} in {sector}
-              </span>
-            </div>
-
-            {/* One bar per report type */}
-            <div className="mt-6 space-y-4">
-              {nearbyByType.map(({ type, count }) => (
-                <div key={type}>
-                  <div className="flex items-center justify-between text-[12px] mb-1.5">
-                    <span className="font-medium text-[#17271D] flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-[#E4ECDB] flex items-center justify-center flex-shrink-0">
-                        {getTypeIcon(type)}
-                      </div>
-                      <span>{type}</span>
-                    </span>
-                    <span className="font-semibold text-[#17271D] tabular-nums">{count}</span>
-                  </div>
-                  <div className="h-2 w-full bg-[#F4F6EF] rounded-full overflow-hidden border border-[rgba(31,74,52,0.06)]">
-                    <div
-                      className="h-full bg-[#3E8E55] rounded-full transition-all duration-500"
-                      style={{ width: `${(count / nearbyTotal) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Muted caption at bottom */}
-          <div className="pt-4 border-t border-[rgba(31,74,52,0.06)] mt-6">
-            <p className="text-[12px] text-[#5B665E]">
-              From farmers in your sector. Names are hidden.
-            </p>
-          </div>
+        {/* Right: community observation map (where reports come from, re-counted by type) */}
+        <div className="lg:col-span-5 bg-[#FBFCF8] rounded-[16px] p-5 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)]">
+          <h3 className="text-[16px] font-semibold text-[#17271D] mb-3">
+            Reports near you · last {FIELD_REPORT_WINDOW_DAYS} days
+          </h3>
+          <CommunityObservationMap reports={reports} homeSector={sector} />
         </div>
       </div>
     </div>
