@@ -1762,9 +1762,29 @@ export default function App() {
   };
 
   // If not signed in, show split-screen Sign In View
+  // Floating demo control before sign-in (landing and sign-in): picking a role signs in as that demo account
+  const demoSwitcherSignedOut = (
+    <FloatingDeviceSwitcher
+      role={role}
+      onRoleChange={handleRoleChange}
+      previewMode={previewMode}
+      onPreviewModeChange={setPreviewMode}
+      hasUnsavedBar={false}
+      onResetDemo={handleResetDemo}
+      onSimulateTimeout={() => {
+        setIsAuthenticated(true);
+        setIsTimeoutModalOpen(true);
+        setTimeoutCountdown(60);
+      }}
+    />
+  );
+
   if (!isAuthenticated && landingScreen === 'landing') {
     return (
-      <LandingPage onSignIn={() => setLandingScreen('sign_in')} onCreateAccount={() => setLandingScreen('sign_up')} />
+      <>
+        <LandingPage onSignIn={() => setLandingScreen('sign_in')} onCreateAccount={() => setLandingScreen('sign_up')} />
+        {demoSwitcherSignedOut}
+      </>
     );
   }
 
@@ -1786,19 +1806,7 @@ export default function App() {
         />
 
         {/* Floating Device Switcher stays as demo shortcut: it signs in as that demo account */}
-        <FloatingDeviceSwitcher
-          role={role}
-          onRoleChange={handleRoleChange}
-          previewMode={previewMode}
-          onPreviewModeChange={setPreviewMode}
-          hasUnsavedBar={false}
-          onResetDemo={handleResetDemo}
-          onSimulateTimeout={() => {
-            setIsAuthenticated(true);
-            setIsTimeoutModalOpen(true);
-            setTimeoutCountdown(60);
-          }}
-        />
+        {demoSwitcherSignedOut}
 
         {toastMessage && (
           <div className="fixed top-6 right-6 z-50 bg-[#1F4A34] text-white text-[13px] font-medium px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 animate-in fade-in">
