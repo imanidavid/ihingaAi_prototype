@@ -36,6 +36,10 @@ interface SignInViewProps {
   twoStepRoles?: AppRole[];
   /** Sign-in form locks after this many failed attempts (Security & audit settings). */
   lockAfterFailed?: number;
+  /** Open on sign-up instead of sign-in (from the landing page's "Create account"). */
+  initialMode?: 'sign_in' | 'sign_up';
+  /** Back to the landing page. */
+  onBackToHome?: () => void;
 }
 
 export type AuthMode = 'sign_in' | 'two_step' | 'sign_up' | 'forgot_password' | 'waiting_approval';
@@ -50,9 +54,11 @@ export const SignInView: React.FC<SignInViewProps> = ({
   onSignInFailed = () => {},
   twoStepRoles = ['officer', 'admin'],
   lockAfterFailed = 5,
+  initialMode = 'sign_in',
+  onBackToHome,
 }) => {
   const [lang, setLang] = useState<SignInLanguage>(initialLanguage);
-  const [authMode, setAuthMode] = useState<AuthMode>('sign_in');
+  const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
   const t = SIGN_IN_TRANSLATIONS[lang];
 
   // Sign-in form inputs
@@ -317,6 +323,15 @@ export const SignInView: React.FC<SignInViewProps> = ({
         {/* ======================================================================= */}
         {authMode === 'sign_in' && (
           <div className="max-w-[420px] w-full mx-auto my-auto space-y-6">
+            {onBackToHome && (
+              <button
+                type="button"
+                onClick={onBackToHome}
+                className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[#1F4A34] hover:underline cursor-pointer"
+              >
+                ← Back to home
+              </button>
+            )}
             <div className="bg-[#FBFCF8] rounded-[20px] p-7 md:p-8 border border-[rgba(31,74,52,0.12)] shadow-[0_4px_24px_rgba(31,74,52,0.06)] space-y-6">
               <div>
                 <h2 className="text-[22px] font-bold text-[#17271D] tracking-tight">

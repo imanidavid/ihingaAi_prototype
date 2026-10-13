@@ -78,6 +78,7 @@ import { OfficerTrainingView } from './components/officer/OfficerTrainingView';
 import { CooperativeTrainingView } from './components/CooperativeTrainingView';
 import { ScheduleMeetingModal } from './components/coop/ScheduleMeetingModal';
 import { MessageComposerModal } from './components/MessageComposerModal';
+import { LandingView } from './components/LandingView';
 import { SignInView } from './components/SignInView';
 import { INITIAL_GENERATED_REPORTS } from './data/reportsModuleData';
 import {
@@ -181,7 +182,7 @@ export default function App() {
   const [hasUnsavedSettings, setHasUnsavedSettings] = useState(false);
 
   // Authentication & session state
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [generatedReports, setGeneratedReports] = useState<GeneratedReport[]>(INITIAL_GENERATED_REPORTS);
 
   // Shared cooperative broadcast messages store
@@ -280,6 +281,9 @@ export default function App() {
   const resetInactivityTimer = () => {
     lastActivityRef.current = Date.now();
   };
+
+  // Before sign-in: the landing page first, then sign-in or sign-up
+  const [landingScreen, setLandingScreen] = useState<'landing' | 'sign_in' | 'sign_up'>('landing');
 
   const handleSignOut = () => {
     setIsAuthenticated(false);
@@ -1757,10 +1761,19 @@ export default function App() {
   };
 
   // If not signed in, show split-screen Sign In View
+  if (!isAuthenticated && landingScreen === 'landing') {
+    return (
+      <LandingView onSignIn={() => setLandingScreen('sign_in')} onCreateAccount={() => setLandingScreen('sign_up')} />
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-[#F4F6EF] relative">
         <SignInView
+          key={landingScreen}
+          initialMode={landingScreen === 'sign_up' ? 'sign_up' : 'sign_in'}
+          onBackToHome={() => setLandingScreen('landing')}
           onSignInSuccess={handleSignInSuccess}
           accounts={accounts}
           accessRequests={accessRequests}
