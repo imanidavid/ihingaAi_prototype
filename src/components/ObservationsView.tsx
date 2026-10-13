@@ -16,12 +16,24 @@ import {
   X,
 } from 'lucide-react';
 import { ObservationItem } from '../types';
+import {
+  FIELD_REPORT_WINDOW_DAYS,
+  REPORT_TYPES,
+  SEASON_START_DATE,
+  computeReportValidation,
+  formatDayShort,
+  reportsInLastDays,
+  reportsThisSeason,
+} from '../data/musanzeData';
 
 interface ObservationsViewProps {
   reports: ObservationItem[];
   onOpenReportModal: () => void;
   onSelectObservation: (report: ObservationItem) => void;
   onRetrySend?: (id: string) => void;
+  /** The signed-in farmer's name as reports carry it ("Jean-Baptiste N.") and their sector. */
+  farmerReportName: string;
+  sector: string;
 }
 
 export const ObservationsView: React.FC<ObservationsViewProps> = ({
@@ -29,22 +41,24 @@ export const ObservationsView: React.FC<ObservationsViewProps> = ({
   onOpenReportModal,
   onSelectObservation,
   onRetrySend,
+  farmerReportName,
+  sector,
 }) => {
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
   const [localToast, setLocalToast] = useState<string | null>(null);
 
-  // Farmer "My reports" = reports where farmer = Jean-Baptiste
-  // "Reports near you" = reports in Kinigi
-  const myReports = reports.filter((r) => r.farmer.includes('Jean-Baptiste'));
-  const kinigiReports = reports.filter((r) => r.sector === 'Kinigi');
-
+  // My reports = reports the signed-in farmer sent; near you = their sector in the last 7 days
+  const myReports = reports.filter((r) => r.farmer === farmerReportName);
+  const mySeasonReports = reportsThisSeason(myReports);
   const verifiedCount = myReports.filter((r) => r.status === 'Verified').length;
-
-  const kinigiRainfallCount = kinigiReports.filter((r) => r.type === 'Rainfall').length;
-  const kinigiFloodCount = kinigiReports.filter((r) => r.type === 'Flood / damage').length;
-  const kinigiCropCount = kinigiReports.filter((r) => r.type === 'Crop condition').length;
-  const kinigiPestCount = kinigiReports.filter((r) => r.type === 'Pest / disease').length;
-  const totalKinigi = kinigiReports.length || 1;
+  // Same rule the research page uses: sent rainfall and flood reports are checked against the forecast
+  const validation = computeReportValidation(myReports);
+  const nearbyReports = reportsInLastDays(reports.filter((r) => r.sector === sector));
+  const nearbyByType = REPORT_TYPES.map((type) => ({
+    type,
+    count: nearbyReports.filter((r) => r.type === type).length,
+  }));
+  const nearbyTotal = nearbyReports.length || 1;
 
   const handleRetry = (id: string) => {
     if (onRetrySend) {
@@ -128,7 +142,7 @@ export const ObservationsView: React.FC<ObservationsViewProps> = ({
         <div>
           <h1 className="text-[24px] font-semibold text-[#17271D]">Observations</h1>
           <p className="text-[13px] text-[#5B665E] mt-0.5">
-            Your field reports help improve forecasts for Kinigi.
+            Your field reports help improve forecasts for {sector}.
           </p>
         </div>
 
@@ -156,10 +170,10 @@ export const ObservationsView: React.FC<ObservationsViewProps> = ({
               Reports this season
             </span>
             <span className="text-[22px] font-semibold text-[#17271D] leading-tight mt-0.5">
-              {myReports.length}
+              {mySeasonReports.length}
             </span>
             <span className="text-[12px] text-[#5B665E] mt-0.5 font-medium">
-              Logged for Kinigi Sector
+              Since {formatDayShort(SEASON_START_DATE)} · {sector} sector
             </span>
           </div>
         </div>
@@ -176,8 +190,8 @@ export const ObservationsView: React.FC<ObservationsViewProps> = ({
             <span className="text-[22px] font-semibold text-[#17271D] leading-tight mt-0.5">
               {verifiedCount}
             </span>
-            <span className="text-[12px] text-[#3E8E55] mt-0.5 font-medium">
-              Confirmed on-site
+            <span className="text-[12px] text-[#5B665E] mt-0.5 font-medium">
+              Of your {myReports.length} {myReports.length === 1 ? 'report' : 'reports'}
             </span>
           </div>
         </div>
@@ -192,10 +206,10 @@ export const ObservationsView: React.FC<ObservationsViewProps> = ({
               Used in forecasts
             </span>
             <span className="text-[22px] font-semibold text-[#17271D] leading-tight mt-0.5">
-              1
+              {validation.used}
             </span>
             <span className="text-[12px] text-[#5B665E] mt-0.5 font-medium leading-snug">
-              Your report confirmed the Kinigi rain warning
+              Rain and flood reports · {validation.matched} matched the forecast
             </span>
           </div>
         </div>
@@ -312,91 +326,35 @@ export const ObservationsView: React.FC<ObservationsViewProps> = ({
         <div className="lg:col-span-4 bg-[#FBFCF8] rounded-[16px] p-5 border border-[rgba(31,74,52,0.10)] shadow-[0_2px_12px_rgba(31,74,52,0.05)] flex flex-col justify-between">
           <div>
             <h3 className="text-[16px] font-semibold text-[#17271D]">
-              Reports near you · last 7 days
+              Reports near you · last {FIELD_REPORT_WINDOW_DAYS} days
             </h3>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-[22px] font-semibold text-[#17271D]">
-                {kinigiReports.length} reports in Kinigi
+                {nearbyReports.length} {nearbyReports.length === 1 ? 'report' : 'reports'} in {sector}
               </span>
             </div>
 
-            {/* 4 Horizontal progress bars with counts & forest green icons in tint circles */}
+            {/* One bar per report type */}
             <div className="mt-6 space-y-4">
-              {/* 1. Rainfall */}
-              <div>
-                <div className="flex items-center justify-between text-[12px] mb-1.5">
-                  <span className="font-medium text-[#17271D] flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-[#E4ECDB] flex items-center justify-center flex-shrink-0">
-                      <CloudRain className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-                    </div>
-                    <span>Rainfall</span>
-                  </span>
-                  <span className="font-semibold text-[#17271D]">{kinigiRainfallCount}</span>
+              {nearbyByType.map(({ type, count }) => (
+                <div key={type}>
+                  <div className="flex items-center justify-between text-[12px] mb-1.5">
+                    <span className="font-medium text-[#17271D] flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-[#E4ECDB] flex items-center justify-center flex-shrink-0">
+                        {getTypeIcon(type)}
+                      </div>
+                      <span>{type}</span>
+                    </span>
+                    <span className="font-semibold text-[#17271D] tabular-nums">{count}</span>
+                  </div>
+                  <div className="h-2 w-full bg-[#F4F6EF] rounded-full overflow-hidden border border-[rgba(31,74,52,0.06)]">
+                    <div
+                      className="h-full bg-[#3E8E55] rounded-full transition-all duration-500"
+                      style={{ width: `${(count / nearbyTotal) * 100}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-2 w-full bg-[#F4F6EF] rounded-full overflow-hidden border border-[rgba(31,74,52,0.06)]">
-                  <div
-                    className="h-full bg-[#3E8E55] rounded-full transition-all duration-500"
-                    style={{ width: `${(kinigiRainfallCount / totalKinigi) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* 2. Flood / damage */}
-              <div>
-                <div className="flex items-center justify-between text-[12px] mb-1.5">
-                  <span className="font-medium text-[#17271D] flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-[#E4ECDB] flex items-center justify-center flex-shrink-0">
-                      <AlertTriangle className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-                    </div>
-                    <span>Flood / damage</span>
-                  </span>
-                  <span className="font-semibold text-[#17271D]">{kinigiFloodCount}</span>
-                </div>
-                <div className="h-2 w-full bg-[#F4F6EF] rounded-full overflow-hidden border border-[rgba(31,74,52,0.06)]">
-                  <div
-                    className="h-full bg-[#3E8E55] rounded-full transition-all duration-500"
-                    style={{ width: `${(kinigiFloodCount / totalKinigi) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* 3. Crop condition */}
-              <div>
-                <div className="flex items-center justify-between text-[12px] mb-1.5">
-                  <span className="font-medium text-[#17271D] flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-[#E4ECDB] flex items-center justify-center flex-shrink-0">
-                      <Sprout className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-                    </div>
-                    <span>Crop condition</span>
-                  </span>
-                  <span className="font-semibold text-[#17271D]">{kinigiCropCount}</span>
-                </div>
-                <div className="h-2 w-full bg-[#F4F6EF] rounded-full overflow-hidden border border-[rgba(31,74,52,0.06)]">
-                  <div
-                    className="h-full bg-[#3E8E55] rounded-full transition-all duration-500"
-                    style={{ width: `${(kinigiCropCount / totalKinigi) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* 4. Pest / disease */}
-              <div>
-                <div className="flex items-center justify-between text-[12px] mb-1.5">
-                  <span className="font-medium text-[#17271D] flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-[#E4ECDB] flex items-center justify-center flex-shrink-0">
-                      <Bug className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-                    </div>
-                    <span>Pest / disease</span>
-                  </span>
-                  <span className="font-semibold text-[#17271D]">{kinigiPestCount}</span>
-                </div>
-                <div className="h-2 w-full bg-[#F4F6EF] rounded-full overflow-hidden border border-[rgba(31,74,52,0.06)]">
-                  <div
-                    className="h-full bg-[#3E8E55] rounded-full transition-all duration-500"
-                    style={{ width: `${(kinigiPestCount / totalKinigi) * 100}%` }}
-                  />
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 

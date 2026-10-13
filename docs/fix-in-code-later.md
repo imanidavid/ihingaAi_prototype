@@ -69,3 +69,6 @@ Found with the timeframe picker (11/10/2026):
 - [ ] Scheduled report frequency ("Every Monday 07:00") is still free text — a recurrence, not a range.
 - [ ] Seeded warnings have timeframe text only (no `startsAt`/`endsAt`); they get values when an officer clicks "Change dates" in Edit.
 
+Farmer observations (12/10/2026):
+- [ ] Mobile report sheet: "Use my location" and its default sector/cell are still Kinigi · Bisoke (desktop modal now uses the farmer's own sector and cell).
+- [ ] A report's "matched the forecast" flag (`isConsistent`) is seeded; new reports never get one, so they count as used but not matched.

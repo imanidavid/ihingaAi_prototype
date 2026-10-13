@@ -129,6 +129,7 @@ import {
   computeCropPhase,
   computeCropRiskMatrix,
   planItemsForCrops,
+  nowReportStamp,
   formatPlanDue,
   computeSectorForecastRisk,
   computeDistrictClimateRisk,
@@ -883,10 +884,21 @@ export default function App() {
   // REPORT MUTATION HANDLERS (Change the one record; both roles update)
   // =========================================================================
   const handleSubmitObservation = (report: ReportItem) => {
-    setReports((prev) => [report, ...prev]);
+    // A new report carries the signed-in person's name (how "My reports" finds it)
+    const author = role === 'farmer' ? userSettings.fullName : accounts.find((a) => a.id === currentAccountId)?.fullName || userSettings.fullName;
+    const stamped = { ...report, farmer: report.farmer || reportNameOf(author) };
+    setReports((prev) => [stamped, ...prev]);
     setToastMessage('Observation sent');
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  // Timeline after a manual retry: saved when written, sent and received at NOW
+  const retryTimeline = (savedAt: string): ReportItem['timeline'] => [
+    { step: `Saved on your phone · ${savedAt}`, time: savedAt, status: 'completed' },
+    { step: 'Sent', time: nowReportStamp(), status: 'completed' },
+    { step: 'Received by officer', time: nowReportStamp(), status: 'current' },
+    { step: 'Verified', status: 'upcoming' },
+  ];
 
   const handleRetrySendObservation = (id: string) => {
     setReports((prev) =>
@@ -896,12 +908,7 @@ export default function App() {
           ...r,
           status: 'Under review' as const,
           statusCaption: 'Received by officer · Under review',
-          timeline: [
-            { step: 'Saved on your phone · 28/09 13:40', time: '28/09 13:40', status: 'completed' as const },
-            { step: 'Sent', time: '28/09 13:42', status: 'completed' as const },
-            { step: 'Received by officer', time: '28/09 13:42', status: 'current' as const },
-            { step: 'Verified', status: 'upcoming' as const },
-          ],
+          timeline: retryTimeline(r.date),
         };
         return updated;
       })
@@ -915,12 +922,7 @@ export default function App() {
             ...prev.data,
             status: 'Under review',
             statusCaption: 'Received by officer · Under review',
-            timeline: [
-              { step: 'Saved on your phone · 28/09 13:40', time: '28/09 13:40', status: 'completed' },
-              { step: 'Sent', time: '28/09 13:42', status: 'completed' },
-              { step: 'Received by officer', time: '28/09 13:42', status: 'current' },
-              { step: 'Verified', status: 'upcoming' },
-            ],
+            timeline: retryTimeline(prev.data.date),
           },
         };
       }
@@ -2034,6 +2036,8 @@ export default function App() {
                   onOpenReportModal={handleOpenReportModal}
                   onSelectObservation={handleSelectObservation}
                   onRetrySend={handleRetrySendObservation}
+                  farmerReportName={reportNameOf(userSettings.fullName)}
+                  sector={farmerSector}
                 />
               ))}
 
@@ -2129,6 +2133,8 @@ export default function App() {
 
       {/* Report Observation Modal */}
       <ReportObservationModal
+        defaultSector={farmerSector}
+        defaultCell={userSettings.cell}
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
         onSubmitSuccess={handleSubmitObservation}
