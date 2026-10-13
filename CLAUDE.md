@@ -349,11 +349,12 @@ data, and "Data for your research" (forecast CSV via `forecastsToCsv`, gated by 
 link to field data). Model performance uses plain words ("Usual miss", "Too wet or too dry?",
 "Did the warnings work?" with % of farmers who saw each warning).
 
-Landing (14/10/2026): the app opens signed out on `LandingView` (hero, five "how it works"
-steps, who it's for, questions, final call to action). "Sign in" and "Create account" open
-`SignInView` on sign-in or sign-up (`landingScreen` in App, `initialMode`); sign-in has "Back to
-home". Adapted from the separate landing project: its video, live ticker, impact numbers,
-testimonials, pricing and outside photos were dropped (invented or unsourced).
+Landing (14/10/2026): the app opens signed out on the owner's landing page, ported as-is from the
+landing project into `src/components/landing/` (`LandingPage` + its sections, her design, video,
+motion and Instrument Serif headings — the one exception to Design System v3). Every sign-in /
+portal button opens `SignInView`; every join / start button opens sign-up (`landingScreen`,
+`initialMode`); sign-in has "Back to home". Only text changed: invented numbers replaced by
+prototype facts or labelled illustrative, and official-endorsement wording removed.
 
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 

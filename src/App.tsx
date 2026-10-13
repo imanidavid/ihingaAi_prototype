@@ -78,7 +78,7 @@ import { OfficerTrainingView } from './components/officer/OfficerTrainingView';
 import { CooperativeTrainingView } from './components/CooperativeTrainingView';
 import { ScheduleMeetingModal } from './components/coop/ScheduleMeetingModal';
 import { MessageComposerModal } from './components/MessageComposerModal';
-import { LandingView } from './components/LandingView';
+import { LandingPage } from './components/landing/LandingPage';
 import { SignInView } from './components/SignInView';
 import { INITIAL_GENERATED_REPORTS } from './data/reportsModuleData';
 import {
@@ -1763,7 +1763,7 @@ export default function App() {
   // If not signed in, show split-screen Sign In View
   if (!isAuthenticated && landingScreen === 'landing') {
     return (
-      <LandingView onSignIn={() => setLandingScreen('sign_in')} onCreateAccount={() => setLandingScreen('sign_up')} />
+      <LandingPage onSignIn={() => setLandingScreen('sign_in')} onCreateAccount={() => setLandingScreen('sign_up')} />
     );
   }
 
