@@ -23,3 +23,18 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(31, 74, 52, 0.4);
 }
+
+/* Community observation map: plain report-count label in the middle of each sector */
+.leaflet-tooltip.ihinga-count-label {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  color: #17271d;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.leaflet-tooltip.ihinga-count-label::before {
+  display: none;
+}
