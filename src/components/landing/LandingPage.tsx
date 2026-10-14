@@ -13,7 +13,8 @@ import { FinalCtaBanner } from './FinalCtaBanner';
 import { Footer } from './Footer';
 import { Volume2, VolumeX, ChevronDown } from 'lucide-react';
 
-const VIDEO_URL =
+/** The landing hero video, also used behind the sign-in and sign-up screens. */
+export const VIDEO_URL =
   'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_204103_f607742e-09da-4cf5-bb06-4e67b0a531de.mp4';
 
 interface LandingPageProps {
@@ -21,10 +22,25 @@ interface LandingPageProps {
   onSignIn: () => void;
   /** Every "join / start / create account" button opens our sign-up wizard. */
   onCreateAccount: () => void;
+  /** Told when the hero section scrolls in or out of view (the demo control shows only on the hero). */
+  onHeroVisibleChange?: (visible: boolean) => void;
 }
 
 /** The IHINGA AI landing page (ported from the landing project), shown before sign-in. */
-export function LandingPage({ onSignIn, onCreateAccount }: LandingPageProps) {
+export function LandingPage({ onSignIn, onCreateAccount, onHeroVisibleChange }: LandingPageProps) {
+  // The hero stays pinned while the next screen slides over it, so use the scroll position:
+  // the demo control shows only while the page is scrolled less than half a screen.
+  useEffect(() => {
+    if (!onHeroVisibleChange) return;
+    const update = () => onHeroVisibleChange(window.scrollY < window.innerHeight * 0.5);
+    update();
+    const afterRestore = window.setTimeout(update, 300); // the browser may restore the scroll position after load
+    window.addEventListener('scroll', update, { passive: true });
+    return () => {
+      window.clearTimeout(afterRestore);
+      window.removeEventListener('scroll', update);
+    };
+  }, [onHeroVisibleChange]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [videoLoaded, setVideoLoaded] = useState(false);
