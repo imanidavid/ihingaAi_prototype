@@ -46,7 +46,7 @@ export function Hero({ onExploreRiskMap, onHowItWorks }: HeroProps) {
               onClick={onExploreRiskMap}
               className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white text-black px-8 py-4 rounded-full font-semibold transition-transform hover:scale-105 active:scale-95 text-sm sm:text-base cursor-pointer shadow-lg shadow-white/5"
             >
-              <span>Explore Risk Map</span>
+              <span>Sign in</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 

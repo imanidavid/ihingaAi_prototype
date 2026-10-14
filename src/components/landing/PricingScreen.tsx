@@ -31,7 +31,7 @@ const TIERS: PricingTier[] = [
       'Basic crop calendar',
       'Community observation reporting',
     ],
-    ctaLabel: 'Get Started Free',
+    ctaLabel: 'Sign up',
     ctaAction: 'join',
   },
   {
@@ -50,7 +50,7 @@ const TIERS: PricingTier[] = [
       'Shared crop calendar',
       'Cooperative performance reporting',
     ],
-    ctaLabel: 'Start Free Trial',
+    ctaLabel: 'Sign up',
     ctaAction: 'join',
   },
   {
@@ -68,7 +68,7 @@ const TIERS: PricingTier[] = [
       'Warning threshold configuration',
       'Priority support',
     ],
-    ctaLabel: 'Start Free Trial',
+    ctaLabel: 'Sign up',
     ctaAction: 'join',
   },
   {
@@ -86,7 +86,7 @@ const TIERS: PricingTier[] = [
       'Dedicated implementation support',
       'On-prem or private cloud option',
     ],
-    ctaLabel: 'Contact Us',
+    ctaLabel: 'Sign up',
     ctaAction: 'contact',
   },
 ];

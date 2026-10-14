@@ -139,7 +139,7 @@ export function FinalCtaBanner({ onStartTrial, onSignIn }: FinalCtaBannerProps) 
               onClick={onStartTrial}
               className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white text-black px-8 py-4 rounded-full font-semibold transition-transform hover:scale-105 active:scale-95 text-sm sm:text-base cursor-pointer shadow-lg shadow-white/5"
             >
-              <span>Start Free Trial</span>
+              <span>Sign up</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -151,7 +151,7 @@ export function FinalCtaBanner({ onStartTrial, onSignIn }: FinalCtaBannerProps) 
               <div className="w-5 h-5 flex items-center justify-center bg-white/20 rounded-full">
                 <LogIn className="w-3 h-3 text-white" />
               </div>
-              <span>Sign In</span>
+              <span>Sign in</span>
             </button>
           </motion.div>
         </div>
