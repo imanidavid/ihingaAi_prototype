@@ -697,7 +697,8 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 </h2>
                 <p className="text-[12.5px] text-[#5B665E] mt-1 leading-relaxed">
                   The administrator created your {ROLE_LABELS[invitedAccount.role].toLowerCase()} account and sent an
-                  invitation to {invitedAccount.email}. Set a password to finish.
+                  invitation {invitedAccount.email ? `to ${invitedAccount.email}` : `by SMS to ${invitedAccount.phone}`}. Set a
+                  password to finish.
                 </p>
               </div>
               <label className="block">

@@ -78,6 +78,8 @@ interface OfficerWarningsViewProps {
   /** Risk types the officer can issue (built in + added by officers). */
   riskTypes: RiskTypeItem[];
   onAddRiskType: (type: RiskTypeItem) => void;
+  /** Permission matrix: may issue, edit and end warnings. */
+  canIssue?: boolean;
   /** Registered farmers per sector (administrator's sector register). */
   sectorRegister: SectorRegisterEntry[];
 }
@@ -113,6 +115,7 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
   riskTypes,
   onAddRiskType,
   sectorRegister,
+  canIssue = true,
 }) => {
   const sectorNames = sectorRegister.map((r) => r.sector);
   const [adviceFor, setAdviceFor] = useState<OfficerActiveWarning | null>(null);
@@ -403,7 +406,9 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
 
           <button
             onClick={() => setIsIssueModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1F4A34] text-white text-[12.5px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer active:scale-98"
+            disabled={!canIssue}
+            title={canIssue ? undefined : 'Your role does not have the “Issue warnings” permission'}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1F4A34] text-white text-[12.5px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4 text-[#E4ECDB]" strokeWidth={2} />
             <span>Issue warning</span>
@@ -522,14 +527,17 @@ export const OfficerWarningsView: React.FC<OfficerWarningsViewProps> = ({
                     </button>
                     <button
                       onClick={() => setEditingWarning(warning)}
-                      className="p-1.5 rounded-full bg-[#F4F6EF] text-[#5B665E] hover:text-[#17271D] hover:bg-[#E4ECDB] transition-colors cursor-pointer"
+                      disabled={!canIssue}
+                      className="disabled:opacity-40 disabled:cursor-not-allowed p-1.5 rounded-full bg-[#F4F6EF] text-[#5B665E] hover:text-[#17271D] hover:bg-[#E4ECDB] transition-colors cursor-pointer"
                       title="Edit warning"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setWarningToEnd(warning)}
-                      className="px-3 py-1.5 rounded-full bg-white text-[#C93B3B] border border-[#C93B3B]/30 hover:bg-[#C93B3B]/10 text-[12px] font-medium transition-all cursor-pointer"
+                      disabled={!canIssue}
+                      title={canIssue ? undefined : 'Your role does not have the “Issue warnings” permission'}
+                      className="disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-full bg-white text-[#C93B3B] border border-[#C93B3B]/30 hover:bg-[#C93B3B]/10 text-[12px] font-medium transition-all cursor-pointer"
                     >
                       End warning
                     </button>

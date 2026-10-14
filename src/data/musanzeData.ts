@@ -3291,13 +3291,24 @@ export const PERMISSIONS: { id: PermissionId; label: string; hint: string }[] = 
   { id: 'manage_users', label: 'Manage users', hint: 'Accounts, roles and access' },
 ];
 
+/**
+ * Which permissions make sense for each role (the screens that role has). The matrix only offers
+ * these; the rest show "—". The administrator keeps the feed connections; the officer uploads readings.
+ */
+export const PERMISSION_APPLIES: RolePermissions = {
+  farmer: ['view_forecasts'],
+  cooperative: ['view_forecasts', 'message_members', 'manage_members', 'export_data'],
+  officer: ['view_forecasts', 'issue_warnings', 'verify_reports', 'export_data', 'upload_weather_data'],
+  researcher: ['view_forecasts', 'view_research_data', 'export_data'],
+  admin: ['manage_users', 'manage_data_sources', 'export_data'],
+};
+
 export const INITIAL_ROLE_PERMISSIONS: RolePermissions = {
   farmer: ['view_forecasts'],
   cooperative: ['view_forecasts', 'message_members', 'manage_members'],
   officer: ['view_forecasts', 'issue_warnings', 'verify_reports', 'export_data', 'upload_weather_data'],
   researcher: ['view_forecasts', 'view_research_data', 'export_data'],
-  // The administrator keeps the feed connections; the officer uploads the readings and forecasts
-  admin: PERMISSIONS.map((p) => p.id).filter((id) => id !== 'upload_weather_data'),
+  admin: ['manage_users', 'manage_data_sources', 'export_data'],
 };
 
 /** Seeded events before NOW; the store appends real events as the demo runs. */

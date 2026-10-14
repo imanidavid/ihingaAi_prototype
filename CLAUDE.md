@@ -362,6 +362,17 @@ section links scroll, every other button opens `SignInView` on sign-in or sign-u
 `initialMode`); sign-in has "Back to home" and signing out returns to the landing page. Only text changed: invented numbers replaced by
 prototype facts or labelled illustrative, and official-endorsement wording removed.
 
+Permissions (14/10/2026): the permission matrix is enforced. App's `can(permission)` reads
+`rolePermissions[role]`; guarded handlers start with `allowed(...)` (toast if missing) and the
+matching buttons are disabled with a tooltip: issue/edit/end warnings (`issue_warnings`), verify /
+more info / reject reports (`verify_reports`), add/remove members, groups, join requests
+(`manage_members`), message composer (`message_members`), CSV exports (`export_data`), Risk forecast
+and Early warnings pages (`view_forecasts`), Users & access (`manage_users`); locked pages show
+`NoPermission`. `PERMISSION_APPLIES` (`musanzeData.ts`) lists the permissions each role has screens
+for; the matrix shows "—" for the rest. Bulk import (Users & access → Bulk import) creates `invited`
+farmer accounts (SMS invitation; first sign-in by phone sets a password) and, for Musanze Potato
+Growers Cooperative, adds them to the group of their sector (`suggestGroupFor`), else a join request.
+
 Smaller deferred items live in `docs/fix-in-code-later.md`.
 
 ## Cross-role flows (the demo — must always work)

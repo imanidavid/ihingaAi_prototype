@@ -54,6 +54,8 @@ interface RiskForecastViewProps {
   cropRisk: CropRiskMatrixRow[];
   /** Officer advice the viewer can open from a matrix cell (farmer: only advice visible to them). */
   advisories: CropAdvisory[];
+  /** Permission matrix: may export data. */
+  canExport?: boolean;
 }
 
 export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
@@ -68,6 +70,7 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
   thresholdRules,
   cropRisk,
   advisories,
+  canExport = true,
 }) => {
   const [horizon, setHorizon] = useState<HorizonType>('10d');
   // Farmers see their own sector; others pick a sector (the highest-risk one first)
@@ -101,6 +104,11 @@ export const RiskForecastView: React.FC<RiskForecastViewProps> = ({
   const isOfficer = role === 'officer';
 
   const handleExportCsv = () => {
+    if (!canExport) {
+      setToastMessage('Your role does not have the “Export data” permission');
+      setTimeout(() => setToastMessage(null), 2500);
+      return;
+    }
     setToastMessage('Forecast exported');
     setTimeout(() => setToastMessage(null), 2500);
   };

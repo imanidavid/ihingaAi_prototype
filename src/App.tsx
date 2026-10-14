@@ -46,6 +46,7 @@ import {
   SectorRegisterEntry,
   WarningSectorDelivery,
   ChannelDelivery,
+  PermissionId,
 } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -78,6 +79,7 @@ import { OfficerTrainingView } from './components/officer/OfficerTrainingView';
 import { CooperativeTrainingView } from './components/CooperativeTrainingView';
 import { ScheduleMeetingModal } from './components/coop/ScheduleMeetingModal';
 import { MessageComposerModal } from './components/MessageComposerModal';
+import { NoPermission } from './components/NoPermission';
 import { LandingPage } from './components/landing/LandingPage';
 import { SignInView } from './components/SignInView';
 import { INITIAL_GENERATED_REPORTS } from './data/reportsModuleData';
@@ -131,6 +133,9 @@ import {
   INITIAL_PLAN_AHEAD_ITEMS,
   INITIAL_CROP_PLANTINGS,
   INITIAL_COOP_JOIN_REQUESTS,
+  PERMISSIONS,
+  COOPERATIVE_DATA,
+  suggestGroupFor,
   INITIAL_TRAINING_MATERIALS,
   INITIAL_TRAINING_SHARES,
   trainingShareText,
@@ -216,6 +221,17 @@ export default function App() {
   const [currentAccountId, setCurrentAccountId] = useState<string>(DEMO_ACCOUNT_ID_BY_ROLE.farmer);
 
   /** Append an audit event at NOW, by the signed-in account unless an actor is given. */
+  // Permission matrix (Users & access): what the signed-in role may do. Every guarded action checks it.
+  const can = (permission: PermissionId) => rolePermissions[role].includes(permission);
+  /** Blocks an action the role is not allowed to do, with a message saying which permission is missing. */
+  const allowed = (permission: PermissionId) => {
+    if (can(permission)) return true;
+    const label = PERMISSIONS.find((x) => x.id === permission)?.label || permission;
+    setToastMessage(`Your role does not have the “${label}” permission`);
+    setTimeout(() => setToastMessage(null), 3500);
+    return false;
+  };
+
   const logAudit = (action: string, target: string, actor?: { name: string; role: AuditEvent['actorRole'] }) => {
     const account = accounts.find((a) => a.id === currentAccountId);
     setAuditEvents((prev) => [
@@ -1056,6 +1072,7 @@ export default function App() {
     feedbackMessage?: string,
     _useForForecast: boolean = true
   ) => {
+    if (!allowed('verify_reports')) return;
     const feedbackText =
       feedbackMessage || 'Confirmed. Field report verified against Bisoke weather telemetry.';
     const officerSignature = 'Claudine M., Agricultural Officer · Musanze';
@@ -1119,6 +1136,7 @@ export default function App() {
   };
 
   const handleOfficerAskMoreInfo = (reportId: string, feedbackMessage: string) => {
+    if (!allowed('verify_reports')) return;
     const officerSignature = 'Claudine M., Agricultural Officer · Musanze';
 
     setReports((prev) =>
@@ -1173,6 +1191,7 @@ export default function App() {
   };
 
   const handleOfficerRejectReport = (reportId: string, reason: string) => {
+    if (!allowed('verify_reports')) return;
     const officerSignature = 'Claudine M., Agricultural Officer · Musanze';
 
     setReports((prev) =>
@@ -1274,6 +1293,7 @@ export default function App() {
   // WARNING MUTATION HANDLERS
   // =========================================================================
   const handleIssueWarning = (newWarning: WarningItem, channels: ChannelDelivery['channel'][]) => {
+    if (!allowed('issue_warnings')) return;
     const type = riskTypes.find((t) => t.name === newWarning.riskType);
     const warningToStore: WarningItem = {
       ...newWarning,
@@ -1314,6 +1334,7 @@ export default function App() {
   };
 
   const handleEndWarning = (warningId: string) => {
+    if (!allowed('issue_warnings')) return;
     logAudit('Ended warning', warnings.find((w) => w.id === warningId)?.title || warningId);
     setWarnings((prev) =>
       prev.map((w) =>
@@ -1329,6 +1350,7 @@ export default function App() {
   };
 
   const handleUpdateWarning = (updatedWarning: WarningItem) => {
+    if (!allowed('issue_warnings')) return;
     // Only the editable fields; delivery totals stay computed from `warningDeliveries`
     const { timeframe, messageEn, severity } = updatedWarning;
     setWarnings((prev) =>
@@ -1356,6 +1378,7 @@ export default function App() {
   const groupNameOf = (groupId: string) => coopGroupRecords.find((g) => g.id === groupId)?.name || '';
 
   const handleAddCoopMember = (farmer: RegisteredFarmer, groupId: string) => {
+    if (!allowed('manage_members')) return;
     const member: CoopMember = {
       id: `mem-demo-${Date.now()}`,
       fullName: farmer.fullName,
@@ -1376,6 +1399,7 @@ export default function App() {
 
   // Join requests and "told in person" (cooperative leader)
   const handleAcceptJoinRequest = (requestId: string, groupId: string) => {
+    if (!allowed('manage_members')) return;
     const req = coopJoinRequests.find((r) => r.id === requestId);
     if (!req) return;
     const member: CoopMember = {
@@ -1419,6 +1443,7 @@ export default function App() {
   };
 
   const handleChangeCoopRole = (memberId: string, role: CoopMemberRole) => {
+    if (!allowed('manage_members')) return;
     const target = coopMembers.find((m) => m.id === memberId);
     if (!target) return;
     setCoopMembers((prev) =>
@@ -1435,6 +1460,7 @@ export default function App() {
   };
 
   const handleRemoveCoopMember = (memberId: string) => {
+    if (!allowed('manage_members')) return;
     const target = coopMembers.find((m) => m.id === memberId);
     if (!target || target.role === 'Leader') return;
     setCoopMembers((prev) => prev.filter((m) => m.id !== memberId));
@@ -1442,6 +1468,7 @@ export default function App() {
   };
 
   const handleCreateCoopGroup = (input: { name: string; leadId: string; memberIds: string[] }) => {
+    if (!allowed('manage_members')) return;
     const lead = coopMembers.find((m) => m.id === input.leadId);
     if (!lead) return;
     const group: CoopGroupRecord = {
@@ -1484,6 +1511,7 @@ export default function App() {
   };
 
   const openComposer = (prefill: { group?: string; en?: string; rw?: string; member?: CoopMember; lessonId?: string }) => {
+    if (!allowed('message_members')) return;
     setMessageComposerPrefill(prefill);
     setIsMessageComposerOpen(true);
   };
@@ -1564,8 +1592,55 @@ export default function App() {
 
   const handleImportAccounts = (imported: UserAccount[], cooperative: string) => {
     setAccounts((prev) => [...prev, ...imported]);
-    logAudit('Imported users', `${imported.length} farmers · ${cooperative}`);
-    showToast(`${imported.length} farmers imported`);
+    // Members of our cooperative join the group of their sector; with no group there, the leader places them.
+    let placed = 0;
+    if (cooperative === COOPERATIVE_DATA.cooperativeName) {
+      const stamp = Date.now();
+      const members: CoopMember[] = [];
+      const requests: CoopJoinRequest[] = [];
+      imported.forEach((a, i) => {
+        const sector = a.farmerDetails?.sector || '';
+        const cell = a.farmerDetails?.cell || '';
+        const crops = a.farmerDetails?.cropsGrown || [];
+        const groupId = suggestGroupFor({ sector }, coopGroupRecords);
+        if (groupId) {
+          members.push({
+            id: `mem-import-${stamp}-${i}`,
+            fullName: a.fullName,
+            groupId,
+            sector,
+            cell,
+            phone: a.phone,
+            role: 'Member',
+            crops,
+            acknowledged: {},
+            lastActive: NOW.dateFormatted,
+            activeFromWeek: 4,
+            isDemo: true,
+          });
+        } else {
+          requests.push({
+            id: `join-import-${stamp}-${i}`,
+            accountId: a.id,
+            fullName: a.fullName,
+            phone: a.phone,
+            sector,
+            cell,
+            crops,
+            cooperative,
+            requestedOn: NOW.dateFormatted,
+            status: 'pending',
+          });
+        }
+      });
+      placed = members.length;
+      if (members.length > 0) setCoopMembers((prev) => [...prev, ...members]);
+      if (requests.length > 0) setCoopJoinRequests((prev) => [...requests, ...prev]);
+    }
+    logAudit('Imported users', `${imported.length} farmers · ${cooperative} · SMS invitations sent`);
+    showToast(
+      `${imported.length} farmers invited by SMS` + (placed > 0 ? ` · ${placed} added to their sector group` : '')
+    );
   };
 
   // Data sources, processing and notifications
@@ -1940,7 +2015,8 @@ export default function App() {
               />
             )}
 
-            {currentView === 'users' && (
+            {currentView === 'users' && !can('manage_users') && <NoPermission permission="manage_users" />}
+            {currentView === 'users' && can('manage_users') && (
               <AdminUsersView
                 accounts={accounts}
                 accessRequests={accessRequests}
@@ -2165,8 +2241,10 @@ export default function App() {
                 </div>
               ))}
 
-            {currentView === 'forecast' && (
+            {currentView === 'forecast' && !can('view_forecasts') && <NoPermission permission="view_forecasts" />}
+            {currentView === 'forecast' && can('view_forecasts') && (
               <RiskForecastView
+                canExport={can('export_data')}
                 role={role}
                 onSelectAdvisory={handleSelectAdvisory}
                 hideUserSectorChip={role !== 'farmer'}
@@ -2184,6 +2262,7 @@ export default function App() {
             {currentView === 'warnings' &&
               (role === 'officer' ? (
                 <OfficerWarningsView
+                  canIssue={can('issue_warnings')}
                   activeWarnings={officerActiveWarnings}
                   warningHistory={officerWarningHistory}
                   thresholdRules={thresholdRules}
@@ -2208,11 +2287,16 @@ export default function App() {
                   }}
                 />
               ) : (
-                <EarlyWarningsView alerts={farmerWarnings} onSelectAlert={handleSelectAlert} />
+                can('view_forecasts') ? (
+                  <EarlyWarningsView alerts={farmerWarnings} onSelectAlert={handleSelectAlert} />
+                ) : (
+                  <NoPermission permission="view_forecasts" />
+                )
               ))}
 
             {currentView === 'members' && (
               <CooperativeMembersView
+                canManage={can('manage_members')}
                 members={coopMembers}
                 groupRecords={coopGroupRecords}
                 groups={coopGroups}
@@ -2230,11 +2314,9 @@ export default function App() {
 
             {currentView === 'messages' && (
               <CooperativeMessagesView
+                canMessage={can('message_members')}
                 messages={messages}
-                onOpenMessageComposer={() => {
-                  setMessageComposerPrefill({ group: 'All groups' });
-                  setIsMessageComposerOpen(true);
-                }}
+                onOpenMessageComposer={() => openComposer({ group: 'All groups' })}
                 onSelectMessage={(msg) => {
                   setDrawerContent({ type: 'coop_message', data: msg });
                 }}
@@ -2316,6 +2398,7 @@ export default function App() {
             {currentView === 'observations' &&
               (role === 'officer' ? (
                 <OfficerObservationsView
+                  canVerify={can('verify_reports')}
                   key={reviewReportId}
                   initialReportId={reviewReportId}
                   reports={reports}
@@ -2341,6 +2424,7 @@ export default function App() {
 
             {currentView === 'reports' && (
               <OfficerReportsView
+                canExport={can('export_data')}
                 forecastRisk={sectorForecastRisk}
                 authorName={reportNameOf(accounts.find((a) => a.id === currentAccountId)?.fullName || 'Claudine Mukamana')}
                 reportTypes={

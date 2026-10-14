@@ -8,6 +8,7 @@ Review target date: ~28/10/2026. Each task: follow the `ihinga-new-page` skill, 
 - [x] Sign-in, two-step verification, session timeout, sign-up, verification, forgot password
 - [x] Cooperative leader — part 1 (dashboard, message composer, cross-role messages)
 - [x] Task A — Data integrity fixes (Jean-Baptiste single record, cooperative warning levels computed, rainfall normal in data, composer groups from data, sentence-case sidebar, staff id MUS-AO-4401, media manifest) — 07/10/2026
+- [x] Permission matrix enforced (Module 13 / Module 1 role-based access) and bulk import fixed (imported farmers invited by SMS, placed in their sector group) — 14/10/2026
 - [ ] Task B — PillSelect + DatePicker, replace 17 native selects (folded into Task 9). The two components now exist (built in Task 1); only the replacement is left.
 - [x] Task 1 — Cooperative leader part 2 (Module 11 + Module 8 sharing): Members & groups (Members · Groups · Performance · Directory), Meetings (shared calendar, schedule meeting → farmer crop calendar + bell), Training (materials, shared sprayer bookings with double booking blocked), dashboard fixes, `PillSelect` + `DatePicker` — 08/10/2026
 - [x] Task 2 — Admin: shell, dashboard, Users & access (Module 13, Module 2): Grace's account (two-step), admin sidebar, dashboard, Users · Access requests · Permission matrix · Bulk import, approval lets the account sign in, one set of role names, `auditEvents` store — 08/10/2026
