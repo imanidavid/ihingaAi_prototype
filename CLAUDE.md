@@ -137,8 +137,14 @@ Prefer `musanzeData.ts` for new shared data. Never hard-code a number in a compo
 `AppRole` in `src/types.ts` is exactly `'farmer' | 'officer' | 'cooperative' | 'researcher' | 'admin'`
 (`'cooperative'` = cooperative leader). It is the one set of role names: the app shell,
 `UserAccount.role`, sign-up (`SignUpRole`) and access requests (`ApprovalRole`) all use it.
-Display names come from `ROLE_LABELS`. Account status: `active · pending · suspended · rejected`;
-only `active` accounts can sign in. Officers and administrators need the two-step code.
+Display names come from `ROLE_LABELS`. Account status: `active · pending · suspended · rejected · invited`;
+only `active` accounts can sign in. **Only farmers sign up** (the sign-up wizard is farmers-only, so
+account-creation spam cannot bury real officials). Cooperative leaders, officers, researchers and
+administrators are created by the administrator (Users & access → "Add user", `InviteUserModal`):
+the account starts `invited`, an invitation email is shown (simulated), and the first sign-in with
+that email asks the person to set a password (`accept_invite` in `SignInView`, then the two-step
+code if their role needs it). "Resend invitation" is on the user row. The seeded access requests
+(Esther, Celestin) stay as earlier requests. Officers and administrators need the two-step code.
 
 | Role | Sign-in identifier | Password | Lands on |
 |---|---|---|---|

@@ -642,7 +642,8 @@ export type SignUpRole = Exclude<AppRole, 'admin'>;
 /** Roles that need an administrator's approval before they can sign in. */
 export type ApprovalRole = 'cooperative' | 'officer' | 'researcher';
 
-export type AccountStatus = 'active' | 'pending' | 'suspended' | 'rejected';
+/** 'invited' = created by the administrator; the person has not accepted the email invitation yet. */
+export type AccountStatus = 'active' | 'pending' | 'suspended' | 'rejected' | 'invited';
 
 export interface UserAccount {
   id: string;
@@ -658,6 +659,9 @@ export interface UserAccount {
   /** 'DD/MM/YYYY HH:MM'; undefined = never signed in. */
   lastSignIn?: string;
   twoStepEnabled?: boolean;
+  /** Invitation sent by the administrator ('DD/MM/YYYY HH:MM') and who sent it. */
+  invitedAt?: string;
+  invitedBy?: string;
   /** Geographic access: the district, optionally limited to sectors, and/or one cooperative. */
   scope?: {
     district: string;

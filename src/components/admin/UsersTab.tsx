@@ -9,6 +9,7 @@ import {
   Search,
   UserCog,
   Users,
+  Mail,
 } from 'lucide-react';
 import { AccountStatus, AppRole, UserAccount } from '../../types';
 import { ROLE_LABELS, ROLE_ORDER } from '../../data/musanzeData';
@@ -32,6 +33,7 @@ export const STATUS_LABELS: Record<AccountStatus, string> = {
   pending: 'Waiting for approval',
   suspended: 'Suspended',
   rejected: 'Rejected',
+  invited: 'Invited · not accepted yet',
 };
 
 /** "Musanze district" or "Kinigi, Busogo" (+ cooperative) */
@@ -47,7 +49,8 @@ export const UsersTab: React.FC<{
   onSetStatus: (accountId: string, status: AccountStatus) => void;
   onChangeRole: (accountId: string, role: AppRole) => void;
   onUpdateScope: (accountId: string, scope: NonNullable<UserAccount['scope']>) => void;
-}> = ({ accounts, currentAccountId, onSetStatus, onChangeRole, onUpdateScope }) => {
+  onResendInvite: (accountId: string) => void;
+}> = ({ accounts, currentAccountId, onSetStatus, onChangeRole, onUpdateScope, onResendInvite }) => {
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -170,6 +173,9 @@ export const UsersTab: React.FC<{
                           disabled={!isDecided}
                           onClick={() => setScopeTarget(a)}
                         />
+                        {a.status === 'invited' && (
+                          <RowAction label={`Resend invitation to ${a.fullName}`} icon={Mail} onClick={() => onResendInvite(a.id)} />
+                        )}
                         {a.status === 'suspended' ? (
                           <RowAction label={`Reactivate ${a.fullName}`} icon={RotateCcw} onClick={() => setStatusTarget(a)} />
                         ) : (

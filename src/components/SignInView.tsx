@@ -22,6 +22,7 @@ import {
 } from '../translations/signInTranslations';
 import { VerificationCodeInput } from './auth/VerificationCodeInput';
 import { SignUpWizard } from './auth/SignUpWizard';
+import { ROLE_LABELS } from '../data/musanzeData';
 import { ForgotPasswordWizard } from './auth/ForgotPasswordWizard';
 
 interface SignInViewProps {
@@ -41,9 +42,11 @@ interface SignInViewProps {
   initialMode?: 'sign_in' | 'sign_up';
   /** Back to the landing page. */
   onBackToHome?: () => void;
+  /** An invited official sets their password the first time they sign in. */
+  onAcceptInvite?: (accountId: string, password: string) => void;
 }
 
-export type AuthMode = 'sign_in' | 'two_step' | 'sign_up' | 'forgot_password' | 'waiting_approval';
+export type AuthMode = 'sign_in' | 'two_step' | 'sign_up' | 'forgot_password' | 'waiting_approval' | 'accept_invite';
 
 export const SignInView: React.FC<SignInViewProps> = ({
   onSignInSuccess,
@@ -57,9 +60,26 @@ export const SignInView: React.FC<SignInViewProps> = ({
   lockAfterFailed = 5,
   initialMode = 'sign_in',
   onBackToHome,
+  onAcceptInvite = () => {},
 }) => {
   const [lang, setLang] = useState<SignInLanguage>(initialLanguage);
   const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
+  // Accepting an email invitation (accounts the administrator created)
+  const [invitedAccount, setInvitedAccount] = useState<UserAccount | null>(null);
+  const [invitePassword, setInvitePassword] = useState('');
+  const [inviteConfirm, setInviteConfirm] = useState('');
+
+  const finishInvite = () => {
+    if (!invitedAccount) return;
+    onAcceptInvite(invitedAccount.id, invitePassword);
+    const account = { ...invitedAccount, status: 'active' as const };
+    if (twoStepRoles.includes(account.role)) {
+      setTwoStepTarget({ role: account.role, account });
+      setAuthMode('two_step');
+    } else {
+      onSignInSuccess(account.role, account);
+    }
+  };
   const t = SIGN_IN_TRANSLATIONS[lang];
 
   // Sign-in form inputs
@@ -109,7 +129,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
   // Resolve role and account match from input
   const resolveAccount = (
     inputIdentifier: string
-  ): { role: AppRole | 'pending_role' | 'blocked_role'; account?: UserAccount } | null => {
+  ): { role: AppRole | 'pending_role' | 'blocked_role' | 'invited_role'; account?: UserAccount } | null => {
     const clean = inputIdentifier.trim().toLowerCase();
     const cleanDigits = clean.replace(/\D/g, '');
 
@@ -124,6 +144,9 @@ export const SignInView: React.FC<SignInViewProps> = ({
     if (matched) {
       if (matched.status === 'pending') {
         return { role: 'pending_role', account: matched };
+      }
+      if (matched.status === 'invited') {
+        return { role: 'invited_role', account: matched };
       }
       if (matched.status === 'suspended' || matched.status === 'rejected') {
         return { role: 'blocked_role', account: matched };
@@ -192,6 +215,15 @@ export const SignInView: React.FC<SignInViewProps> = ({
         return;
       }
 
+      // Invited by the administrator: set a password first
+      if (resolution && resolution.role === 'invited_role' && resolution.account) {
+        setInvitedAccount(resolution.account);
+        setInvitePassword('');
+        setInviteConfirm('');
+        setAuthMode('accept_invite');
+        return;
+      }
+
       // Suspended or rejected accounts cannot sign in
       if (resolution && resolution.role === 'blocked_role') {
         onSignInFailed(
@@ -223,11 +255,11 @@ export const SignInView: React.FC<SignInViewProps> = ({
       }
 
       // Valid credentials
-      if (resolution.role !== 'pending_role' && resolution.role !== 'blocked_role' && twoStepRoles.includes(resolution.role)) {
+      if (resolution.role !== 'pending_role' && resolution.role !== 'blocked_role' && resolution.role !== 'invited_role' && twoStepRoles.includes(resolution.role)) {
         // Roles chosen in Security & audit (officers and administrators by default) need the code
         setTwoStepTarget({ role: resolution.role, account: resolution.account });
         setAuthMode('two_step');
-      } else if (resolution.role === 'pending_role' || resolution.role === 'blocked_role') {
+      } else if (resolution.role === 'pending_role' || resolution.role === 'blocked_role' || resolution.role === 'invited_role') {
         return;
       } else {
         // Farmers, cooperative leaders and researchers sign directly in
@@ -656,6 +688,59 @@ export const SignInView: React.FC<SignInViewProps> = ({
         {/* ======================================================================= */}
         {/* SUB-VIEW 5: WAITING FOR APPROVAL (SHOWN FOR PENDING ACCOUNTS) */}
         {/* ======================================================================= */}
+        {authMode === 'accept_invite' && invitedAccount && (
+          <div className="max-w-[420px] w-full mx-auto my-auto space-y-6">
+            <div className="bg-[#FBFCF8] rounded-[20px] p-7 md:p-8 border border-[rgba(31,74,52,0.12)] shadow-[0_4px_24px_rgba(31,74,52,0.06)] space-y-5">
+              <div>
+                <h2 className="text-[22px] font-bold text-[#17271D] tracking-tight">
+                  Welcome, {invitedAccount.fullName.split(' ')[0]}
+                </h2>
+                <p className="text-[12.5px] text-[#5B665E] mt-1 leading-relaxed">
+                  The administrator created your {ROLE_LABELS[invitedAccount.role].toLowerCase()} account and sent an
+                  invitation to {invitedAccount.email}. Set a password to finish.
+                </p>
+              </div>
+              <label className="block">
+                <span className="block text-[12.5px] font-semibold text-[#17271D] mb-1.5">New password</span>
+                <input
+                  type="password"
+                  value={invitePassword}
+                  onChange={(e) => setInvitePassword(e.target.value)}
+                  className="w-full h-11 px-4 rounded-full bg-white border border-[rgba(31,74,52,0.18)] text-[13px] focus:outline-none focus:border-[#1F4A34]"
+                />
+                <span className="block text-[11.5px] text-[#5B665E] mt-1">At least 8 characters</span>
+              </label>
+              <label className="block">
+                <span className="block text-[12.5px] font-semibold text-[#17271D] mb-1.5">Confirm password</span>
+                <input
+                  type="password"
+                  value={inviteConfirm}
+                  onChange={(e) => setInviteConfirm(e.target.value)}
+                  className="w-full h-11 px-4 rounded-full bg-white border border-[rgba(31,74,52,0.18)] text-[13px] focus:outline-none focus:border-[#1F4A34]"
+                />
+                {inviteConfirm !== '' && inviteConfirm !== invitePassword && (
+                  <span className="block text-[12px] font-medium text-[#17271D] mt-1">Passwords do not match.</span>
+                )}
+              </label>
+              <button
+                type="button"
+                disabled={invitePassword.length < 8 || invitePassword !== inviteConfirm}
+                onClick={finishInvite}
+                className="w-full h-11 rounded-full bg-[#1F4A34] text-white text-[13px] font-semibold hover:bg-[#2C6343] cursor-pointer disabled:opacity-50"
+              >
+                Set password and sign in
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMode('sign_in')}
+                className="w-full text-[12px] text-[#5B665E] hover:text-[#17271D] cursor-pointer"
+              >
+                Back to sign in
+              </button>
+            </div>
+          </div>
+        )}
+
         {authMode === 'waiting_approval' && (
           <div className="max-w-[420px] w-full mx-auto my-auto space-y-6">
             <div className="bg-[#FBFCF8] rounded-[20px] p-7 md:p-8 border border-[rgba(31,74,52,0.12)] shadow-[0_4px_24px_rgba(31,74,52,0.06)] space-y-6 text-center">
