@@ -39,4 +39,7 @@ Roles can be shown in one tab (floating switcher) or in several tabs side by sid
 12. As Officer: Training → Add lesson "Storing seed potatoes" (Guide, 2 pages, three steps). As
     Cooperative leader: Training → Share it → Kinigi growers → Send. As Farmer: bell "New lesson"
     → Recommendations opens it; Learn shows it above "Recognising late blight early".
-13. [Reset demo] restores everything in every role.
+13. As Admin: Users & access → Add user → Eric Habimana, Agricultural officer, eric.h@ihinga.demo,
+    +250 788 000 091 → Send invitation (email shown). Sign out → Sign in with eric.h@ihinga.demo →
+    set a password → code 246810 → officer dashboard. Sign up shows the farmer option only.
+14. [Reset demo] restores everything in every role.

@@ -1493,6 +1493,26 @@ export default function App() {
   // =========================================================================
   const accountName = (id: string) => accounts.find((a) => a.id === id)?.fullName || id;
 
+  // Officials: the administrator creates the account and the person accepts the emailed invitation
+  const handleInviteUser = (account: UserAccount) => {
+    setAccounts((prev) => [account, ...prev]);
+    logAudit('Invited user', `${account.fullName} · ${ROLE_LABELS[account.role]} · ${account.email}`);
+    showToast(`Invitation sent to ${account.email}`);
+  };
+
+  const handleResendInvite = (accountId: string) => {
+    const account = accounts.find((a) => a.id === accountId);
+    setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, invitedAt: NOW_STAMP } : a)));
+    logAudit('Resent invitation', account ? `${account.fullName} · ${account.email}` : accountId);
+    showToast(`Invitation sent again to ${account?.email}`);
+  };
+
+  const handleAcceptInvite = (accountId: string, password: string) => {
+    const account = accounts.find((a) => a.id === accountId);
+    setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, status: 'active', password } : a)));
+    if (account) logAudit('Accepted invitation', `${account.fullName} · ${ROLE_LABELS[account.role]}`, { name: account.fullName, role: account.role });
+  };
+
   const handleApproveRequest = (requestId: string) => {
     const request = accessRequests.find((r) => r.id === requestId);
     if (!request) return;
@@ -1806,6 +1826,7 @@ export default function App() {
           onSignInFailed={handleSignInFailed}
           twoStepRoles={securitySettings.twoStepRoles}
           lockAfterFailed={securitySettings.lockAfterFailed}
+          onAcceptInvite={handleAcceptInvite}
         />
 
 
@@ -1934,6 +1955,9 @@ export default function App() {
                 onImportAccounts={handleImportAccounts}
                 sectorRegister={sectorRegister}
                 onSaveSectorRegister={handleSaveSectorRegister}
+                onInviteUser={handleInviteUser}
+                onResendInvite={handleResendInvite}
+                adminName={accounts.find((a) => a.id === currentAccountId)?.fullName || 'The administrator'}
               />
             )}
 

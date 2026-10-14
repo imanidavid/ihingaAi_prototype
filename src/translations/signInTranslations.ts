@@ -203,13 +203,13 @@ export const SIGN_IN_TRANSLATIONS: Record<SignInLanguage, SignInTranslationStrin
     backButton: 'Back',
 
     // Step 1: Role
-    roleTitle: 'Choose your role',
-    roleSubtitle: 'Select your primary role in the agricultural ecosystem',
+    roleTitle: 'Create a farmer account',
+    roleSubtitle: 'Sign-up is for farmers. It takes two minutes with your phone.',
     farmerCardDesc: 'Access field-level hazard warnings, soil conditions, and localized crop advisories.',
     coopCardDesc: 'Monitor member fields, cooperative aggregation risk, and seasonal advisories.',
     officerCardDesc: 'Review farmer field observations, broadcast warnings, and district climate risk.',
     researcherCardDesc: 'Explore forecasts, field reports and model accuracy.',
-    adminCardNote: 'Administrator accounts are created by the system administrator.',
+    adminCardNote: 'Cooperative leaders, agricultural officers, researchers and administrators do not sign up here. The administrator creates your account and sends you an invitation by email.',
 
     // Step 2: Details
     detailsTitle: 'Your profile details',
@@ -388,9 +388,9 @@ export const SIGN_IN_TRANSLATIONS: Record<SignInLanguage, SignInTranslationStrin
     backButton: 'Subira inyuma',
 
     // to be reviewed by a native speaker
-    roleTitle: 'Hitamo icyiciro cyawe',
+    roleTitle: 'Fungura konti y’umuhinzi',
     // to be reviewed by a native speaker
-    roleSubtitle: 'Hitamo umurimo ukora mu buhinzi',
+    roleSubtitle: 'Kwiyandikisha ni iby’abahinzi. Bifata iminota ibiri ukoresheje telefoni yawe.',
     // to be reviewed by a native speaker
     farmerCardDesc: 'Amakuru y’imvura, ibyago by’ikirere n’inama z’ubuhinzi ku murima wawe.',
     // to be reviewed by a native speaker
@@ -400,7 +400,7 @@ export const SIGN_IN_TRANSLATIONS: Record<SignInLanguage, SignInTranslationStrin
     // to be reviewed by a native speaker
     researcherCardDesc: 'Kureba iteganyagihe, raporo zo mu murima n’ukuri kw’icyitegererezo.',
     // to be reviewed by a native speaker
-    adminCardNote: 'Konti z’abayobozi ba sisitemu zishyirwaho n’umuyobozi mukuru.',
+    adminCardNote: 'Abayobozi ba koperative, abakozi b’ubuhinzi, abashakashatsi n’abayobozi ba sisitemu ntibiyandikisha hano. Umuyobozi wa sisitemu ni we ubafungurira konti akaboherereza ubutumire kuri email.',
 
     // to be reviewed by a native speaker
     detailsTitle: 'Imyirondoro yawe',

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { AccessRequest, AccountStatus, AppRole, RolePermissions, SectorRegisterEntry, UserAccount } from '../types';
-import { PageHeader, SegmentedTabs } from './coop/CoopUi';
+import { PageHeader, PRIMARY_BUTTON, SegmentedTabs } from './coop/CoopUi';
+import { InviteUserModal } from './admin/InviteUserModal';
+import { UserPlus } from 'lucide-react';
 import { UsersTab } from './admin/UsersTab';
 import { AccessRequestsTab } from './admin/AccessRequestsTab';
 import { PermissionMatrixTab } from './admin/PermissionMatrixTab';
@@ -24,17 +26,36 @@ interface AdminUsersViewProps {
   /** Registered farmers per sector — the administrator owns these numbers. */
   sectorRegister: SectorRegisterEntry[];
   onSaveSectorRegister: (farmersBySector: Record<string, number>) => void;
+  /** Officials are created by the administrator and receive an invitation email. */
+  onInviteUser: (account: UserAccount) => void;
+  onResendInvite: (accountId: string) => void;
+  adminName: string;
 }
 
 export const AdminUsersView: React.FC<AdminUsersViewProps> = (props) => {
   const pendingCount = props.accessRequests.filter((r) => r.status === 'pending').length;
   const [tab, setTab] = useState<UsersTabId>(pendingCount > 0 ? 'requests' : 'users');
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const invitedCount = props.accounts.filter((a) => a.status === 'invited').length;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Users & access"
-        subtitle={`${props.accounts.length} accounts · ${pendingCount} access ${pendingCount === 1 ? 'request' : 'requests'} waiting`}
+        subtitle={`${props.accounts.length} accounts · ${pendingCount} access ${pendingCount === 1 ? 'request' : 'requests'} waiting · ${invitedCount} ${invitedCount === 1 ? 'invitation' : 'invitations'} not accepted yet`}
+        actions={
+          <button type="button" onClick={() => setIsInviteOpen(true)} className={PRIMARY_BUTTON}>
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Add user</span>
+          </button>
+        }
+      />
+      <InviteUserModal
+        isOpen={isInviteOpen}
+        accounts={props.accounts}
+        adminName={props.adminName}
+        onClose={() => setIsInviteOpen(false)}
+        onInvite={props.onInviteUser}
       />
       <SegmentedTabs<UsersTabId>
         value={tab}
@@ -54,6 +75,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = (props) => {
           onSetStatus={props.onSetStatus}
           onChangeRole={props.onChangeRole}
           onUpdateScope={props.onUpdateScope}
+          onResendInvite={props.onResendInvite}
         />
       )}
       {tab === 'requests' && (
