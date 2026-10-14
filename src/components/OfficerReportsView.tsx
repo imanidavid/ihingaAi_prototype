@@ -47,6 +47,8 @@ interface OfficerReportsViewProps {
   reportsList?: GeneratedReport[];
   onReportsListChange?: React.Dispatch<React.SetStateAction<GeneratedReport[]>>;
   onShowToast: (message: string) => void;
+  /** Permission matrix: may download report data. */
+  canExport?: boolean;
   /** Report types offered in "New report" (officer/admin: the five district types; researcher: research types). */
   reportTypes?: GeneratedReportType[];
   /** Short name of the signed-in author, e.g. "Claudine M.". */
@@ -162,6 +164,7 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   authorName = 'Claudine M.',
   forecastRisk,
   sectorRegister,
+  canExport = true,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'library' | 'scheduled'>('overview');
   const [internalReportsList, setInternalReportsList] = useState<GeneratedReport[]>(INITIAL_GENERATED_REPORTS);
@@ -368,6 +371,10 @@ export const OfficerReportsView: React.FC<OfficerReportsViewProps> = ({
   // ACTIONS: CSV EXPORT
   // =========================================================================
   const handleDownloadCsv = (report: GeneratedReport) => {
+    if (!canExport) {
+      onShowToast('Your role does not have the “Export data” permission');
+      return;
+    }
     const lines: string[] = [];
 
     // Header

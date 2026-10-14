@@ -15,12 +15,15 @@ import { CoopMessage } from '../types';
 interface CooperativeMessagesViewProps {
   messages: CoopMessage[];
   onOpenMessageComposer: () => void;
+  /** Permission matrix: may send messages. */
+  canMessage?: boolean;
   onSelectMessage: (msg: CoopMessage) => void;
 }
 
 export const CooperativeMessagesView: React.FC<CooperativeMessagesViewProps> = ({
   messages,
   onOpenMessageComposer,
+  canMessage = true,
   onSelectMessage,
 }) => {
   return (
@@ -42,7 +45,9 @@ export const CooperativeMessagesView: React.FC<CooperativeMessagesViewProps> = (
         <button
           type="button"
           onClick={onOpenMessageComposer}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#1F4A34] text-white text-[13px] font-semibold hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer active:scale-98 self-start sm:self-auto"
+          disabled={!canMessage}
+          title={canMessage ? undefined : 'Your role does not have the “Message members” permission'}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#1F4A34] text-white text-[13px] font-semibold hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer active:scale-98 self-start sm:self-auto disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" strokeWidth={2} />
           <span>New broadcast</span>

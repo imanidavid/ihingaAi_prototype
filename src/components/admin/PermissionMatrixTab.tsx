@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Lock, ShieldCheck } from 'lucide-react';
 import { AppRole, PermissionId, RolePermissions } from '../../types';
-import { PERMISSIONS, ROLE_LABELS, ROLE_ORDER } from '../../data/musanzeData';
+import { PERMISSION_APPLIES, PERMISSIONS, ROLE_LABELS, ROLE_ORDER } from '../../data/musanzeData';
 import { CARD_CLASS, ConfirmModal, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../coop/CoopUi';
 
 /** Administrators always keep "Manage users", so nobody can lock themselves out. */
@@ -42,7 +42,7 @@ export const PermissionMatrixTab: React.FC<{
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[rgba(31,74,52,0.08)]">
         <div>
           <h3 className="text-[16px] font-semibold text-[#17271D]">Permission matrix</h3>
-          <p className="text-[12px] text-[#5B665E]">What each role can do. Changes apply after you save.</p>
+          <p className="text-[12px] text-[#5B665E]">What each role can do. Changes apply after you save. “—” means the role has no screen for it.</p>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" disabled={changes === 0} onClick={() => setDraft(rolePermissions)} className={SECONDARY_BUTTON}>
@@ -77,6 +77,13 @@ export const PermissionMatrixTab: React.FC<{
                   const on = draft[role].includes(p.id);
                   const changed = on !== rolePermissions[role].includes(p.id);
                   const locked = isLocked(role, p.id);
+                  if (!PERMISSION_APPLIES[role].includes(p.id)) {
+                    return (
+                      <td key={role} className="py-3 px-3 text-center text-[#5B665E]" title={`${ROLE_LABELS[role]} has no screen for this`}>
+                        —
+                      </td>
+                    );
+                  }
                   return (
                     <td key={role} className="py-3 px-3 text-center">
                       <button

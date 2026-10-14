@@ -33,6 +33,8 @@ interface OfficerObservationsViewProps {
   onOpenReport?: (report: DistrictFieldReportItem) => void;
   /** Report to show first in To review (opened from the dashboard or the bell). */
   initialReportId?: string;
+  /** Permission matrix: may verify, ask for more info and reject. */
+  canVerify?: boolean;
 }
 
 const QUICK_FEEDBACK_TEMPLATES = [
@@ -49,6 +51,7 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
   onShowToast,
   onOpenReport,
   initialReportId,
+  canVerify = true,
 }) => {
   const [activeTab, setActiveTab] = useState<'review' | 'all' | 'insights'>('review');
 
@@ -467,7 +470,9 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
                     <button
                       type="button"
                       onClick={handleActionVerify}
-                      className="w-full py-2.5 rounded-full bg-[#1F4A34] text-white text-[12.5px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
+                        disabled={!canVerify}
+                      title={canVerify ? undefined : 'Your role does not have the “Verify reports” permission'}
+                      className="w-full py-2.5 rounded-full bg-[#1F4A34] text-white text-[12.5px] font-medium hover:bg-[#2C6343] transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Check className="w-4 h-4" />
                       <span>Verify</span>
@@ -477,8 +482,9 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
                       <button
                         type="button"
                         onClick={handleActionAskMoreInfo}
-                        className="py-2 px-3 rounded-full bg-white text-[#17271D] border border-[rgba(31,74,52,0.22)] hover:bg-[#F4F6EF] text-[11.5px] font-medium transition-all cursor-pointer flex items-center justify-center gap-1"
-                        title={!feedbackText ? 'Enter a feedback message first' : undefined}
+                        disabled={!canVerify}
+                        className="py-2 px-3 rounded-full bg-white text-[#17271D] border border-[rgba(31,74,52,0.22)] hover:bg-[#F4F6EF] text-[11.5px] font-medium transition-all cursor-pointer flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={!canVerify ? 'Your role does not have the “Verify reports” permission' : !feedbackText ? 'Enter a feedback message first' : undefined}
                       >
                         <HelpCircle className="w-3.5 h-3.5 text-[#5B665E]" />
                         <span>Ask for more info</span>
@@ -487,8 +493,9 @@ export const OfficerObservationsView: React.FC<OfficerObservationsViewProps> = (
                       <button
                         type="button"
                         onClick={handleActionReject}
-                        className="py-2 px-3 rounded-full bg-white text-[#C93B3B] border border-[#C93B3B]/30 hover:bg-[#C93B3B]/10 text-[11.5px] font-medium transition-all cursor-pointer flex items-center justify-center gap-1"
-                        title={!feedbackText ? 'Enter a reason in the feedback box' : undefined}
+                        disabled={!canVerify}
+                        className="py-2 px-3 rounded-full bg-white text-[#C93B3B] border border-[#C93B3B]/30 hover:bg-[#C93B3B]/10 text-[11.5px] font-medium transition-all cursor-pointer flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={!canVerify ? 'Your role does not have the “Verify reports” permission' : !feedbackText ? 'Enter a reason in the feedback box' : undefined}
                       >
                         <X className="w-3.5 h-3.5 text-[#C93B3B]" />
                         <span>Reject</span>

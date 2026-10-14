@@ -15,7 +15,9 @@ import { CARD_CLASS, EmptyState, NeutralChip, PRIMARY_BUTTON, SECONDARY_BUTTON }
 export const BulkImportTab: React.FC<{
   accounts: UserAccount[];
   onImport: (accounts: UserAccount[], cooperative: string) => void;
-}> = ({ accounts, onImport }) => {
+  /** Signed-in administrator, recorded as the one who sent the invitations. */
+  adminName: string;
+}> = ({ accounts, onImport, adminName }) => {
   const [cooperative, setCooperative] = useState('Musanze Potato Growers Cooperative');
   const [csv, setCsv] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
@@ -42,8 +44,10 @@ export const BulkImportTab: React.FC<{
       phone: r.phone,
       district: 'Musanze',
       preferredLanguage: 'rw',
-      status: 'active',
+      status: 'invited',
       createdAt: NOW.dateFormatted,
+      invitedAt: NOW_STAMP,
+      invitedBy: adminName,
       twoStepEnabled: false,
       scope: { district: 'Musanze', sectors: [r.sector], cooperative },
       farmerDetails: {
@@ -110,7 +114,8 @@ export const BulkImportTab: React.FC<{
         </div>
         <p className="flex items-center gap-1.5 text-[12px] text-[#5B665E]">
           <Info className="w-3.5 h-3.5 text-[#1F4A34]" strokeWidth={1.5} />
-          Imported farmers get an active account and can be added to a group by their cooperative leader.
+          Each farmer gets an SMS invitation and sets a password the first time they sign in with their phone. They join
+          the cooperative group for their sector.
         </p>
       </div>
 

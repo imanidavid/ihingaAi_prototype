@@ -89,7 +89,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = (props) => {
       {tab === 'permissions' && (
         <PermissionMatrixTab rolePermissions={props.rolePermissions} onSave={props.onSavePermissions} />
       )}
-      {tab === 'import' && <BulkImportTab accounts={props.accounts} onImport={props.onImportAccounts} />}
+      {tab === 'import' && <BulkImportTab accounts={props.accounts} onImport={props.onImportAccounts} adminName={props.adminName} />}
       {tab === 'sectors' && (
         <SectorRegisterTab sectorRegister={props.sectorRegister} onSave={props.onSaveSectorRegister} />
       )}

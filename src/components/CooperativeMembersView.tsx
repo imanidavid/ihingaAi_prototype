@@ -56,6 +56,8 @@ interface CooperativeMembersViewProps {
   onChangeRole: (memberId: string, role: CoopMemberRole) => void;
   onRemoveMember: (memberId: string) => void;
   onCreateGroup: (input: { name: string; leadId: string; memberIds: string[] }) => void;
+  /** Permission matrix: may add, remove and change members and groups. */
+  canManage?: boolean;
   onMessageMember: (member: CoopMember) => void;
   onMessageGroup: (groupName: string) => void;
   onOpenGroup: (group: CoopGroup) => void;
@@ -71,6 +73,7 @@ export const CooperativeMembersView: React.FC<CooperativeMembersViewProps> = ({
   onChangeRole,
   onRemoveMember,
   onCreateGroup,
+  canManage = true,
   onMessageMember,
   onMessageGroup,
   onOpenGroup,
@@ -157,12 +160,12 @@ export const CooperativeMembersView: React.FC<CooperativeMembersViewProps> = ({
         subtitle={`Musanze Potato Growers Cooperative · ${members.length} members in ${groups.length} groups`}
         actions={
           tab === 'members' ? (
-            <button type="button" onClick={() => setIsAddOpen(true)} className={PRIMARY_BUTTON}>
+            <button type="button" onClick={() => setIsAddOpen(true)} disabled={!canManage} title={canManage ? undefined : 'Your role does not have the “Manage members” permission'} className={PRIMARY_BUTTON}>
               <Plus className="w-3.5 h-3.5" />
               <span>Add member</span>
             </button>
           ) : tab === 'groups' ? (
-            <button type="button" onClick={() => setIsCreateGroupOpen(true)} className={PRIMARY_BUTTON}>
+            <button type="button" onClick={() => setIsCreateGroupOpen(true)} disabled={!canManage} title={canManage ? undefined : 'Your role does not have the “Manage members” permission'} className={PRIMARY_BUTTON}>
               <Plus className="w-3.5 h-3.5" />
               <span>Create group</span>
             </button>
