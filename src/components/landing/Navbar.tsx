@@ -46,20 +46,20 @@ export function Navbar({
         </div>
       </div>
 
-      {/* Right side: Farmer Portal + Join Network Button */}
+      {/* Right side: Sign in + Sign up */}
       <div className="flex items-center gap-6 sm:gap-8">
         <button
           onClick={onOpenPortal}
           className="text-sm font-medium hover:text-white/80 transition-colors hidden lg:block text-white/90 cursor-pointer"
         >
-          Farmer Portal
+          Sign in
         </button>
 
         <button
           onClick={onOpenJoin}
           className="hidden sm:block bg-white text-black text-xs font-bold uppercase tracking-widest px-6 py-3 rounded-full hover:bg-gray-100 transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer"
         >
-          Join Network
+          Sign up
         </button>
 
         {/* Mobile Hamburger Button: 3 lines (middle line shorter) */}

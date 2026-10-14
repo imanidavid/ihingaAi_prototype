@@ -284,8 +284,6 @@ export default function App() {
 
   // Before sign-in: the landing page first, then sign-in or sign-up
   const [landingScreen, setLandingScreen] = useState<'landing' | 'sign_in' | 'sign_up'>('landing');
-  // The demo control shows only while the landing hero is on screen
-  const [landingHeroVisible, setLandingHeroVisible] = useState(true);
 
   const handleSignOut = () => {
     setIsAuthenticated(false);
@@ -1764,7 +1762,7 @@ export default function App() {
   };
 
   // If not signed in, show split-screen Sign In View
-  // Floating demo control before sign-in (landing and sign-in): picking a role signs in as that demo account
+  // Floating demo control on the sign-in / sign-up screen: picking a role signs in as that demo account
   const demoSwitcherSignedOut = (
     <FloatingDeviceSwitcher
       role={role}
@@ -1787,9 +1785,8 @@ export default function App() {
         <LandingPage
           onSignIn={() => setLandingScreen('sign_in')}
           onCreateAccount={() => setLandingScreen('sign_up')}
-          onHeroVisibleChange={setLandingHeroVisible}
         />
-        {landingHeroVisible && demoSwitcherSignedOut}
+
       </>
     );
   }
@@ -1811,6 +1808,9 @@ export default function App() {
           lockAfterFailed={securitySettings.lockAfterFailed}
         />
 
+
+        {/* Floating demo control: only on the sign-in / sign-up screen (not on the landing page) */}
+        {demoSwitcherSignedOut}
 
         {toastMessage && (
           <div className="fixed top-6 right-6 z-50 bg-[#1F4A34] text-white text-[13px] font-medium px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 animate-in fade-in">

@@ -21,7 +21,7 @@ export function MobileMenu({
     { title: 'Intelligence', type: 'section' },
     { title: 'Co-operatives', type: 'section' },
     { title: 'Methodology', type: 'section' },
-    { title: 'Farmer Portal', type: 'portal' },
+    { title: 'Sign in', type: 'portal' },
   ];
 
   const handleLinkClick = (item: { title: string; type: string }) => {
@@ -88,7 +88,7 @@ export function MobileMenu({
           }}
           className="w-full sm:w-auto bg-white text-black font-bold text-xs uppercase tracking-wider rounded-full px-6 py-3.5 flex items-center justify-center gap-2 hover:bg-neutral-200 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-md"
         >
-          Join Network
+          Sign up
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

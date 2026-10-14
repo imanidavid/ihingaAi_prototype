@@ -48,9 +48,9 @@ export function Footer({
   };
 
   const handleTrustClick = (item: string) => {
-    if (item === 'Sign In') {
+    if (item === 'Sign in') {
       onOpenPortal();
-    } else if (item === 'Start Free Trial') {
+    } else if (item === 'Sign up') {
       onOpenJoin();
     } else if (item === 'Data & Security' || item === 'Compliance') {
       const el = document.getElementById('faq-screen');
@@ -156,7 +156,7 @@ export function Footer({
               Company
             </h4>
             <ul className="space-y-2.5 text-xs text-white/60">
-              {['Why Rwanda', 'Pricing', 'FAQ', 'Contact Sales'].map((item) => (
+              {['Why Rwanda', 'Pricing', 'FAQ'].map((item) => (
                 <li key={item}>
                   <button
                     onClick={() => handleCompanyClick(item)}
@@ -175,7 +175,7 @@ export function Footer({
               Trust
             </h4>
             <ul className="space-y-2.5 text-xs text-white/60">
-              {['Sign In', 'Start Free Trial', 'Data & Security', 'Compliance'].map((item) => (
+              {['Sign in', 'Sign up', 'Data & Security', 'Compliance'].map((item) => (
                 <li key={item}>
                   <button
                     onClick={() => handleTrustClick(item)}
